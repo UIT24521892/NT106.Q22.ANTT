@@ -51,15 +51,98 @@ namespace Monopoly.Shared.Models.Constants
                 PositionIndex = 7, Name = "Nice", Type = "Resort", LineIndex = "1",
                 BuyPrice = 200000, RentPrices = new List<long> { 50000 } // Resort fixed theo logic entity.md
             }},
-            
-            
-            
-            { 39, new BoardSquareConfig {
-                PositionIndex = 39, Name = "Hà Nội", Type = "City",
-                BuyPrice = 400000,
-                RentPrices = new List<long> { 50000, 200000, 600000, 1400000, 2000000 },
-                ColorSet = "Blue",
-                LineIndex = "4"      // Nằm ở cạnh cuối cùng
+            { 8, new BoardSquareConfig {
+                PositionIndex = 8, Name = "Du Lịch Thế Giới", Type = "WorldTour", LineIndex = "2"
+            }},
+            { 9, new BoardSquareConfig {
+                PositionIndex = 9, Name = "New York", Type = "City", ColorSet = "Blue", LineIndex = "2",
+                BuyPrice = 140000, RentPrices = new List<long> { 10000, 50000, 150000, 450000, 750000 }
+            }},
+            { 10, new BoardSquareConfig {
+                PositionIndex = 10, Name = "Las Vegas", Type = "City", ColorSet = "Blue", LineIndex = "2",
+                BuyPrice = 140000, RentPrices = new List<long> { 10000, 50000, 150000, 450000, 750000 }
+            }},
+            { 11, new BoardSquareConfig {
+                PositionIndex = 11, Name = "Chicago", Type = "City", ColorSet = "Blue", LineIndex = "2",
+                BuyPrice = 160000, RentPrices = new List<long> { 12000, 60000, 180000, 500000, 900000 }
+            }},
+            { 12, new BoardSquareConfig {
+                PositionIndex = 12, Name = "Cơ Hội", Type = "Chance", LineIndex = "2"
+            }},
+            { 13, new BoardSquareConfig {
+                PositionIndex = 13, Name = "Sydney", Type = "City", ColorSet = "Green", LineIndex = "2",
+                BuyPrice = 180000, RentPrices = new List<long> { 14000, 70000, 200000, 550000, 950000 }
+            }},
+            { 14, new BoardSquareConfig {
+                PositionIndex = 14, Name = "Dubai", Type = "Resort", LineIndex = "2",
+                BuyPrice = 200000, RentPrices = new List<long> { 50000 }
+            }},
+            { 15, new BoardSquareConfig {
+                PositionIndex = 15, Name = "London", Type = "City", ColorSet = "Green", LineIndex = "2",
+                BuyPrice = 200000, RentPrices = new List<long> { 16000, 80000, 220000, 600000, 1000000 }
+            }},
+
+            { 16, new BoardSquareConfig {
+                PositionIndex = 16, Name = "Giải Vô Địch", Type = "WorldChampionship", LineIndex = "3"
+            }},
+            { 17, new BoardSquareConfig {
+                PositionIndex = 17, Name = "Berlin", Type = "City", ColorSet = "Brown", LineIndex = "3",
+                BuyPrice = 220000, RentPrices = new List<long> { 18000, 90000, 250000, 700000, 1050000 }
+            }},
+            { 18, new BoardSquareConfig {
+                PositionIndex = 18, Name = "Cyprus", Type = "Resort", LineIndex = "3",
+                BuyPrice = 200000, RentPrices = new List<long> { 50000 }
+            }},
+            { 19, new BoardSquareConfig {
+                PositionIndex = 19, Name = "Hamburg", Type = "City", ColorSet = "Brown", LineIndex = "3",
+                BuyPrice = 240000, RentPrices = new List<long> { 20000, 100000, 300000, 750000, 1100000 }
+            }},
+            { 20, new BoardSquareConfig {
+                PositionIndex = 20, Name = "Cơ Hội", Type = "Chance", LineIndex = "3"
+            }},
+            { 21, new BoardSquareConfig {
+                PositionIndex = 21, Name = "Rome", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                BuyPrice = 260000, RentPrices = new List<long> { 22000, 110000, 330000, 800000, 1150000 }
+            }},
+            { 22, new BoardSquareConfig {
+                PositionIndex = 22, Name = "Milan", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                BuyPrice = 260000, RentPrices = new List<long> { 22000, 110000, 330000, 800000, 1150000 }
+            }},
+            { 23, new BoardSquareConfig {
+                PositionIndex = 23, Name = "Venice", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                BuyPrice = 280000, RentPrices = new List<long> { 24000, 120000, 360000, 850000, 1200000 }
+            }},
+
+             { 24, new BoardSquareConfig {
+                PositionIndex = 24, Name = "Đảo Hoang", Type = "LostIsland", LineIndex = "4"
+            }},
+            { 25, new BoardSquareConfig {
+                PositionIndex = 25, Name = "Shanghai", Type = "City", ColorSet = "Orange", LineIndex = "4",
+                BuyPrice = 300000, RentPrices = new List<long> { 26000, 130000, 390000, 900000, 1275000 }
+            }},
+            { 26, new BoardSquareConfig {
+                PositionIndex = 26, Name = "Beijing", Type = "City", ColorSet = "Orange", LineIndex = "4",
+                BuyPrice = 300000, RentPrices = new List<long> { 26000, 130000, 390000, 900000, 1275000 }
+            }},
+            { 27, new BoardSquareConfig {
+                PositionIndex = 27, Name = "Hong Kong", Type = "City", ColorSet = "Orange", LineIndex = "4",
+                BuyPrice = 320000, RentPrices = new List<long> { 28000, 150000, 450000, 1000000, 1400000 }
+            }},
+            { 28, new BoardSquareConfig {
+                PositionIndex = 28, Name = "Bali", Type = "Resort", LineIndex = "4",
+                BuyPrice = 200000, RentPrices = new List<long> { 50000 }
+            }},
+            { 29, new BoardSquareConfig {
+                PositionIndex = 29, Name = "Madrid", Type = "City", ColorSet = "Cyan", LineIndex = "4",
+                BuyPrice = 350000, RentPrices = new List<long> { 35000, 175000, 500000, 1100000, 1500000 }
+            }},
+            { 30, new BoardSquareConfig {
+                PositionIndex = 30, Name = "Seville", Type = "City", ColorSet = "Cyan", LineIndex = "4",
+                BuyPrice = 350000, RentPrices = new List<long> { 35000, 175000, 500000, 1100000, 1500000 }
+            }},
+            { 31, new BoardSquareConfig {
+                PositionIndex = 31, Name = "Granada", Type = "City", ColorSet = "Cyan", LineIndex = "4",
+                BuyPrice = 400000, RentPrices = new List<long> { 50000, 200000, 600000, 1400000, 2000000 }
             }}
         };
     }
