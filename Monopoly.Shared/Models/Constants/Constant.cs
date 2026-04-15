@@ -82,6 +82,37 @@ namespace Monopoly.Shared.Models.Constants
                 BuyPrice = 200000, RentPrices = new List<long> { 16000, 80000, 220000, 600000, 1000000 }
             }},
 
+            { 16, new BoardSquareConfig {
+                PositionIndex = 16, Name = "Giải Vô Địch", Type = "WorldChampionship", LineIndex = "3"
+            }},
+            { 17, new BoardSquareConfig {
+                PositionIndex = 17, Name = "Berlin", Type = "City", ColorSet = "Brown", LineIndex = "3",
+                BuyPrice = 220000, RentPrices = new List<long> { 18000, 90000, 250000, 700000, 1050000 }
+            }},
+            { 18, new BoardSquareConfig {
+                PositionIndex = 18, Name = "Cyprus", Type = "Resort", LineIndex = "3",
+                BuyPrice = 200000, RentPrices = new List<long> { 50000 }
+            }},
+            { 19, new BoardSquareConfig {
+                PositionIndex = 19, Name = "Hamburg", Type = "City", ColorSet = "Brown", LineIndex = "3",
+                BuyPrice = 240000, RentPrices = new List<long> { 20000, 100000, 300000, 750000, 1100000 }
+            }},
+            { 20, new BoardSquareConfig {
+                PositionIndex = 20, Name = "Cơ Hội", Type = "Chance", LineIndex = "3"
+            }},
+            { 21, new BoardSquareConfig {
+                PositionIndex = 21, Name = "Rome", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                BuyPrice = 260000, RentPrices = new List<long> { 22000, 110000, 330000, 800000, 1150000 }
+            }},
+            { 22, new BoardSquareConfig {
+                PositionIndex = 22, Name = "Milan", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                BuyPrice = 260000, RentPrices = new List<long> { 22000, 110000, 330000, 800000, 1150000 }
+            }},
+            { 23, new BoardSquareConfig {
+                PositionIndex = 23, Name = "Venice", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                BuyPrice = 280000, RentPrices = new List<long> { 24000, 120000, 360000, 850000, 1200000 }
+            }},
+
 
 
             { 39, new BoardSquareConfig {
