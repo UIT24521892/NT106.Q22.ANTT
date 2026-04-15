@@ -51,9 +51,39 @@ namespace Monopoly.Shared.Models.Constants
                 PositionIndex = 7, Name = "Nice", Type = "Resort", LineIndex = "1",
                 BuyPrice = 200000, RentPrices = new List<long> { 50000 } // Resort fixed theo logic entity.md
             }},
-            
-            
-            
+            { 8, new BoardSquareConfig {
+                PositionIndex = 8, Name = "Du Lịch Thế Giới", Type = "WorldTour", LineIndex = "2"
+            }},
+            { 9, new BoardSquareConfig {
+                PositionIndex = 9, Name = "New York", Type = "City", ColorSet = "Blue", LineIndex = "2",
+                BuyPrice = 140000, RentPrices = new List<long> { 10000, 50000, 150000, 450000, 750000 }
+            }},
+            { 10, new BoardSquareConfig {
+                PositionIndex = 10, Name = "Las Vegas", Type = "City", ColorSet = "Blue", LineIndex = "2",
+                BuyPrice = 140000, RentPrices = new List<long> { 10000, 50000, 150000, 450000, 750000 }
+            }},
+            { 11, new BoardSquareConfig {
+                PositionIndex = 11, Name = "Chicago", Type = "City", ColorSet = "Blue", LineIndex = "2",
+                BuyPrice = 160000, RentPrices = new List<long> { 12000, 60000, 180000, 500000, 900000 }
+            }},
+            { 12, new BoardSquareConfig {
+                PositionIndex = 12, Name = "Cơ Hội", Type = "Chance", LineIndex = "2"
+            }},
+            { 13, new BoardSquareConfig {
+                PositionIndex = 13, Name = "Sydney", Type = "City", ColorSet = "Green", LineIndex = "2",
+                BuyPrice = 180000, RentPrices = new List<long> { 14000, 70000, 200000, 550000, 950000 }
+            }},
+            { 14, new BoardSquareConfig {
+                PositionIndex = 14, Name = "Dubai", Type = "Resort", LineIndex = "2",
+                BuyPrice = 200000, RentPrices = new List<long> { 50000 }
+            }},
+            { 15, new BoardSquareConfig {
+                PositionIndex = 15, Name = "London", Type = "City", ColorSet = "Green", LineIndex = "2",
+                BuyPrice = 200000, RentPrices = new List<long> { 16000, 80000, 220000, 600000, 1000000 }
+            }},
+
+
+
             { 39, new BoardSquareConfig {
                 PositionIndex = 39, Name = "Hà Nội", Type = "City",
                 BuyPrice = 400000,
