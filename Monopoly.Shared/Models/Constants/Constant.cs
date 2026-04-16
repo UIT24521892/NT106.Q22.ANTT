@@ -180,8 +180,20 @@ namespace Monopoly.Shared.Models.Constants
             { "CARD_GOLD_05", new ChanceCardConfig
                 { ID = "CARD_GOLD_05", Name = "Xúc Xắc Ma Thuật", Type = "Golden", EffectCode = "FORCE_DOUBLE",
                   DetailEffect = "Sử dụng trước khi đổ: Lượt xúc xắc này của bạn chắc chắn sẽ ra số Đôi." } },
+            { "CARD_SILVER_06", new ChanceCardConfig
+                { ID = "CARD_SILVER_06", Name = "Chuyến Bay Đêm", Type = "Silver", EffectCode = "GO_TO_WORLD_TOUR",
+                  DetailEffect = "Bay khẩn cấp! Đi thẳng đến ô Du Lịch Thế Giới (Sân bay) để chờ cất cánh vào lượt sau." } },
+            { "CARD_SILVER_07", new ChanceCardConfig
+                { ID = "CARD_SILVER_07", Name = "Đăng Cai Giải Đấu", Type = "Silver", EffectCode = "MOVE_CHAMPIONSHIP",
+                  DetailEffect = "Quyền lực tối thượng: Lập tức dời Giải Vô Địch Thế Giới về một thành phố của bạn!" } },
+            { "CARD_SILVER_08", new ChanceCardConfig
+                { ID = "CARD_SILVER_08", Name = "Trúng Số Độc Đắc", Type = "Silver", EffectCode = "JACKPOT",
+                  DetailEffect = "Trúng giải Vietlott! Nhận ngay 500,000 từ Ngân hàng." } },
+            { "CARD_SILVER_09", new ChanceCardConfig
+                { ID = "CARD_SILVER_09", Name = "Quỹ Từ Thiện", Type = "Silver", EffectCode = "CHARITY_PAY",
+                  DetailEffect = "Bạn có lòng hảo tâm. Bắt buộc trích 50,000 tiền mặt tặng cho mỗi người chơi khác." } },
 
-            
+
         };
     }
 }
