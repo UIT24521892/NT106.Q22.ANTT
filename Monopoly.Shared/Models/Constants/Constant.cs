@@ -193,6 +193,28 @@ namespace Monopoly.Shared.Models.Constants
                 { ID = "CARD_SILVER_09", Name = "Quỹ Từ Thiện", Type = "Silver", EffectCode = "CHARITY_PAY",
                   DetailEffect = "Bạn có lòng hảo tâm. Bắt buộc trích 50,000 tiền mặt tặng cho mỗi người chơi khác." } },
 
+            { "CARD_WOOD_01", new ChanceCardConfig
+                { ID = "CARD_WOOD_01", Name = "Cúp Điện Toàn Thành Phố", Type = "Wooden", EffectCode = "POWER_OUTAGE",
+                  DetailEffect = "Chọn 1 thành phố của đối thủ. Nó sẽ mất hiệu lực thu tiền phạt trong 2 lượt tới." } },
+            { "CARD_WOOD_02", new ChanceCardConfig
+                { ID = "CARD_WOOD_02", Name = "Động Đất", Type = "Wooden", EffectCode = "EARTHQUAKE",
+                  DetailEffect = "Thiên tai! Phá huỷ làm tụt 1 cấp độ xây dựng của một thành phố ngẫu nhiên thuộc về đối thủ." } },
+            { "CARD_WOOD_03", new ChanceCardConfig
+                { ID = "CARD_WOOD_03", Name = "Biên Bản Phạt", Type = "Wooden", EffectCode = "FINE",
+                  DetailEffect = "Vi phạm luật lệ giao thông. Bị trừ ngay 100,000 tiền mặt!" } },
+            { "CARD_WOOD_04", new ChanceCardConfig
+                { ID = "CARD_WOOD_04", Name = "Tình Nghi Gian Lận", Type = "Wooden", EffectCode = "GO_TO_JAIL",
+                  DetailEffect = "Bắt quả tang gian lận! Lập tức bị đày ra Đảo Hoang nghỉ mát." } },
+            
+            // --- NEW: Các thẻ phạt đau đớn nhất ---
+            { "CARD_WOOD_05", new ChanceCardConfig
+                { ID = "CARD_WOOD_05", Name = "Đóng Băng Giao Dịch", Type = "Wooden", EffectCode = "SKIP_TURN",
+                  DetailEffect = "Tài khoản bị phong tỏa tạm thời. Bạn bị mất lượt đi tiếp theo!" } },
+            { "CARD_WOOD_06", new ChanceCardConfig
+                { ID = "CARD_WOOD_06", Name = "Thanh Tra Thuế", Type = "Wooden", EffectCode = "TAX_PENALTY",
+                  DetailEffect = "Thanh tra đột xuất! Bắt buộc nộp phạt 10% tổng số tiền mặt hiện có cho Ngân hàng." } }
+
+
 
         };
     }
