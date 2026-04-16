@@ -1,98 +1,66 @@
-﻿using Monopoly.Shared;
-using Monopoly.Shared;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Drawing;
+using System.Text;
 using System.Windows.Forms;
+using Newtonsoft.Json;
 
 namespace Monopoly.Client
 {
     public class frmAuth : Form
     {
-        // Khai báo các Controls
+        private bool isLoginMode = true;
         private Label lblTitle;
-        private TextBox txtEmail;
-        private TextBox txtPassword;
-        private Button btnLogin;
-        private Button btnRegister;
-        private LinkLabel lnkForgotPass;
+        private TextBox txtEmail, txtPassword;
+        private Button btnAction, btnSwitch;
 
         public frmAuth()
         {
-            InitializeComponentProgrammatically();
-        }
-
-        private void InitializeComponentProgrammatically()
-        {
-            // 1. Cấu hình Form
-            this.Text = "Monopoly - Đăng Nhập";
-            this.Size = new Size(350, 450);
+            this.Size = new Size(350, 400);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.BackColor = Color.WhiteSmoke;
+            this.Text = "Cổng Xác Thực";
 
-            // 2. Khởi tạo Controls
-            lblTitle = new Label { Text = "CỜ TỶ PHÚ", Font = new Font("Arial", 20, FontStyle.Bold), ForeColor = Color.DarkRed, Location = new Point(90, 30), Size = new Size(200, 40) };
+            lblTitle = new Label { Text = "ĐĂNG NHẬP", Font = new Font("Arial", 16, FontStyle.Bold), Location = new Point(100, 30), AutoSize = true };
 
-            Label lblEmail = new Label { Text = "Email:", Location = new Point(50, 100), Size = new Size(250, 20) };
-            txtEmail = new TextBox { Location = new Point(50, 120), Size = new Size(230, 30), Font = new Font("Arial", 12) };
+            Label lblEmail = new Label { Text = "Email:", Location = new Point(50, 90), AutoSize = true };
+            txtEmail = new TextBox { Location = new Point(50, 110), Width = 230 };
 
-            Label lblPass = new Label { Text = "Mật khẩu:", Location = new Point(50, 170), Size = new Size(250, 20) };
-            txtPassword = new TextBox { Location = new Point(50, 190), Size = new Size(230, 30), Font = new Font("Arial", 12), PasswordChar = '*' };
+            Label lblPass = new Label { Text = "Mật khẩu:", Location = new Point(50, 160), AutoSize = true };
+            txtPassword = new TextBox { Location = new Point(50, 180), Width = 230, PasswordChar = '*' };
 
-            btnLogin = new Button { Text = "ĐĂNG NHẬP", Location = new Point(50, 250), Size = new Size(230, 40), BackColor = Color.Teal, ForeColor = Color.White, Font = new Font("Arial", 10, FontStyle.Bold), FlatStyle = FlatStyle.Flat };
-            btnRegister = new Button { Text = "Tạo tài khoản mới", Location = new Point(50, 300), Size = new Size(230, 30), FlatStyle = FlatStyle.Flat };
-            lnkForgotPass = new LinkLabel { Text = "Quên mật khẩu?", Location = new Point(120, 340), Size = new Size(150, 20) };
+            btnAction = new Button { Text = "ĐĂNG NHẬP", Location = new Point(50, 240), Width = 230, Height = 40, BackColor = Color.Teal, ForeColor = Color.White };
+            btnSwitch = new Button { Text = "Chưa có tài khoản? Đăng ký ngay", Location = new Point(50, 290), Width = 230 };
 
-            // 3. Đăng ký Sự kiện (Events)
-            btnLogin.Click += BtnLogin_Click;
-            btnRegister.Click += BtnRegister_Click;
-            lnkForgotPass.Click += LnkForgotPass_Click;
+            btnAction.Click += BtnAction_Click;
+            btnSwitch.Click += BtnSwitch_Click;
 
-            // 4. Gắn Controls vào Form
-            this.Controls.Add(lblTitle);
-            this.Controls.Add(lblEmail);
-            this.Controls.Add(txtEmail);
-            this.Controls.Add(lblPass);
-            this.Controls.Add(txtPassword);
-            this.Controls.Add(btnLogin);
-            this.Controls.Add(btnRegister);
-            this.Controls.Add(lnkForgotPass);
+            this.Controls.AddRange(new Control[] { lblTitle, lblEmail, txtEmail, lblPass, txtPassword, btnAction, btnSwitch });
         }
 
-        // --- XỬ LÝ LOGIC NÚT BẤM ---
-
-        private void BtnLogin_Click(object sender, EventArgs e)
+        private void BtnSwitch_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(txtEmail.Text) || string.IsNullOrEmpty(txtPassword.Text))
-            {
-                MessageBox.Show("Vui lòng nhập đủ Email và Mật khẩu!");
-                return;
-            }
+            isLoginMode = !isLoginMode;
+            lblTitle.Text = isLoginMode ? "ĐĂNG NHẬP" : "ĐĂNG KÝ TÀI KHOẢN";
+            btnAction.Text = isLoginMode ? "ĐĂNG NHẬP" : "TẠO TÀI KHOẢN";
+            btnSwitch.Text = isLoginMode ? "Chưa có tài khoản? Đăng ký ngay" : "Đã có tài khoản? Đăng nhập";
+        }
 
-            // Đóng gói dữ liệu
-            var payload = new AuthPayload { Email = txtEmail.Text, Password = txtPassword.Text };
-            var packet = new NetworkPacket
+        private async void BtnAction_Click(object sender, EventArgs e)
+        {
+            // 1. Tạo cục JSON gửi đi
+            var payload = new { Email = txtEmail.Text, Password = txtPassword.Text };
+            var packet = new
             {
-                Type = PacketType.Login,
+                Type = isLoginMode ? "Login" : "Register",
                 Payload = JsonConvert.SerializeObject(payload)
             };
 
-            string jsonToSend = JsonConvert.SerializeObject(packet);
+            string jsonToSend = JsonConvert.SerializeObject(packet) + "<EOF>"; // Dấu kết thúc tin nhắn
+            byte[] outStream = Encoding.UTF8.GetBytes(jsonToSend);
 
-            // TƯỞNG TƯỢNG HÀM NÀY: TcpClientManager.Instance.Send(jsonToSend);
-            MessageBox.Show($"Đang gửi qua TCP:\n{jsonToSend}");
-        }
+            // 2. Bắn qua TCP Server
+            await frmSplash.ServerStream.WriteAsync(outStream, 0, outStream.Length);
 
-        private void BtnRegister_Click(object sender, EventArgs e)
-        {
-            // Tương tự Login, đổi PacketType thành Register
-        }
-
-        private void LnkForgotPass_Click(object sender, EventArgs e)
-        {
-            // Dùng InputBox hoặc form nhỏ để nhập email, sau đó gửi PacketType.ResetPassword
+            // Note: Cần viết thêm luồng (Thread) Lắng nghe kết quả trả về từ Server để hiển thị MessageBox.
         }
     }
 }
