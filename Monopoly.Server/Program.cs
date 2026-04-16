@@ -32,7 +32,7 @@ namespace Monopoly.Server
 
             var response = await SendAuthRequest(url, requestBody);
 
-            // Nếu đăng ký thành công, tự động gửi luôn email xác 
+            // Nếu đăng ký thành công, tự động gửi luôn email xác thuc
             if (response.IsSuccess)
             {
                 await SendEmailVerificationAsync(response.UID); // response.UID tạm dùng chứa ID Token lúc đăng ký
