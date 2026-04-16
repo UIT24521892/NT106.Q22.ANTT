@@ -163,25 +163,25 @@ namespace Monopoly.Shared.Models.Constants
         // Đã đổi Key của Dictionary thành "string" để khớp với CardCode từ Firebase
         public static readonly Dictionary<string, ChanceCardConfig> Cards = new Dictionary<string, ChanceCardConfig>()
         {
-            { "CARD_WOOD_01", new ChanceCardConfig // Key tra cứu chuẩn
-                {
-                    ID = "CARD_WOOD_01",
-                    Name = "Vào Tù",
-                    DetailEffect = "Bạn bị tình nghi gian lận thương mại. Đi thẳng vào tù!",
-                    EffectCode = "GO_TO_JAIL",
-                    Type = "Wooden"
-                }
-            },
             { "CARD_GOLD_01", new ChanceCardConfig
-                {
-                    ID = "CARD_GOLD_01",
-                    Name = "Thẻ Miễn Phí",
-                    DetailEffect = "Được miễn phí một lần trả tiền thuê đất.",
-                    EffectCode = "FREE_RENT",
-                    Type = "Golden"
-                }
-            }
-            //...
+                { ID = "CARD_GOLD_01", Name = "Khiên Miễn Trừ", Type = "Golden", EffectCode = "FREE_RENT",
+                  DetailEffect = "Thẻ Miễn Phí: Không phải trả tiền phạt khi giẫm vào khu đất đắt đỏ của đối thủ." } },
+            { "CARD_GOLD_02", new ChanceCardConfig
+                { ID = "CARD_GOLD_02", Name = "Vé Máy Bay Hạng Thương Gia", Type = "Golden", EffectCode = "FLIGHT",
+                  DetailEffect = "Thẻ Bay: Chọn bay thẳng đến bất kỳ ô nào trên bàn cờ. Nếu đi ngang Bắt Đầu, nhận 300,000." } },
+            { "CARD_GOLD_03", new ChanceCardConfig
+                { ID = "CARD_GOLD_03", Name = "Trực Thăng Cứu Hộ", Type = "Golden", EffectCode = "ESCAPE_ISLAND",
+                  DetailEffect = "Thẻ Ra Đảo: Dùng để thoát khỏi Đảo Hoang ngay lập tức mà không tốn 200,000." } },
+            { "CARD_GOLD_04", new ChanceCardConfig
+                { ID = "CARD_GOLD_04", Name = "Giấy Phép Xây Dựng", Type = "Golden", EffectCode = "FREE_UPGRADE",
+                  DetailEffect = "Thẻ Nâng Cấp: Tự động nâng cấp miễn phí 1 bậc cho một thành phố của bạn." } },
+            
+            // --- NEW: Tính năng ép xúc xắc của Business Tour ---
+            { "CARD_GOLD_05", new ChanceCardConfig
+                { ID = "CARD_GOLD_05", Name = "Xúc Xắc Ma Thuật", Type = "Golden", EffectCode = "FORCE_DOUBLE",
+                  DetailEffect = "Sử dụng trước khi đổ: Lượt xúc xắc này của bạn chắc chắn sẽ ra số Đôi." } },
+
+            
         };
     }
 }
