@@ -110,6 +110,8 @@ namespace Monopoly.Server
                         string email = authPayload.Email;
                         string password = authPayload.Password;
                         bool isLogin = (packetType == "Login");
+                        string username = authPayload.Username; // Thêm dòng này lấy từ JSON
+                        string result = await _firebaseApi.AuthenticateUser(email, password, username, isLogin); // Cập nhật tham số
 
                         Console.WriteLine($"[AUTH] Đang xử lý {(isLogin ? "Đăng nhập" : "Đăng ký")} " +
                             $"cho {email}...");
