@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-// using Monopoly.Shared.Models.Network; // Mở comment này nếu bạn đã add reference tới project Shared
+using Monopoly.Shared.Models.Network; // Mở comment này nếu bạn đã add reference tới project Shared
 
 namespace Monopoly.Server
 {
@@ -56,17 +56,19 @@ namespace Monopoly.Server
 
                     while (true) // Vòng lặp lắng nghe tin nhắn của Client này
                     {
-                        // Đọc byte từ mạng vào buffer
+                        // Đọc byte từ mạng vào buffer: stream ghi dữ liệu vào buffer, trả về số nguyên
                         int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
 
                         // Nếu số byte đọc được = 0, nghĩa là Client đã chủ động ngắt kết nối
-                        if (bytesRead == 0) break;
+                        if (bytesRead == 0) 
+                            break;
 
                         // Chuyển byte thành chuỗi
                         string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
                         // Kỹ thuật Packet Framing: Cắt chuỗi dựa vào dấu <EOF> để tránh dính gói tin
-                        string[] jsonPackets = receivedData.Split(new[] { "<EOF>" }, StringSplitOptions.RemoveEmptyEntries);
+                        string[] jsonPackets = receivedData.Split(new[] { "<EOF>" }, 
+                            StringSplitOptions.RemoveEmptyEntries);
 
                         // Xử lý từng gói tin một
                         foreach (var json in jsonPackets)
@@ -109,10 +111,12 @@ namespace Monopoly.Server
                         string password = authPayload.Password;
                         bool isLogin = (packetType == "Login");
 
-                        Console.WriteLine($"[AUTH] Đang xử lý {(isLogin ? "Đăng nhập" : "Đăng ký")} cho {email}...");
+                        Console.WriteLine($"[AUTH] Đang xử lý {(isLogin ? "Đăng nhập" : "Đăng ký")} " +
+                            $"cho {email}...");
 
                         // Gọi sang class FirebaseApiService
-                        string result = await _firebaseApi.AuthenticateUser(email, password, isLogin);
+                        string result = await _firebaseApi.AuthenticateUser(email, password, 
+                            isLogin);
 
                         // Trả kết quả ngược lại cho Client
                         byte[] responseBytes = Encoding.UTF8.GetBytes(result + "<EOF>");
@@ -126,7 +130,8 @@ namespace Monopoly.Server
                         break;
 
                     default:
-                        Console.WriteLine($"[CẢNH BÁO] Nhận được loại Packet không xác định: {packetType}");
+                        Console.WriteLine($"[CẢNH BÁO] Nhận được loại Packet không xác định: " +
+                            $"{packetType}");
                         break;
                 }
             }
