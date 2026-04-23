@@ -42,7 +42,7 @@ namespace Monopoly.Client
                 ServerStream = ClientSocket.GetStream();
 
                 lblStatus.Text = "Kết nối thành công! Đang tải hệ thống...";
-                await Task.Delay(1000); // Dừng 1 giây cho đẹp mắt
+                await Task.Delay(5000); // Dừng 5 giây để kiểm tra hiển thị của frmSplash
 
                 // Chuyển sang Form Đăng nhập
                 this.Hide();

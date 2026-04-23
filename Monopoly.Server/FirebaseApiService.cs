@@ -9,7 +9,7 @@ namespace Monopoly.Server
     public class FirebaseApiService
     {
         // Gắn Web API Key của dự án Firebase vào đây
-        private readonly string API_KEY = "AIzaSyB-xxxxxxxxxxxxxxxxxxxxxxx";
+        private readonly string API_KEY = "AIzaSyBrkPdAmZGitSBFtqHdvgnrr77iDduLI2g";
         private readonly HttpClient _http = new HttpClient();
 
         public async Task<string> AuthenticateUser(string email, string password, bool isLogin)
