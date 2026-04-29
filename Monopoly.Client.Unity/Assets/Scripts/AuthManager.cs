@@ -86,7 +86,9 @@ public class AuthManager : MonoBehaviour
                 if (response.StartsWith("SUCCESS"))
                 {
                     string[] parts = response.Split('|');
-                    Debug.Log($"<color=green>THÀNH CÔNG! Chào mừng {parts[3]}</color>");
+                    Debug.Log($"<color=green>THÀNH CÔNG! Chào mừng {parts[1]}</color>");
+                    string uid = parts[1];
+                    string jwtToken = parts[2];
                     // TODO: Tắt AuthPanel, Bật MainMenu Panel ở đây!
                 }
                 else
