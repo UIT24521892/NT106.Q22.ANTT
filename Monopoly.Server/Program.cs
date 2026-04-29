@@ -117,7 +117,7 @@ namespace Monopoly.Server
                             $"cho {email}...");
 
                         // Gọi sang class FirebaseApiService
-                        string result = await _firebaseApi.AuthenticateUser(email, password, 
+                        string result = await _firebaseApi.AuthenticateUser(email, password, username,
                             isLogin);
 
                         // Trả kết quả ngược lại cho Client
