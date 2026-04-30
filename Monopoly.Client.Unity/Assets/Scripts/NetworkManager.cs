@@ -10,7 +10,7 @@ public class NetworkManager : MonoBehaviour
     public static NetworkManager Instance { get; private set; }
 
     // ✅ Đổi ServerStream thành property public
-    public static NetworkStream ServerStream;
+    
 
     // ✅ Thêm Awake
     private void Awake()
