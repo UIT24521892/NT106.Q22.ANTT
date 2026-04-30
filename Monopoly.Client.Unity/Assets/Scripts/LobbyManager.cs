@@ -260,7 +260,7 @@ public class LobbyManager : MonoBehaviour
         NetworkManager.Instance?.Disconnect();
 
         // Tải lại Scene Login (đảm bảo "LoginScene" đúng tên trong Build Settings)
-        UnityEngine.SceneManagement.SceneManager.LoadScene("LoginScene");
+        UnityEngine.SceneManagement.SceneManager.LoadScene("SampleScene");
     }
 
     // ──────────────────────────────────────────────────────────
