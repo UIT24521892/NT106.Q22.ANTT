@@ -6,6 +6,26 @@ using System;
 
 public class NetworkManager : MonoBehaviour
 {
+    // ✅ Thêm singleton Instance
+    public static NetworkManager Instance { get; private set; }
+
+    // ✅ Đổi ServerStream thành property public
+    public static NetworkStream ServerStream;
+
+    // ✅ Thêm Awake
+    private void Awake()
+    {
+        if (Instance != null) { Destroy(gameObject); return; }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    // ✅ Thêm hàm Disconnect
+    public void Disconnect()
+    {
+        ServerStream?.Close();
+        ClientSocket?.Close();
+    }
     // Kéo thả TextMeshPro vào đây trên Unity
     [SerializeField] private TextMeshProUGUI txtStatus;
 
