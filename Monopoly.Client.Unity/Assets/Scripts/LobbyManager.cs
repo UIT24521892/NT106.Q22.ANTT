@@ -494,36 +494,28 @@ public class LobbyManager : MonoBehaviour
     /// <param name="packetObject">Object bất kỳ sẽ được serialize thành JSON</param>
     private void SendPacketToServer(object packetObject)
     {
-        // ── Kiểm tra kết nối còn sống không ───────────────────
-        if (NetworkManager.Instance == null || NetworkManager.Instance.ServerStream == null)
+        // ✅ Kiểm tra dùng static field trực tiếp
+        if (NetworkManager.ServerStream == null)
         {
-            Debug.LogError("[LobbyManager] Không thể gửi gói tin: NetworkManager hoặc ServerStream là null!");
+            Debug.LogError("[LobbyManager] ServerStream là null!");
             return;
         }
 
         try
         {
-            // ── Serialize object → chuỗi JSON ─────────────────
             string json = JsonConvert.SerializeObject(packetObject);
-
-            // ── Thêm delimiter "<EOF>" để Server nhận dạng cuối gói tin ──
             string message = json + "<EOF>";
-
-            // ── Encode UTF-8 và ghi vào NetworkStream ─────────
             byte[] data = Encoding.UTF8.GetBytes(message);
-            NetworkManager.Instance.ServerStream.Write(data, 0, data.Length);
-            NetworkManager.Instance.ServerStream.Flush(); // Đảm bảo dữ liệu được gửi ngay lập tức
+
+            // ✅ Gọi trực tiếp không qua Instance
+            NetworkManager.ServerStream.Write(data, 0, data.Length);
+            NetworkManager.ServerStream.Flush();
 
             Debug.Log($"[LobbyManager] Đã gửi: {json}");
         }
         catch (IOException ex)
         {
-            // Lỗi I/O thường do kết nối bị đứt
-            Debug.LogError($"[LobbyManager] IOException khi gửi gói tin: {ex.Message}");
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"[LobbyManager] Lỗi không xác định khi gửi gói tin: {ex.Message}");
+            Debug.LogError($"[LobbyManager] Lỗi gửi: {ex.Message}");
         }
     }
 
