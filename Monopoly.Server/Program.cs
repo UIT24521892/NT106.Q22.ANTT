@@ -116,9 +116,6 @@ namespace Monopoly.Server
                         Console.WriteLine($"[AUTH] Đang xử lý {(isLogin ? "Đăng nhập" : "Đăng ký")} " +
                             $"cho {email}...");
 
-                        // Gọi sang class FirebaseApiService
-                        string result = await _firebaseApi.AuthenticateUser(email, password, 
-                            isLogin);
 
                         // Trả kết quả ngược lại cho Client
                         byte[] responseBytes = Encoding.UTF8.GetBytes(result + "<EOF>");
