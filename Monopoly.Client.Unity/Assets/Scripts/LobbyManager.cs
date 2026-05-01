@@ -497,7 +497,7 @@ public class LobbyManager : MonoBehaviour
         // ✅ Kiểm tra dùng static field trực tiếp
         if (NetworkManager.ServerStream == null)
         {
-            Debug.LogError("[LobbyManager] ServerStream là null!");
+            Debug.LogWarning("[LobbyManager] ServerStream là null!");
             return;
         }
 
