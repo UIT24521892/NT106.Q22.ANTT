@@ -260,7 +260,7 @@ public class LobbyManager : MonoBehaviour
         NetworkManager.Instance?.Disconnect();
 
         // Tải lại Scene Login (đảm bảo "LoginScene" đúng tên trong Build Settings)
-        UnityEngine.SceneManagement.SceneManager.LoadScene("LoginScene");
+        UnityEngine.SceneManagement.SceneManager.LoadScene("SampleScene");
     }
 
     // ──────────────────────────────────────────────────────────
@@ -497,7 +497,7 @@ public class LobbyManager : MonoBehaviour
         // ✅ Kiểm tra dùng static field trực tiếp
         if (NetworkManager.ServerStream == null)
         {
-            Debug.LogError("[LobbyManager] ServerStream là null!");
+            Debug.LogWarning("[LobbyManager] ServerStream là null!");
             return;
         }
 
