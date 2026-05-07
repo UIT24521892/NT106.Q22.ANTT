@@ -24,6 +24,7 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private GameObject panelMainMenu;      // Panel 1: Menu chính
     [SerializeField] private GameObject panelRoomSettings;  // Panel 2: Tạo phòng
     [SerializeField] private GameObject panelWaitingRoom;   // Panel 3: Phòng chờ
+    [SerializeField] private GameObject panelRoomList;      // Panel 4: Danh sách phòng
 
     // ──────────────────────────────────────────────────────────
     // SECTION 2: UI COMPONENTS - PANEL MAIN MENU
@@ -58,6 +59,15 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private Button btnReady;               // Nút "Sẵn sàng" (client thường)
     [SerializeField] private Button btnStart;               // Nút "Bắt đầu" (chỉ host)
     [SerializeField] private TMP_Text txtBtnReady;          // Text trên nút Ready (để đổi màu/text)
+
+//  ──────────────────────────────────────────────────────────
+    // SECTION 4.5: UI COMPONENTS - PANEL ROOM LIST
+    // ──────────────────────────────────────────────────────────
+
+    [Header("=== ROOM LIST UI ===")]
+    [SerializeField] private Transform roomListContainer; // Kéo object 'Content' nằm trong Scroll View vào đây
+    [SerializeField] private GameObject roomSlotPrefab;   // Prefab 1 dòng thông tin phòng
+    [SerializeField] private TMP_Text txtEmptyRoom;       // Text "Không có phòng nào đang chờ" (Txt_Empty)
 
     // ──────────────────────────────────────────────────────────
     // SECTION 5: TRẠNG THÁI NỘI BỘ (PRIVATE STATE)
@@ -166,6 +176,7 @@ public class LobbyManager : MonoBehaviour
         panelMainMenu.SetActive(false);
         panelRoomSettings.SetActive(false);
         panelWaitingRoom.SetActive(false);
+        panelRoomList.SetActive(false); // Thêm dòng này
 
         // Bật đúng panel mục tiêu
         if (targetPanel != null)
@@ -228,6 +239,16 @@ public class LobbyManager : MonoBehaviour
     /// </summary>
     public void OnBtnJoinRoomClicked()
     {
+
+        ShowPanel(panelRoomList);
+        
+        if (txtEmptyRoom != null) 
+        {
+            txtEmptyRoom.gameObject.SetActive(true);
+            txtEmptyRoom.text = "Đang tải danh sách phòng...";
+        }
+
+
         // ── Đóng gói gói tin JSON ──────────────────────────────
         // Type: "GET_ROOM_LIST" — Server sẽ trả về danh sách phòng còn chỗ trống
         var packet = new
@@ -523,6 +544,46 @@ public class LobbyManager : MonoBehaviour
             Debug.LogError($"[LobbyManager] Lỗi gửi: {ex.Message}");
         }
     }
+
+// ──────────────────────────────────────────────────────────
+    // SECTION 14: BUTTON HANDLERS - ROOM LIST
+    // ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// [Gán vào nút "Trở về" (Btn_Return) trong Panel Room List]
+    /// </summary>
+    public void OnBtnReturnFromRoomListClicked()
+    {
+        ShowPanel(panelMainMenu);
+    }
+
+    /// <summary>
+    /// [Gán vào nút "Làm mới" (Btn_Refresh) trong Panel Room List]
+    /// </summary>
+    public void OnBtnRefreshRoomListClicked()
+    {
+        if (txtEmptyRoom != null) 
+        {
+            txtEmptyRoom.gameObject.SetActive(true);
+            txtEmptyRoom.text = "Đang làm mới...";
+        }
+
+        var packet = new
+        {
+            Type = "GET_ROOM_LIST",
+            Payload = new { }
+        };
+        SendPacketToServer(packet);
+    }
+
+    /// <summary>
+    /// [Gán vào nút "Tạo phòng" (Btn_Create) trong Panel Room List]
+    /// </summary>
+    public void OnBtnCreateFromRoomListClicked()
+    {
+        OnBtnCreateRoomClicked(); // Tái sử dụng hàm đã viết ở Main Menu
+    }
+
 
     /// <summary>
     /// Cấu hình Waiting Room cho vai trò Host:
