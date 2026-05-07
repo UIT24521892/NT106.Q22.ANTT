@@ -73,6 +73,11 @@ public class LobbyManager : MonoBehaviour
 
     private void Start()
     {
+        // Bổ sung dòng này để bắt đầu nghe Server
+        if (NetworkManager.Instance != null)
+        {
+            NetworkManager.Instance.StartListeningToServer();
+        }
         // Khởi tạo slider với giá trị hợp lệ
         InitSliders();
 
