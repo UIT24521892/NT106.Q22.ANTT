@@ -1,18 +1,23 @@
 using UnityEngine;
-using TMPro; // Thư viện để chỉnh chữ
+using TMPro;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System;
+using System.Text;
 
 public class NetworkManager : MonoBehaviour
 {
-    // ✅ Thêm singleton Instance
     public static NetworkManager Instance { get; private set; }
 
-    // ✅ Đổi ServerStream thành property public
-    
+    [SerializeField] private TextMeshProUGUI txtStatus;
+    [SerializeField] private GameObject splashPanel;
+    [SerializeField] private GameObject authPanel;
 
-    // ✅ Thêm Awake
+    public static TcpClient ClientSocket;
+    public static NetworkStream ServerStream;
+
+    private bool isListening = false;
+
     private void Awake()
     {
         if (Instance != null) { Destroy(gameObject); return; }
@@ -20,33 +25,11 @@ public class NetworkManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    // ✅ Thêm hàm Disconnect
-    public void Disconnect()
-    {
-        ServerStream?.Close();
-        ClientSocket?.Close();
-    }
-    // Kéo thả TextMeshPro vào đây trên Unity
-    [SerializeField] private TextMeshProUGUI txtStatus;
-
-    // Thêm các Panel để bật/tắt (kéo thả vào từ Unity)
-    [SerializeField] private GameObject splashPanel;
-    [SerializeField] private GameObject authPanel; // Sẽ làm sau
-
-    // Biến static tĩnh để giữ kết nối dùng cho toàn bộ game
-    public static TcpClient ClientSocket;
-    public static NetworkStream ServerStream;
-
-    // Start được gọi ngay khi mở game lên
     private async void Start()
     {
-        // Ẩn panel Auth, hiện panel Splash
         if (authPanel != null) authPanel.SetActive(false);
-        splashPanel.SetActive(true);
-
-        txtStatus.text = "Đang kết nối tới Máy chủ TCP...";
-
-        // Gọi hàm kết nối
+        if (splashPanel != null) splashPanel.SetActive(true);
+        if (txtStatus != null) txtStatus.text = "Đang kết nối tới Máy chủ TCP...";
         await ConnectToServerAsync();
     }
 
@@ -55,32 +38,66 @@ public class NetworkManager : MonoBehaviour
         try
         {
             ClientSocket = new TcpClient();
-
-            // Đợi kết nối (Sửa IP thành IP của Server nếu chơi mạng LAN)
             await ClientSocket.ConnectAsync("127.0.0.1", 8080);
             ServerStream = ClientSocket.GetStream();
 
-            txtStatus.color = Color.green;
-            txtStatus.text = "Kết nối thành công! Đang tải hệ thống...";
-
-            // Đợi 1 giây cho đẹp mắt
+            if (txtStatus != null)
+            {
+                txtStatus.color = Color.green;
+                txtStatus.text = "Kết nối thành công!";
+            }
             await Task.Delay(1000);
 
-            splashPanel.SetActive(false); // Tắt màn hình chờ
-            if (authPanel != null) authPanel.SetActive(true); // Bật màn hình Đăng nhập
+            if (splashPanel != null) splashPanel.SetActive(false);
+            if (authPanel != null) authPanel.SetActive(true);
         }
         catch (Exception ex)
         {
-            txtStatus.color = Color.red;
-            txtStatus.text = "Lỗi: Không tìm thấy Máy chủ!\nHãy kiểm tra xem Server Console đã bật chưa.";
+            if (txtStatus != null)
+            {
+                txtStatus.color = Color.red;
+                txtStatus.text = "Lỗi: Không tìm thấy Máy chủ!";
+            }
             Debug.LogError($"TCP Error: {ex.Message}");
         }
     }
 
-    // Đảm bảo đóng kết nối khi tắt game
-    private void OnApplicationQuit()
+    // Hàm lắng nghe liên tục - Gọi từ LobbyManager
+    public async void StartListeningToServer()
     {
-        if (ServerStream != null) ServerStream.Close();
-        if (ClientSocket != null) ClientSocket.Close();
+        if (isListening || ServerStream == null) return;
+        isListening = true;
+        byte[] buffer = new byte[4096];
+
+        try
+        {
+            while (ClientSocket.Connected)
+            {
+                int bytesRead = await ServerStream.ReadAsync(buffer, 0, buffer.Length);
+                if (bytesRead > 0)
+                {
+                    string response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Replace("<EOF>", "");
+                    ProcessServerMessage(response);
+                }
+            }
+        }
+        catch (Exception) { isListening = false; }
     }
+
+    private void ProcessServerMessage(string jsonResponse)
+    {
+        // Nhận lệnh chuyển cảnh từ Server
+        if (jsonResponse.Contains("GAME_STARTING"))
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("GameScene");
+        }
+    }
+
+    public void Disconnect()
+    {
+        ServerStream?.Close();
+        ClientSocket?.Close();
+    }
+
+    private void OnApplicationQuit() => Disconnect();
 }
