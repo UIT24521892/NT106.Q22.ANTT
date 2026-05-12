@@ -25,6 +25,8 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private GameObject panelRoomSettings;  // Panel 2: Tạo phòng
     [SerializeField] private GameObject panelWaitingRoom;   // Panel 3: Phòng chờ
     [SerializeField] private GameObject panelRoomList;      // Panel 4: Danh sách phòng
+    [SerializeField] private GameObject panelProfile; // panel thông tin cá nhân (nếu có)
+
 
     // ──────────────────────────────────────────────────────────
     // SECTION 2: UI COMPONENTS - PANEL MAIN MENU
@@ -34,6 +36,19 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private TMP_Text txtPlayerUsername;    // Tên người chơi
     [SerializeField] private TMP_Text txtPlayerBalance;     // Số dư tiền tệ
     [SerializeField] private Image imgPlayerAvatar;         // Ảnh đại diện
+
+    [Header("=== PROFILE PANEL UI ===")]
+    [SerializeField] private TMP_InputField inpNewUsername;
+    [SerializeField] private TMP_Text txtProfileCurrentName;
+    [SerializeField] private TMP_Text txtProfileStatus;
+    [SerializeField] private Button btnSaveProfile;
+    [SerializeField] private TMP_Text txtSaveProfileBtn;
+    [SerializeField] private Button[] avatarButtons;
+    [SerializeField] private Sprite[] avatarSprites;
+
+    private readonly string[] avatarIds = { "avatar_1", "avatar_2", "avatar_3", "avatar_4" };
+    private string _selectedAvatarId = "";
+    private bool _avatarListenersRegistered = false;
 
     // ──────────────────────────────────────────────────────────
     // SECTION 3: UI COMPONENTS - PANEL ROOM SETTINGS
@@ -60,7 +75,7 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private Button btnStart;               // Nút "Bắt đầu" (chỉ host)
     [SerializeField] private TMP_Text txtBtnReady;          // Text trên nút Ready (để đổi màu/text)
 
-//  ──────────────────────────────────────────────────────────
+    //  ──────────────────────────────────────────────────────────
     // SECTION 4.5: UI COMPONENTS - PANEL ROOM LIST
     // ──────────────────────────────────────────────────────────
 
@@ -177,6 +192,7 @@ public class LobbyManager : MonoBehaviour
         panelRoomSettings.SetActive(false);
         panelWaitingRoom.SetActive(false);
         panelRoomList.SetActive(false); // Thêm dòng này
+        panelProfile.SetActive(false); // ← THÊM
 
         // Bật đúng panel mục tiêu
         if (targetPanel != null)
@@ -241,8 +257,8 @@ public class LobbyManager : MonoBehaviour
     {
 
         ShowPanel(panelRoomList);
-        
-        if (txtEmptyRoom != null) 
+
+        if (txtEmptyRoom != null)
         {
             txtEmptyRoom.gameObject.SetActive(true);
             txtEmptyRoom.text = "Đang tải danh sách phòng...";
@@ -405,7 +421,7 @@ public class LobbyManager : MonoBehaviour
     {
         // ── Đóng gói gói tin JSON ──────────────────────────────
         // Type: "START_GAME" — Server kiểm tra điều kiện (tất cả ready, đủ người),
-        //                       nếu hợp lệ sẽ broadcast "GAME_STARTING" cho tất cả client
+        //                      nếu hợp lệ sẽ broadcast "GAME_STARTING" cho tất cả client
         var packet = new
         {
             Type = "START_GAME",
@@ -432,7 +448,7 @@ public class LobbyManager : MonoBehaviour
     {
         // ── Đóng gói gói tin JSON ──────────────────────────────
         // Type: "LEAVE_ROOM" — Server xóa người chơi khỏi phòng,
-        //                       nếu là Host thì giải tán phòng hoặc chuyển quyền
+        //                      nếu là Host thì giải tán phòng hoặc chuyển quyền
         var packet = new
         {
             Type = "LEAVE_ROOM",
@@ -545,7 +561,7 @@ public class LobbyManager : MonoBehaviour
         }
     }
 
-// ──────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────
     // SECTION 14: BUTTON HANDLERS - ROOM LIST
     // ──────────────────────────────────────────────────────────
 
@@ -562,7 +578,7 @@ public class LobbyManager : MonoBehaviour
     /// </summary>
     public void OnBtnRefreshRoomListClicked()
     {
-        if (txtEmptyRoom != null) 
+        if (txtEmptyRoom != null)
         {
             txtEmptyRoom.gameObject.SetActive(true);
             txtEmptyRoom.text = "Đang làm mới...";
@@ -644,6 +660,139 @@ public class LobbyManager : MonoBehaviour
     {
         return $"{amount:N0} đ".Replace(",", ".");
     }
+
+    // ═══════════════════════════════════════
+    // SECTION 15: PROFILE PANEL
+    // ═══════════════════════════════════════
+
+    public void OnBtnOpenProfileClicked()
+    {
+        if (txtProfileCurrentName != null)
+            txtProfileCurrentName.text = $"Tên hiện tại: {PlayerSession.Instance?.Username ?? "Player"}";
+        if (inpNewUsername != null)
+            inpNewUsername.text = PlayerSession.Instance?.Username ?? "";
+
+        _selectedAvatarId = PlayerSession.Instance?.AvatarId ?? avatarIds[0];
+        HighlightSelectedAvatar();
+        RegisterAvatarButtonListeners();
+
+        if (txtProfileStatus != null) txtProfileStatus.text = "";
+        ShowPanel(panelProfile);
+    }
+
+    public void OnBtnCloseProfileClicked()
+    {
+        ShowPanel(panelMainMenu);
+    }
+
+    private void RegisterAvatarButtonListeners()
+    {
+        if (_avatarListenersRegistered || avatarButtons == null) return;
+        _avatarListenersRegistered = true;
+        for (int i = 0; i < avatarButtons.Length; i++)
+        {
+            int idx = i;
+            avatarButtons[idx].onClick.AddListener(() => OnAvatarSelected(idx));
+        }
+    }
+
+    private void OnAvatarSelected(int index)
+    {
+        if (index < 0 || index >= avatarIds.Length) return;
+        _selectedAvatarId = avatarIds[index];
+        HighlightSelectedAvatar();
+    }
+
+    private void HighlightSelectedAvatar()
+    {
+        if (avatarButtons == null) return;
+        for (int i = 0; i < avatarButtons.Length; i++)
+        {
+            if (avatarButtons[i] == null) continue;
+            var colors = avatarButtons[i].colors;
+            bool isSelected = (i < avatarIds.Length && avatarIds[i] == _selectedAvatarId);
+            colors.normalColor = isSelected
+                ? new Color(1f, 0.85f, 0.1f, 1f)
+                : new Color(1f, 1f, 1f, 1f);
+            avatarButtons[i].colors = colors;
+        }
+    }
+
+    public void OnBtnSaveProfileClicked()
+    {
+        string newUsername = inpNewUsername != null ? inpNewUsername.text.Trim() : "";
+
+        if (string.IsNullOrEmpty(newUsername) || newUsername.Length < 3)
+        {
+            ShowProfileStatus("Tên phải từ 3 ký tự trở lên!", isError: true);
+            return;
+        }
+        if (string.IsNullOrEmpty(_selectedAvatarId))
+        {
+            ShowProfileStatus("Vui lòng chọn Avatar!", isError: true);
+            return;
+        }
+
+        if (btnSaveProfile != null) btnSaveProfile.interactable = false;
+        if (txtSaveProfileBtn != null) txtSaveProfileBtn.text = "ĐANG LƯU...";
+        ShowProfileStatus("Đang gửi yêu cầu...", isError: false);
+
+        var packet = new
+        {
+            Type = "UPDATE_PROFILE",
+            Payload = new
+            {
+                Uid = PlayerSession.Instance?.Uid,
+                IdToken = PlayerSession.Instance?.IdToken,
+                NewUsername = newUsername,
+                NewAvatarId = _selectedAvatarId
+            }
+        };
+        SendPacketToServer(packet);
+    }
+
+    public void OnProfileUpdateSuccess(string newUsername, string newAvatarId)
+    {
+        PlayerSession.Instance?.UpdateProfile(newUsername, newAvatarId);
+        RefreshMainMenuPlayerInfo();
+
+        if (txtProfileCurrentName != null)
+            txtProfileCurrentName.text = $"Tên hiện tại: {newUsername}";
+        if (btnSaveProfile != null) btnSaveProfile.interactable = true;
+        if (txtSaveProfileBtn != null) txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+        ShowProfileStatus("✓ Cập nhật thành công!", isError: false);
+    }
+
+    public void OnProfileUpdateFailed(string errorMessage)
+    {
+        if (btnSaveProfile != null) btnSaveProfile.interactable = true;
+        if (txtSaveProfileBtn != null) txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+        ShowProfileStatus($"✗ Lỗi: {errorMessage}", isError: true);
+    }
+
+    private void RefreshMainMenuPlayerInfo()
+    {
+        if (txtPlayerUsername != null)
+            txtPlayerUsername.text = PlayerSession.Instance?.Username ?? "Player";
+        if (txtPlayerBalance != null)
+            txtPlayerBalance.text = FormatCurrency(PlayerSession.Instance?.Balance ?? 0);
+
+        if (imgPlayerAvatar != null && avatarSprites != null)
+        {
+            int idx = System.Array.IndexOf(avatarIds, PlayerSession.Instance?.AvatarId ?? "");
+            if (idx >= 0 && idx < avatarSprites.Length && avatarSprites[idx] != null)
+                imgPlayerAvatar.sprite = avatarSprites[idx];
+        }
+    }
+
+    private void ShowProfileStatus(string message, bool isError)
+    {
+        if (txtProfileStatus == null) return;
+        txtProfileStatus.text = message;
+        txtProfileStatus.color = isError
+            ? new Color(0.9f, 0.2f, 0.2f, 1f)
+            : new Color(0.2f, 0.75f, 0.3f, 1f);
+    }
 }
 
 
@@ -667,35 +816,36 @@ public class PlayerSlotData
 // ============================================================
 //  PLAYER SESSION SINGLETON (STUB)
 //  Lớp này lưu thông tin phiên đăng nhập sau khi AuthManager xác thực xong.
-//  Bạn có thể đã có class này rồi — nếu có hãy bỏ phần này đi.
 // ============================================================
 
 public class PlayerSession
 {
     public static PlayerSession Instance { get; private set; }
 
+    public string Uid { get; private set; }
+    public string IdToken { get; private set; }
     public string Username { get; private set; }
     public long Balance { get; private set; }
-    public string AvatarUrl { get; private set; }
+    public string AvatarId { get; private set; }
 
-    /// <summary>
-    /// Được gọi bởi AuthManager sau khi đăng nhập thành công
-    /// </summary>
-    public static void Initialize(string username, long balance, string avatarUrl = "")
+    public static void Initialize(string uid, string idToken, string username,
+                                  long balance, string avatarId = "avatar_1")
     {
         Instance = new PlayerSession
         {
+            Uid = uid,
+            IdToken = idToken,
             Username = username,
             Balance = balance,
-            AvatarUrl = avatarUrl
+            AvatarId = avatarId
         };
     }
 
-    /// <summary>
-    /// Xóa session khi đăng xuất
-    /// </summary>
-    public static void Clear()
+    public void UpdateProfile(string newUsername, string newAvatarId)
     {
-        Instance = null;
+        Username = newUsername;
+        AvatarId = newAvatarId;
     }
+
+    public static void Clear() { Instance = null; }
 }

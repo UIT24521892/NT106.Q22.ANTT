@@ -90,6 +90,8 @@ public class AuthManager : MonoBehaviour
                     string uid = parts[1];
                     string jwtToken = parts[2];
                     // TODO: Tắt AuthPanel, Bật MainMenu Panel ở đây!
+                    PlayerSession.Initialize(uid, jwtToken, inpEmail.text, 2000000, "avatar_1");
+
                     UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
                 }
                 else

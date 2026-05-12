@@ -5,19 +5,24 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Monopoly.Shared.Models.Network; // Mở comment này nếu bạn đã add reference tới project Shared
 
 namespace Monopoly.Server
 {
+    // ============================================================
+    //  Program.cs  (PHIÊN BẢN CẬP NHẬT)
+    //  Thay đổi so với bản gốc:
+    //    • RoutePacketAsync() thêm case "UPDATE_PROFILE"
+    //    • Gọi FirebaseApiService.UpdateUserProfileAsync()
+    //    • Trả về gói JSON { Type, Payload } thay vì chuỗi thuần
+    //      để NetworkManager phía Client dễ phân tích bằng JObject.Parse()
+    // ============================================================
+
     class Program
     {
-        // Khởi tạo dịch vụ Firebase Auth đã viết ở bài trước
         private static FirebaseApiService _firebaseApi = new FirebaseApiService();
 
-        // Đổi Main thành async Task Main để hỗ trợ code bất đồng bộ (Async/Await)
         static async Task Main(string[] args)
         {
-            // Thêm 2 dòng này ĐẦU TIÊN để ép Console dùng UTF-8
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
@@ -26,51 +31,34 @@ namespace Monopoly.Server
             Console.WriteLine("    MÁY CHỦ CỜ TỶ PHÚ ĐANG KHỞI ĐỘNG ");
             Console.WriteLine("=====================================");
 
-            // Lắng nghe trên mọi IP của máy hiện tại, ở cổng 8080
             TcpListener listener = new TcpListener(IPAddress.Any, 8080);
             listener.Start();
             Console.WriteLine($"[INFO] {DateTime.Now:HH:mm:ss} - Server đang lắng nghe tại cổng 8080...\n");
 
-            // Vòng lặp VÔ TẬN để liên tục đón khách (Clients)
             while (true)
             {
-                // AcceptTcpClientAsync sẽ "đứng đợi" ở đây cho đến khi có 1 Client kết nối vào
                 TcpClient client = await listener.AcceptTcpClientAsync();
-                Console.WriteLine($"[CONNECT] Client mới vừa tham gia: {client.Client.RemoteEndPoint}");
-
-                // Giao Client này cho một luồng (Task) riêng biệt chăm sóc
-                // Dấu "_" để báo cho C# biết ta không cần chờ Task này chạy xong mới lặp tiếp
+                Console.WriteLine($"[CONNECT] Client mới: {client.Client.RemoteEndPoint}");
                 _ = HandleClientAsync(client);
             }
         }
 
-        // Hàm chuyên chăm sóc 1 Client cụ thể (Liên tục đọc dữ liệu gửi lên)
         private static async Task HandleClientAsync(TcpClient client)
         {
             try
             {
-                // Dùng khối using để tự động ngắt kết nối NetworkStream khi Client thoát
                 using (NetworkStream stream = client.GetStream())
                 {
-                    byte[] buffer = new byte[4096]; // Bộ đệm 4KB
-
-                    while (true) // Vòng lặp lắng nghe tin nhắn của Client này
+                    byte[] buffer = new byte[4096];
+                    while (true)
                     {
-                        // Đọc byte từ mạng vào buffer: stream ghi dữ liệu vào buffer, trả về số nguyên
                         int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                        if (bytesRead == 0) break;
 
-                        // Nếu số byte đọc được = 0, nghĩa là Client đã chủ động ngắt kết nối
-                        if (bytesRead == 0) 
-                            break;
-
-                        // Chuyển byte thành chuỗi
                         string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        string[] jsonPackets = receivedData.Split(
+                            new[] { "<EOF>" }, StringSplitOptions.RemoveEmptyEntries);
 
-                        // Kỹ thuật Packet Framing: Cắt chuỗi dựa vào dấu <EOF> để tránh dính gói tin
-                        string[] jsonPackets = receivedData.Split(new[] { "<EOF>" }, 
-                            StringSplitOptions.RemoveEmptyEntries);
-
-                        // Xử lý từng gói tin một
                         foreach (var json in jsonPackets)
                         {
                             Console.WriteLine($"[NHẬN TỪ {client.Client.RemoteEndPoint}] {json}");
@@ -81,8 +69,7 @@ namespace Monopoly.Server
             }
             catch (Exception ex)
             {
-                // Bắt lỗi khi Client bị rớt mạng đột ngột (rút dây mạng, tắt ngang màn hình)
-                Console.WriteLine($"[LỖI] Kết nối với Client bị ngắt đột ngột: {ex.Message}");
+                Console.WriteLine($"[LỖI] Kết nối bị ngắt đột ngột: {ex.Message}");
             }
             finally
             {
@@ -91,48 +78,119 @@ namespace Monopoly.Server
             }
         }
 
-        // Hàm "Tổng đài viên": Bóc vỏ gói tin và điều hướng xử lý
         private static async Task RoutePacketAsync(string jsonPacket, NetworkStream stream)
         {
             try
             {
-                // 1. Phân tích gói tin thô thành Dynamic Object (hoặc dùng NetworkPacket class của Shared)
                 dynamic packet = JsonConvert.DeserializeObject(jsonPacket);
                 string packetType = packet.Type;
 
-                // 2. Điều hướng dựa theo Type
                 switch (packetType)
                 {
+                    // ──────────────────────────────────────────
+                    // ĐĂNG NHẬP / ĐĂNG KÝ (giữ nguyên logic cũ)
+                    // ──────────────────────────────────────────
                     case "Login":
                     case "Register":
-                        // Bóc tách payload của Login/Register
-                        dynamic authPayload = JsonConvert.DeserializeObject(packet.Payload.ToString());
-                        string email = authPayload.Email;
-                        string password = authPayload.Password;
-                        bool isLogin = (packetType == "Login");
-                        string username = authPayload.Username; // Thêm dòng này lấy từ JSON
-                        string result = await _firebaseApi.AuthenticateUser(email, password, username, isLogin); // Cập nhật tham số
+                        {
+                            dynamic authPayload = JsonConvert.DeserializeObject(packet.Payload.ToString());
+                            string email = authPayload.Email;
+                            string password = authPayload.Password;
+                            string username = authPayload.Username ?? "";
+                            bool isLogin = (packetType == "Login");
 
-                        Console.WriteLine($"[AUTH] Đang xử lý {(isLogin ? "Đăng nhập" : "Đăng ký")} " +
-                            $"cho {email}...");
+                            Console.WriteLine($"[AUTH] Xử lý {(isLogin ? "Đăng nhập" : "Đăng ký")} cho {email}...");
 
-                        // Gọi sang class FirebaseApiService
-                      
+                            string result = await _firebaseApi.AuthenticateUser(email, password, username, isLogin);
 
-                        // Trả kết quả ngược lại cho Client
-                        byte[] responseBytes = Encoding.UTF8.GetBytes(result + "<EOF>");
-                        await stream.WriteAsync(responseBytes, 0, responseBytes.Length);
+                            // Trả về chuỗi thuần (giữ tương thích với AuthManager.cs gốc)
+                            byte[] responseBytes = Encoding.UTF8.GetBytes(result + "<EOF>");
+                            await stream.WriteAsync(responseBytes, 0, responseBytes.Length);
 
-                        Console.WriteLine($"[TRẢ VỀ] {result}");
-                        break;
+                            Console.WriteLine($"[TRẢ VỀ AUTH] {result}");
+                            break;
+                        }
 
+                    // ──────────────────────────────────────────
+                    // CẬP NHẬT HỒ SƠ CÁ NHÂN  ← MỚI
+                    // ──────────────────────────────────────────
+                    case "UPDATE_PROFILE":
+                        {
+                            dynamic profilePayload = JsonConvert.DeserializeObject(packet.Payload.ToString());
+
+                            string uid = profilePayload.Uid?.ToString() ?? "";
+                            string idToken = profilePayload.IdToken?.ToString() ?? "";
+                            string newUsername = profilePayload.NewUsername?.ToString() ?? "";
+                            string newAvatarId = profilePayload.NewAvatarId?.ToString() ?? "";
+
+                            Console.WriteLine($"[PROFILE] Yêu cầu cập nhật từ UID={uid}: " +
+                                              $"Username={newUsername}, Avatar={newAvatarId}");
+
+                            // Validate server-side tối thiểu
+                            if (string.IsNullOrWhiteSpace(uid) || string.IsNullOrWhiteSpace(idToken))
+                            {
+                                await SendJsonPacketAsync(stream, new
+                                {
+                                    Type = "FAIL_PROFILE",
+                                    Payload = new { Message = "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại." }
+                                });
+                                break;
+                            }
+
+                            if (string.IsNullOrWhiteSpace(newUsername) || newUsername.Length < 3)
+                            {
+                                await SendJsonPacketAsync(stream, new
+                                {
+                                    Type = "FAIL_PROFILE",
+                                    Payload = new { Message = "Tên người chơi không hợp lệ (tối thiểu 3 ký tự)." }
+                                });
+                                break;
+                            }
+
+                            // Gọi Firebase để cập nhật
+                            string dbResult = await _firebaseApi.UpdateUserProfileAsync(
+                                uid, newUsername, newAvatarId, idToken);
+
+                            if (dbResult == "SUCCESS_PROFILE")
+                            {
+                                // Trả về JSON với Type = "SUCCESS_PROFILE" để NetworkManager parse
+                                await SendJsonPacketAsync(stream, new
+                                {
+                                    Type = "SUCCESS_PROFILE",
+                                    Payload = new
+                                    {
+                                        NewUsername = newUsername,
+                                        NewAvatarId = newAvatarId
+                                    }
+                                });
+                                Console.WriteLine($"[PROFILE] Cập nhật thành công cho UID={uid}");
+                            }
+                            else
+                            {
+                                // dbResult dạng "FAIL_PROFILE|{lý do}"
+                                string errorMsg = dbResult.Contains("|")
+                                    ? dbResult.Split('|')[1]
+                                    : "Lỗi Database không xác định.";
+
+                                await SendJsonPacketAsync(stream, new
+                                {
+                                    Type = "FAIL_PROFILE",
+                                    Payload = new { Message = errorMsg }
+                                });
+                                Console.WriteLine($"[PROFILE] Cập nhật thất bại: {errorMsg}");
+                            }
+                            break;
+                        }
+
+                    // ──────────────────────────────────────────
+                    // CÁC LOẠI PACKET KHÁC
+                    // ──────────────────────────────────────────
                     case "DiceRoll":
-                        // Gọi hàm xử lý tung xúc xắc ở đây
+                        // TODO: Xử lý tung xúc xắc
                         break;
 
                     default:
-                        Console.WriteLine($"[CẢNH BÁO] Nhận được loại Packet không xác định: " +
-                            $"{packetType}");
+                        Console.WriteLine($"[CẢNH BÁO] Packet không xác định: {packetType}");
                         break;
                 }
             }
@@ -140,6 +198,18 @@ namespace Monopoly.Server
             {
                 Console.WriteLine($"[LỖI XỬ LÝ GÓI TIN] {ex.Message}");
             }
+        }
+
+        // ──────────────────────────────────────────────────────
+        // HELPER: Đóng gói object thành JSON + <EOF> rồi gửi đi
+        // Dùng chung cho tất cả phản hồi dạng JSON (thay vì string thuần)
+        // ──────────────────────────────────────────────────────
+
+        private static async Task SendJsonPacketAsync(NetworkStream stream, object responseObject)
+        {
+            string json = JsonConvert.SerializeObject(responseObject) + "<EOF>";
+            byte[] bytes = Encoding.UTF8.GetBytes(json);
+            await stream.WriteAsync(bytes, 0, bytes.Length);
         }
     }
 }

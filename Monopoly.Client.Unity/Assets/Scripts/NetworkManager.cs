@@ -4,6 +4,15 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using System;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+// ============================================================
+//  NetworkManager.cs  (PHIÊN BẢN CẬP NHẬT)
+//  Thay đổi so với bản gốc:
+//    • ProcessServerMessage() xử lý thêm SUCCESS_PROFILE và FAIL_PROFILE
+//    • Tham chiếu tới LobbyManager thông qua FindObjectOfType<LobbyManager>()
+// ============================================================
 
 public class NetworkManager : MonoBehaviour
 {
@@ -62,7 +71,10 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    // Hàm lắng nghe liên tục - Gọi từ LobbyManager
+    // ──────────────────────────────────────────────────────────
+    // VÒNG LẶP LẮNG NGHE — Gọi từ LobbyManager.Start()
+    // ──────────────────────────────────────────────────────────
+
     public async void StartListeningToServer()
     {
         if (isListening || ServerStream == null) return;
@@ -76,27 +88,107 @@ public class NetworkManager : MonoBehaviour
                 int bytesRead = await ServerStream.ReadAsync(buffer, 0, buffer.Length);
                 if (bytesRead > 0)
                 {
-                    string response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Replace("<EOF>", "");
-                    ProcessServerMessage(response);
+                    // Tách theo <EOF> để xử lý nhiều gói tin đến cùng lúc
+                    string raw = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    string[] packets = raw.Split(new[] { "<EOF>" }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string packet in packets)
+                        ProcessServerMessage(packet.Trim());
                 }
             }
         }
-        catch (Exception) { isListening = false; }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[NetworkManager] Vòng lặp lắng nghe kết thúc: {ex.Message}");
+            isListening = false;
+        }
     }
+
+    // ──────────────────────────────────────────────────────────
+    // XỬ LÝ GÓI TIN TỪ SERVER
+    // ──────────────────────────────────────────────────────────
 
     private void ProcessServerMessage(string jsonResponse)
     {
-        // Nhận lệnh chuyển cảnh từ Server
+        if (string.IsNullOrWhiteSpace(jsonResponse)) return;
+
+        // ── Gói tin cũ: lệnh bắt đầu game ────────────────────
         if (jsonResponse.Contains("GAME_STARTING"))
         {
             UnityEngine.SceneManagement.SceneManager.LoadScene("GameScene");
+            return;
+        }
+
+        // ── Phân tích JSON để điều hướng theo Type ────────────
+        try
+        {
+            var data = JObject.Parse(jsonResponse);
+            string type = data["Type"]?.ToString() ?? "";
+
+            switch (type)
+            {
+                // ── Phòng được tạo thành công ──────────────────
+                case "ROOM_CREATED":
+                    {
+                        string roomId = data["Payload"]?["RoomId"]?.ToString() ?? "";
+                        string mapName = data["Payload"]?["MapName"]?.ToString() ?? "";
+                        FindObjectOfType<LobbyManager>()?.OnRoomCreatedSuccess(roomId, mapName);
+                        break;
+                    }
+
+                // ── Cập nhật danh sách người chơi trong phòng ─
+                case "ROOM_UPDATE":
+                    {
+                        var players = data["Payload"]?["Players"]
+                            ?.ToObject<System.Collections.Generic.List<PlayerSlotData>>();
+                        if (players != null)
+                            FindObjectOfType<LobbyManager>()?.RefreshPlayerList(players);
+                        break;
+                    }
+
+                // ── Cập nhật hồ sơ thành công ─────────────────
+                // Server gửi: { "Type": "SUCCESS_PROFILE",
+                //               "Payload": { "NewUsername": "...", "NewAvatarId": "..." } }
+                case "SUCCESS_PROFILE":
+                    {
+                        string newUsername = data["Payload"]?["NewUsername"]?.ToString() ?? "";
+                        string newAvatarId = data["Payload"]?["NewAvatarId"]?.ToString() ?? "";
+
+                        // Cập nhật phải chạy trên Main Thread — dùng UnityMainThreadDispatcher
+                        // hoặc đơn giản hơn: gọi trực tiếp vì ReadAsync đã được await trên main thread trong Unity
+                        FindObjectOfType<LobbyManager>()?.OnProfileUpdateSuccess(newUsername, newAvatarId);
+                        break;
+                    }
+
+                // ── Cập nhật hồ sơ thất bại ───────────────────
+                // Server gửi: { "Type": "FAIL_PROFILE",
+                //               "Payload": { "Message": "Username đã tồn tại" } }
+                case "FAIL_PROFILE":
+                    {
+                        string errorMsg = data["Payload"]?["Message"]?.ToString() ?? "Lỗi không xác định";
+                        FindObjectOfType<LobbyManager>()?.OnProfileUpdateFailed(errorMsg);
+                        break;
+                    }
+
+                default:
+                    Debug.Log($"[NetworkManager] Gói tin không được xử lý: {type}");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[NetworkManager] Lỗi phân tích JSON: {ex.Message}\nNội dung: {jsonResponse}");
         }
     }
+
+    // ──────────────────────────────────────────────────────────
+    // NGẮT KẾT NỐI
+    // ──────────────────────────────────────────────────────────
 
     public void Disconnect()
     {
         ServerStream?.Close();
         ClientSocket?.Close();
+        isListening = false;
     }
 
     private void OnApplicationQuit() => Disconnect();
