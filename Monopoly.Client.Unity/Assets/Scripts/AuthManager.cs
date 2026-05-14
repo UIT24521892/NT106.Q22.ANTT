@@ -7,107 +7,158 @@ using Newtonsoft.Json;
 
 public class AuthManager : MonoBehaviour
 {
-    [Header("UI Elements")]
-    [SerializeField] private TextMeshProUGUI txtTitle;
-    [SerializeField] private TMP_InputField inpUsername;
-    [SerializeField] private TMP_InputField inpEmail;
-    [SerializeField] private TMP_InputField inpPassword;
+    // --- PHẦN SỬA ĐỔI 1: Khai báo các Panel ---
+    [Header("Panels")]
+    [SerializeField] private GameObject authPanel;     // Login Panel cũ
+    [SerializeField] private GameObject registerPanel; // Register Panel mới bạn vừa tạo
 
-    [SerializeField] private Button btnAction;
-    [SerializeField] private TextMeshProUGUI txtActionBtn; // Chữ bên trong nút Action
-    [SerializeField] private TextMeshProUGUI txtSwitchBtn; // Chữ bên trong nút Switch
+    // --- PHẦN SỬA ĐỔI 2: Tách biệt các ô nhập liệu ---
+    [Header("Login Fields (AuthPanel)")]
+    [SerializeField] private TMP_InputField inpEmail_Login;
+    [SerializeField] private TMP_InputField inpPassword_Login;
+
+    [Header("Register Fields (RegisterPanel)")]
+    // Lưu ý: Phải chọn đúng loại "Input Field - TextMeshPro" trong Unity
+    [SerializeField] private TMP_InputField inpUsername_Reg; 
+    [SerializeField] private TMP_InputField inpEmail_Reg;
+    [SerializeField] private TMP_InputField inpPassword_Reg;
+    [SerializeField] private TMP_InputField inpConfirmPassword_Reg; 
+
+    // Thông báo trạng thái đăng nhâp/đăng ký
+    [SerializeField] private TextMeshProUGUI txtStatus;
+    [SerializeField] private TextMeshProUGUI txtStatus_Reg;
+
+    // Tạo một hàm để hiển thị thông báo lỗi
+    private void ShowMessage(string message, bool isError = true)
+    {
+        // Xác định cái "loa" nào sẽ phát thông báo
+        TextMeshProUGUI targetText = isLoginMode ? txtStatus : txtStatus_Reg;
+
+        if (targetText == null) return;
+        
+        // Dùng Rich Text để ép màu cho chắc chắn
+        string colorHex = isError ? "#FF0000" : "#00FF00";
+        targetText.text = $"<color={colorHex}>{message}</color>";
+
+        // Tự động xóa sau 3 giây
+        CancelInvoke(nameof(ClearMessage));
+        Invoke(nameof(ClearMessage), 3f);
+    }
+
+    private void ClearMessage()
+    {
+        if (txtStatus != null) txtStatus.text = "";
+        if (txtStatus_Reg != null) txtStatus_Reg.text = "";
+    }
 
     private bool isLoginMode = true;
 
+
+    // Trong file AuthManager.cs
     private void Start()
     {
-        UpdateUI();
-    }
+        // 1. Luôn đưa về trạng thái Đăng nhập khi khởi đầu Scene
+        isLoginMode = true;
 
-    // Gắn hàm này vào sự kiện OnClick của nút Switch
-    public void OnSwitchModeClicked()
+        // 2. Ép buộc hiển thị đúng các Panel để tránh lỗi màn hình trống
+        if (authPanel != null) authPanel.SetActive(true);
+        if (registerPanel != null) registerPanel.SetActive(false);
+
+        // 3. Xử lý màn hình Splash (màn hình chờ kết nối)
+        // Tìm đối tượng SplashPanel trong Scene mới
+        GameObject splash = GameObject.Find("SplashPanel");
+        
+        // Nếu NetworkManager đã kết nối thành công từ trước (trường hợp vừa Logout)
+        if (NetworkManager.ServerStream != null && NetworkManager.ClientSocket != null && NetworkManager.ClientSocket.Connected)
+        {
+            // Tắt luôn SplashPanel vì mạng đã sẵn sàng rồi
+            if (splash != null) splash.SetActive(false);
+            Debug.Log("AuthManager: Da co ket noi san, tat Splash va hien Login.");
+        }
+        else
+        {
+            // Trường hợp mới mở game lần đầu, để SplashPanel hiện lên 
+            // cho đến khi NetworkManager kết nối xong và ra lệnh tắt.
+            if (splash != null) splash.SetActive(true);
+        }
+    }
+    // --- PHẦN SỬA ĐỔI 3: Các hàm chuyển đổi cho Button ---
+    public void OpenRegister()
     {
-        isLoginMode = !isLoginMode;
-        UpdateUI();
+        isLoginMode = false;
+        ClearMessage(); // Xóa thông báo cũ của trang Login trước khi sang Reg
+        authPanel.SetActive(false);
+        registerPanel.SetActive(true);
     }
 
-    private void UpdateUI()
+    public void OpenLogin()
     {
-        txtTitle.text = isLoginMode ? "ĐĂNG NHẬP" : "ĐĂNG KÝ TÀI KHOẢN";
-        txtActionBtn.text = isLoginMode ? "ĐĂNG NHẬP" : "TẠO TÀI KHOẢN";
-        txtSwitchBtn.text = isLoginMode ? "Chưa có tài khoản? Đăng ký ngay" : "Đã có tài khoản? Đăng nhập";
-
-        // Chỉ hiện ô nhập Username khi ở chế độ Đăng ký
-        inpUsername.gameObject.SetActive(!isLoginMode);
+        isLoginMode = true;
+        ClearMessage(); // Xóa thông báo cũ của trang Reg trước khi sang Login
+        authPanel.SetActive(true);
+        registerPanel.SetActive(false);
     }
 
-    // Gắn hàm này vào sự kiện OnClick của nút Action (Đăng nhập/Đăng ký)
     public async void OnActionClicked()
     {
-        if (NetworkManager.ServerStream == null)
-        {
-            Debug.LogError("Chưa kết nối đến Server! Hãy kiểm tra lại.");
-            return;
-        }
-
-        btnAction.interactable = false;
-        txtActionBtn.text = "ĐANG XỬ LÝ...";
+        if (NetworkManager.ServerStream == null) return;
 
         try
         {
-            // 1. Tạo gói tin JSON
-            var payload = new
-            {
-                Username = inpUsername.text,
-                Email = inpEmail.text,
-                Password = inpPassword.text
-            };
+            // --- PHẦN SỬA ĐỔI 4: Lấy dữ liệu tùy theo Mode hiện tại ---
+            string email = isLoginMode ? inpEmail_Login.text : inpEmail_Reg.text;
+            string password = isLoginMode ? inpPassword_Login.text : inpPassword_Reg.text;
+            string username = isLoginMode ? "" : inpUsername_Reg.text;
 
-            var packet = new
+            // Kiểm tra khớp mật khẩu cho Register
+            
+            if (!isLoginMode)
             {
-                Type = isLoginMode ? "Login" : "Register",
-                Payload = JsonConvert.SerializeObject(payload)
-            };
+                // 1. Kiểm tra các ô có bị bỏ trống không
+                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
+                {
+                    ShowMessage("Fill in all the blanks!", true);
+                    return;
+                }
+
+                // 2. Kiểm tra khớp mật khẩu
+                if (password != inpConfirmPassword_Reg.text)
+                {
+                    ShowMessage("Passwords do not match!", true); // Hiện chữ đỏ ngay trên màn hình
+                    return;
+                }
+            }
+
+
+            // Gửi dữ liệu lên Server (giữ nguyên logic cũ)
+            var payload = new { Username = username, Email = email, Password = password };
+            var packet = new { Type = isLoginMode ? "Login" : "Register", Payload = JsonConvert.SerializeObject(payload) };
 
             string jsonToSend = JsonConvert.SerializeObject(packet) + "<EOF>";
             byte[] outStream = Encoding.UTF8.GetBytes(jsonToSend);
-
-            // 2. Gửi qua TCP Server
             await NetworkManager.ServerStream.WriteAsync(outStream, 0, outStream.Length);
 
-            // 3. Lắng nghe phản hồi từ Server
+            // Nhận phản hồi
             byte[] buffer = new byte[1024];
             int bytesRead = await NetworkManager.ServerStream.ReadAsync(buffer, 0, buffer.Length);
-
             if (bytesRead > 0)
             {
                 string response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Replace("<EOF>", "");
-
                 if (response.StartsWith("SUCCESS"))
                 {
                     string[] parts = response.Split('|');
-                    Debug.Log($"<color=green>THÀNH CÔNG! Chào mừng {parts[1]}</color>");
-                    string uid = parts[1];
-                    string jwtToken = parts[2];
-                    // TODO: Tắt AuthPanel, Bật MainMenu Panel ở đây!
-                    PlayerSession.Initialize(uid, jwtToken, inpEmail.text, 2000000, "avatar_1");
-
+                    // Lưu thông tin phiên chơi (UID, Token, Email, Tiền mặc định, Avatar mặc định)
+                    PlayerSession.Initialize(parts[1], parts[2], email, 2000000, "avatar_1");
                     UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
                 }
                 else
                 {
-                    Debug.Log($"<color=red>THẤT BẠI: {response.Split('|')[1]}</color>");
+                    // Tách lấy nội dung lỗi từ Server (ví dụ: "FAILED|Sai mật khẩu")
+                    string detail = response.Split('|')[1]; 
+                    ShowMessage(detail, true); // Gọi hàm với tham số true để hiện màu đỏ
                 }
             }
         }
-        catch (Exception ex)
-        {
-            Debug.LogError("Lỗi mạng: " + ex.Message);
-        }
-        finally
-        {
-            btnAction.interactable = true;
-            UpdateUI(); // Phục hồi lại chữ trên nút
-        }
+        catch (Exception ex) { Debug.LogError(ex.Message); }
     }
 }
