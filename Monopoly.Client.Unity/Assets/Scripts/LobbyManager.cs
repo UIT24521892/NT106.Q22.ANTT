@@ -322,20 +322,16 @@ public class LobbyManager : MonoBehaviour
     /// </summary>
     public void OnBtnConfirmCreateRoomClicked()
     {
-        // ── Bước 1: Validate dữ liệu người dùng nhập ──────────
         int maxPlayers = (int)sliderMaxPlayers.value;
         int botCount = (int)sliderBotCount.value;
         string selectedMap = dropdownMap.options[dropdownMap.value].text;
 
-        // Kiểm tra: số bot + 1 người thật không vượt quá maxPlayers
         if (botCount >= maxPlayers)
         {
             ShowRoomSettingsError("Phải có ít nhất 1 người chơi thật trong phòng!");
             return;
         }
 
-        // ── Bước 2: Đóng gói gói tin JSON ────────────────────
-        // Type: "CREATE_ROOM" — Server sẽ tạo phòng, gán RoomID và trả về
         var packet = new
         {
             Type = "CREATE_ROOM",
@@ -350,16 +346,11 @@ public class LobbyManager : MonoBehaviour
 
         SendPacketToServer(packet);
 
-        // ── Bước 3: Đánh dấu người này là chủ phòng ──────────
-        // (Trạng thái chính thức sẽ được Server xác nhận qua phản hồi)
-        isHost = true;
-
-        // ── Bước 4: Chuẩn bị Waiting Room cho Host ────────────
-        // Hiển thị nút "Bắt đầu" thay vì "Sẵn sàng"
-        SetupWaitingRoomForHost();
-
-        // Chuyển sang Waiting Room (Server sẽ gửi lại thông tin phòng đầy đủ)
-        ShowPanel(panelWaitingRoom);
+        if (txtRoomSettingsError != null)
+        {
+            txtRoomSettingsError.color = Color.white;
+            txtRoomSettingsError.text = "Đang tạo phòng...";
+        }
 
         Debug.Log($"[LobbyManager] Đã gửi yêu cầu tạo phòng: MaxPlayers={maxPlayers}, Bot={botCount}, Map={selectedMap}");
     }
@@ -453,9 +444,13 @@ public class LobbyManager : MonoBehaviour
     /// </summary>
     public void OnBtnLeaveRoomClicked()
     {
-        // ── Đóng gói gói tin JSON ──────────────────────────────
-        // Type: "LEAVE_ROOM" — Server xóa người chơi khỏi phòng,
-        //                      nếu là Host thì giải tán phòng hoặc chuyển quyền
+        if (string.IsNullOrWhiteSpace(currentRoomId))
+        {
+            ResetLobbyState();
+            ShowPanel(panelMainMenu);
+            return;
+        }
+
         var packet = new
         {
             Type = "LEAVE_ROOM",
@@ -469,13 +464,7 @@ public class LobbyManager : MonoBehaviour
 
         SendPacketToServer(packet);
 
-        // Reset trạng thái local
-        ResetLobbyState();
-
-        // Quay về Main Menu
-        ShowPanel(panelMainMenu);
-
-        Debug.Log($"[LobbyManager] Đã rời phòng {currentRoomId}");
+        Debug.Log($"[LobbyManager] Đã gửi yêu cầu rời phòng {currentRoomId}");
     }
 
     // ──────────────────────────────────────────────────────────
@@ -491,12 +480,17 @@ public class LobbyManager : MonoBehaviour
     public void OnRoomCreatedSuccess(string roomId, string mapName)
     {
         currentRoomId = roomId;
+        isHost = true;
+        isReady = true;
 
         if (txtRoomId != null)
             txtRoomId.text = $"Mã phòng: #{roomId}";
 
         if (txtRoomMap != null)
             txtRoomMap.text = $"Map: {mapName}";
+
+        SetupWaitingRoomForHost();
+        ShowPanel(panelWaitingRoom);
 
         Debug.Log($"[LobbyManager] Phòng được tạo thành công! RoomID = {roomId}");
     }
@@ -672,18 +666,26 @@ public class LobbyManager : MonoBehaviour
     // SECTION 15: PROFILE PANEL
     // ═══════════════════════════════════════
 
+    // ═══════════════════════════════════════
+    // SECTION 15: PROFILE PANEL
+    // ═══════════════════════════════════════
+
     public void OnBtnOpenProfileClicked()
     {
         if (txtProfileCurrentName != null)
             txtProfileCurrentName.text = $"Tên hiện tại: {PlayerSession.Instance?.Username ?? "Player"}";
+
         if (inpNewUsername != null)
             inpNewUsername.text = PlayerSession.Instance?.Username ?? "";
 
         _selectedAvatarId = PlayerSession.Instance?.AvatarId ?? avatarIds[0];
+
         HighlightSelectedAvatar();
         RegisterAvatarButtonListeners();
 
-        if (txtProfileStatus != null) txtProfileStatus.text = "";
+        if (txtProfileStatus != null)
+            txtProfileStatus.text = "";
+
         ShowPanel(panelProfile);
     }
 
@@ -695,7 +697,9 @@ public class LobbyManager : MonoBehaviour
     private void RegisterAvatarButtonListeners()
     {
         if (_avatarListenersRegistered || avatarButtons == null) return;
+
         _avatarListenersRegistered = true;
+
         for (int i = 0; i < avatarButtons.Length; i++)
         {
             int idx = i;
@@ -706,6 +710,7 @@ public class LobbyManager : MonoBehaviour
     private void OnAvatarSelected(int index)
     {
         if (index < 0 || index >= avatarIds.Length) return;
+
         _selectedAvatarId = avatarIds[index];
         HighlightSelectedAvatar();
     }
@@ -713,14 +718,19 @@ public class LobbyManager : MonoBehaviour
     private void HighlightSelectedAvatar()
     {
         if (avatarButtons == null) return;
+
         for (int i = 0; i < avatarButtons.Length; i++)
         {
             if (avatarButtons[i] == null) continue;
+
             var colors = avatarButtons[i].colors;
-            bool isSelected = (i < avatarIds.Length && avatarIds[i] == _selectedAvatarId);
+
+            bool isSelected = i < avatarIds.Length && avatarIds[i] == _selectedAvatarId;
+
             colors.normalColor = isSelected
                 ? new Color(1f, 0.85f, 0.1f, 1f)
                 : new Color(1f, 1f, 1f, 1f);
+
             avatarButtons[i].colors = colors;
         }
     }
@@ -734,14 +744,19 @@ public class LobbyManager : MonoBehaviour
             ShowProfileStatus("Tên phải từ 3 ký tự trở lên!", isError: true);
             return;
         }
+
         if (string.IsNullOrEmpty(_selectedAvatarId))
         {
             ShowProfileStatus("Vui lòng chọn Avatar!", isError: true);
             return;
         }
 
-        if (btnSaveProfile != null) btnSaveProfile.interactable = false;
-        if (txtSaveProfileBtn != null) txtSaveProfileBtn.text = "ĐANG LƯU...";
+        if (btnSaveProfile != null)
+            btnSaveProfile.interactable = false;
+
+        if (txtSaveProfileBtn != null)
+            txtSaveProfileBtn.text = "ĐANG LƯU...";
+
         ShowProfileStatus("Đang gửi yêu cầu...", isError: false);
 
         var packet = new
@@ -755,6 +770,7 @@ public class LobbyManager : MonoBehaviour
                 NewAvatarId = _selectedAvatarId
             }
         };
+
         SendPacketToServer(packet);
     }
 
@@ -765,15 +781,24 @@ public class LobbyManager : MonoBehaviour
 
         if (txtProfileCurrentName != null)
             txtProfileCurrentName.text = $"Tên hiện tại: {newUsername}";
-        if (btnSaveProfile != null) btnSaveProfile.interactable = true;
-        if (txtSaveProfileBtn != null) txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+
+        if (btnSaveProfile != null)
+            btnSaveProfile.interactable = true;
+
+        if (txtSaveProfileBtn != null)
+            txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+
         ShowProfileStatus("✓ Cập nhật thành công!", isError: false);
     }
 
     public void OnProfileUpdateFailed(string errorMessage)
     {
-        if (btnSaveProfile != null) btnSaveProfile.interactable = true;
-        if (txtSaveProfileBtn != null) txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+        if (btnSaveProfile != null)
+            btnSaveProfile.interactable = true;
+
+        if (txtSaveProfileBtn != null)
+            txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+
         ShowProfileStatus($"✗ Lỗi: {errorMessage}", isError: true);
     }
 
@@ -781,12 +806,14 @@ public class LobbyManager : MonoBehaviour
     {
         if (txtPlayerUsername != null)
             txtPlayerUsername.text = PlayerSession.Instance?.Username ?? "Player";
+
         if (txtPlayerBalance != null)
             txtPlayerBalance.text = FormatCurrency(PlayerSession.Instance?.Balance ?? 0);
 
         if (imgPlayerAvatar != null && avatarSprites != null)
         {
             int idx = System.Array.IndexOf(avatarIds, PlayerSession.Instance?.AvatarId ?? "");
+
             if (idx >= 0 && idx < avatarSprites.Length && avatarSprites[idx] != null)
                 imgPlayerAvatar.sprite = avatarSprites[idx];
         }
@@ -795,12 +822,157 @@ public class LobbyManager : MonoBehaviour
     private void ShowProfileStatus(string message, bool isError)
     {
         if (txtProfileStatus == null) return;
+
         txtProfileStatus.text = message;
         txtProfileStatus.color = isError
             ? new Color(0.9f, 0.2f, 0.2f, 1f)
             : new Color(0.2f, 0.75f, 0.3f, 1f);
     }
+
+    // ═══════════════════════════════════════
+    // SECTION 16: ROOM LIST / JOIN ROOM / SERVER CALLBACKS
+    // ═══════════════════════════════════════
+
+    public void RefreshRoomList(List<RoomSummaryData> rooms)
+    {
+        if (roomListContainer == null || roomSlotPrefab == null)
+        {
+            Debug.LogWarning("[LobbyManager] Chưa gán roomListContainer hoặc roomSlotPrefab trong Inspector.");
+            return;
+        }
+
+        foreach (Transform child in roomListContainer)
+        {
+            Destroy(child.gameObject);
+        }
+
+        if (rooms == null || rooms.Count == 0)
+        {
+            if (txtEmptyRoom != null)
+            {
+                txtEmptyRoom.gameObject.SetActive(true);
+                txtEmptyRoom.text = "Không có phòng nào đang chờ.";
+            }
+
+            Debug.Log("[LobbyManager] Danh sách phòng rỗng.");
+            return;
+        }
+
+        if (txtEmptyRoom != null)
+            txtEmptyRoom.gameObject.SetActive(false);
+
+        foreach (RoomSummaryData room in rooms)
+        {
+            GameObject slot = Instantiate(roomSlotPrefab, roomListContainer);
+            RoomSlotUI slotUI = slot.GetComponent<RoomSlotUI>();
+
+            if (slotUI != null)
+            {
+                slotUI.Setup(room, this);
+            }
+            else
+            {
+                Debug.LogWarning("[LobbyManager] roomSlotPrefab chưa có component RoomSlotUI.");
+            }
+        }
+
+        Debug.Log($"[LobbyManager] Đã hiển thị {rooms.Count} phòng.");
+    }
+
+    public void OnBtnJoinSpecificRoomClicked(string roomId)
+    {
+        if (string.IsNullOrWhiteSpace(roomId))
+        {
+            OnJoinRoomFailed("RoomId không hợp lệ.");
+            return;
+        }
+
+        var packet = new
+        {
+            Type = "JOIN_ROOM",
+            Payload = new
+            {
+                RoomId = roomId,
+                Username = PlayerSession.Instance?.Username
+            }
+        };
+
+        SendPacketToServer(packet);
+
+        if (txtEmptyRoom != null)
+        {
+            txtEmptyRoom.gameObject.SetActive(true);
+            txtEmptyRoom.text = "Đang vào phòng...";
+        }
+
+        Debug.Log($"[LobbyManager] Đã gửi yêu cầu join phòng {roomId}");
+    }
+
+    public void OnJoinRoomSuccess(string roomId, string mapName)
+    {
+        currentRoomId = roomId;
+        isHost = false;
+        isReady = false;
+
+        if (txtRoomId != null)
+            txtRoomId.text = $"Mã phòng: #{roomId}";
+
+        if (txtRoomMap != null)
+            txtRoomMap.text = $"Map: {mapName}";
+
+        SetupWaitingRoomForClient();
+        ShowPanel(panelWaitingRoom);
+
+        Debug.Log($"[LobbyManager] Join phòng thành công: {roomId}");
+    }
+
+    public void OnJoinRoomFailed(string message)
+    {
+        if (txtEmptyRoom != null)
+        {
+            txtEmptyRoom.gameObject.SetActive(true);
+            txtEmptyRoom.text = message;
+        }
+
+        Debug.LogWarning($"[LobbyManager] Join room failed: {message}");
+    }
+
+    public void OnCreateRoomFailed(string message)
+    {
+        ShowRoomSettingsError(message);
+        ShowPanel(panelRoomSettings);
+
+        Debug.LogWarning($"[LobbyManager] Create room failed: {message}");
+    }
+
+    public void OnStartGameFailed(string message)
+    {
+        Debug.LogWarning($"[LobbyManager] Start game failed: {message}");
+
+        if (txtRoomSettingsError != null)
+        {
+            txtRoomSettingsError.color = Color.red;
+            txtRoomSettingsError.text = message;
+        }
+    }
+
+    public void OnLeaveRoomSuccess()
+    {
+        ResetLobbyState();
+        ShowPanel(panelMainMenu);
+
+        Debug.Log("[LobbyManager] Rời phòng thành công.");
+    }
+
+    public void OnRoomClosed(string message)
+    {
+        ResetLobbyState();
+        ShowPanel(panelMainMenu);
+
+        Debug.LogWarning($"[LobbyManager] Room closed: {message}");
+    }
 }
+
 
 
 // ============================================================
@@ -819,6 +991,10 @@ public class PlayerSlotData
     public bool IsBot;
     public string AvatarUrl; // URL ảnh avatar (nếu có)
 }
+// ═══════════════════════════════════════
+// SECTION 16: ROOM LIST / JOIN ROOM / SERVER CALLBACKS
+// ═══════════════════════════════════════
+
 
 // ============================================================
 //  PLAYER SESSION SINGLETON (STUB)
