@@ -298,8 +298,15 @@ public class LobbyManager : MonoBehaviour
 
         SendPacketToServer(packet);
 
-        // Ngắt kết nối
-        NetworkManager.Instance?.Disconnect();
+        // --- BẮT ĐẦU SỬA ĐỔI ---
+        // 1. Comment hoặc xóa dòng ngắt kết nối này đi:
+        // NetworkManager.Instance?.Disconnect();
+
+        // 2. Xóa dữ liệu phiên đăng nhập cũ để account khác có thể login sạch sẽ
+        PlayerSession.Clear();
+        // --- KẾT THÚC SỬA ĐỔI ---
+
+        // Tải lại Scene Login
 
         // Tải lại Scene Login (đảm bảo "LoginScene" đúng tên trong Build Settings)
         UnityEngine.SceneManagement.SceneManager.LoadScene("SampleScene");
