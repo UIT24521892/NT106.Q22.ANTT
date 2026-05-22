@@ -15,6 +15,8 @@ public class PlayerSlotUI : MonoBehaviour
 
     public void Setup(string username, bool isReady, bool isHost, bool isBot)
     {
+        AutoBindMissingReferences();
+
         if (txtUsername != null)
             txtUsername.text = isBot ? $"[BOT] {username}" : username;
 
@@ -33,5 +35,30 @@ public class PlayerSlotUI : MonoBehaviour
 
         if (crownIcon != null)
             crownIcon.SetActive(isHost);
+    }
+
+    private void AutoBindMissingReferences()
+    {
+        TMP_Text[] texts = GetComponentsInChildren<TMP_Text>(true);
+
+        if (txtUsername == null && texts.Length > 0)
+            txtUsername = texts[0];
+
+        if (txtStatus == null && texts.Length > 1)
+            txtStatus = texts[1];
+
+        if (imgReadyIndicator == null)
+        {
+            Image[] images = GetComponentsInChildren<Image>(true);
+
+            foreach (Image image in images)
+            {
+                if (image.gameObject != gameObject)
+                {
+                    imgReadyIndicator = image;
+                    break;
+                }
+            }
+        }
     }
 }
