@@ -22,6 +22,9 @@ public class GameStateData
     public int LastDice1;
     public int LastDice2;
     public int LastDiceTotal;
+    public int LastMovedPlayerIndex;
+    public int LastMoveFromPosition;
+    public int LastMoveToPosition;
     public string LastActionMessage;
     public bool HasRolledThisTurn;
     public int TurnDurationSeconds;
@@ -33,6 +36,15 @@ public class GameStateData
 
     public List<GamePlayerStateData> Players;
     public Dictionary<int, GamePropertyStateData> Properties;
+}
+
+[System.Serializable]
+public class ChatMessageData
+{
+    public string RoomId;
+    public string Username;
+    public string Message;
+    public long SentAtUtcTicks;
 }
 
 [System.Serializable]
