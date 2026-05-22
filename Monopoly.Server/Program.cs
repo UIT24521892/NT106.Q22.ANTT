@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Monopoly.Shared.Models.Constants;
@@ -252,6 +253,11 @@ namespace Monopoly.Server
                     case "BUY_PROPERTY":
                     case "BuyProperty":
                         await HandleBuyPropertyAsync(connection);
+                        break;
+
+                    case "GAME_CHAT":
+                    case "CHAT_MESSAGE":
+                        await HandleGameChatAsync(packet, connection);
                         break;
 
                     default:
@@ -867,8 +873,89 @@ namespace Monopoly.Server
         }
 
         // ============================================================
-        // LEAVE ROOM
+        // GAME CHAT
         // ============================================================
+        private static async Task HandleGameChatAsync(JObject packet, ClientConnection connection)
+        {
+            JObject payload = GetPayloadObject(packet);
+
+            string roomId = payload["RoomId"]?.ToString() ?? connection.CurrentRoomId;
+            string message = payload["Message"]?.ToString() ?? "";
+            string username = connection.Username;
+
+            if (string.IsNullOrWhiteSpace(roomId))
+            {
+                await SendGameActionFailedAsync(connection, "Bạn chưa ở trong phòng để chat.");
+                return;
+            }
+
+            message = NormalizeChatMessage(message);
+
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            bool canSend;
+
+            lock (_lock)
+            {
+                canSend = _rooms.TryGetValue(roomId, out Room room) &&
+                    room.Players.Any(p => p.Username == username && !p.IsBot) &&
+                    connection.CurrentRoomId == roomId;
+            }
+
+            if (!canSend)
+            {
+                await SendGameActionFailedAsync(connection, "Bạn không ở trong phòng này.");
+                return;
+            }
+
+            await BroadcastToRoomAsync(roomId, new
+            {
+                Type = "CHAT_MESSAGE",
+                Payload = new
+                {
+                    RoomId = roomId,
+                    Username = username,
+                    Message = message,
+                    SentAtUtcTicks = DateTime.UtcNow.Ticks
+                }
+            });
+
+            Console.WriteLine($"[CHAT] Room={roomId}, User={username}, Message={message}");
+        }
+
+        private static string NormalizeChatMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return "";
+            }
+
+            string normalized = message.Replace("\r", " ").Replace("\n", " ").Trim();
+
+            while (normalized.Contains("  "))
+            {
+                normalized = normalized.Replace("  ", " ");
+            }
+
+            if (normalized.Length > 160)
+            {
+                normalized = normalized.Substring(0, 160);
+            }
+
+            return normalized;
+        }
+
+        // ============================================================
+        // DICE ROLL
+        // ============================================================
+        private static int RollDie()
+        {
+            return RandomNumberGenerator.GetInt32(1, 7);
+        }
+
         private static async Task HandleDiceRollAsync(ClientConnection connection)
         {
             string roomId = connection.CurrentRoomId;
@@ -918,6 +1005,9 @@ namespace Monopoly.Server
                         room.GameState.LastDice1 = 0;
                         room.GameState.LastDice2 = 0;
                         room.GameState.LastDiceTotal = 0;
+                        room.GameState.LastMovedPlayerIndex = player.PlayerIndex;
+                        room.GameState.LastMoveFromPosition = player.Position;
+                        room.GameState.LastMoveToPosition = player.Position;
                         room.GameState.HasRolledThisTurn = true;
 
                         actionMessages.Add($"{player.Username} đang ở Đảo Hoang và bị mất lượt này.");
@@ -925,8 +1015,8 @@ namespace Monopoly.Server
                     else
                     {
                         int boardSize = BoardDatabase.Squares.Count;
-                        int dice1 = _random.Next(1, 7);
-                        int dice2 = _random.Next(1, 7);
+                        int dice1 = RollDie();
+                        int dice2 = RollDie();
                         int diceTotal = dice1 + dice2;
                         int oldPosition = player.Position;
                         int rawPosition = oldPosition + diceTotal;
@@ -978,6 +1068,9 @@ namespace Monopoly.Server
                         room.GameState.LastDice1 = dice1;
                         room.GameState.LastDice2 = dice2;
                         room.GameState.LastDiceTotal = diceTotal;
+                        room.GameState.LastMovedPlayerIndex = player.PlayerIndex;
+                        room.GameState.LastMoveFromPosition = oldPosition;
+                        room.GameState.LastMoveToPosition = newPosition;
                         Console.WriteLine(
                             $"[DICE] Room={roomId}, Player={player.Username}, " +
                             $"Dice={dice1}+{dice2}, Position={oldPosition}->{newPosition}, Money={player.Money}"
@@ -1510,6 +1603,9 @@ namespace Monopoly.Server
                 CurrentTurnPlayerIndex = room.Players[0].PlayerIndex,
                 CurrentTurnUsername = room.Players[0].Username,
                 HasRolledThisTurn = false,
+                LastMovedPlayerIndex = -1,
+                LastMoveFromPosition = -1,
+                LastMoveToPosition = -1,
                 TurnDurationSeconds = TurnDurationSeconds,
                 IsFinished = false,
                 WinnerUsername = ""

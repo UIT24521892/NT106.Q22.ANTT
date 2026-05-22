@@ -39,7 +39,12 @@ public class NetworkManager : MonoBehaviour
     private Button buyButton;
     private Button endTurnButton;
     private string lastGameActionError = "";
+    private string lastClientActionStatus = "";
     private long serverClockOffsetTicks = 0;
+    private const int MaxChatMessages = 30;
+    private readonly List<ChatMessageData> gameChatMessages = new List<ChatMessageData>();
+
+    public event Action<ChatMessageData> GameChatMessageReceived;
 
     private void Awake()
     {
@@ -113,6 +118,10 @@ public class NetworkManager : MonoBehaviour
         gameActionLogText = actionLogText;
         gameErrorText = errorText;
 
+        ConfigureGameplayText(gameStateOverlayText, 22f);
+        ConfigureGameplayText(gameActionLogText, 18f);
+        ConfigureGameplayText(gameErrorText, 18f);
+
         BindButton(rollButton, SendDiceRollRequest);
         BindButton(buyButton, SendBuyPropertyRequest);
         BindButton(endTurnButton, SendEndTurnRequest);
@@ -131,6 +140,11 @@ public class NetworkManager : MonoBehaviour
         gameErrorText = null;
     }
 
+    public IReadOnlyList<ChatMessageData> GetGameChatMessages()
+    {
+        return gameChatMessages.AsReadOnly();
+    }
+
     private void BindButton(Button button, UnityEngine.Events.UnityAction action)
     {
         if (button == null)
@@ -138,6 +152,16 @@ public class NetworkManager : MonoBehaviour
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(action);
+    }
+
+    private void ConfigureGameplayText(TextMeshProUGUI text, float fontSize)
+    {
+        if (text == null)
+            return;
+
+        text.fontSize = fontSize;
+        text.enableWordWrapping = false;
+        text.overflowMode = TextOverflowModes.Ellipsis;
     }
 
     private void UpdateGameStateOverlayText()
@@ -172,16 +196,15 @@ public class NetworkManager : MonoBehaviour
     {
         StringBuilder builder = new StringBuilder();
 
-        builder.AppendLine($"Room: {state.RoomId} | Turn: {state.TurnNumber} | Time: {GetRemainingTurnSeconds(state)}s");
+        builder.AppendLine($"Room {state.RoomId} | Turn {state.TurnNumber} | {GetRemainingTurnSeconds(state)}s");
 
         if (state.IsFinished)
         {
-            builder.AppendLine($"Game Over | Winner: {state.WinnerUsername}");
+            builder.AppendLine($"Game Over | Winner: {ShortName(state.WinnerUsername)}");
         }
         else
         {
-            builder.AppendLine($"Current Turn: {state.CurrentTurnUsername}");
-            builder.AppendLine($"Rolled: {(state.HasRolledThisTurn ? "Yes - press E to end turn" : "No - press R to roll")}");
+            builder.AppendLine($"Turn: {ShortName(state.CurrentTurnUsername)} | {(state.HasRolledThisTurn ? "Rolled" : "Need roll")}");
         }
 
         if (state.LastDiceTotal > 0)
@@ -189,21 +212,16 @@ public class NetworkManager : MonoBehaviour
             builder.AppendLine($"Dice: {state.LastDice1} + {state.LastDice2} = {state.LastDiceTotal}");
         }
 
-        if (!string.IsNullOrWhiteSpace(state.LastActionMessage))
-        {
-            builder.AppendLine(state.LastActionMessage);
-        }
-
         if (state.Players != null)
         {
             foreach (GamePlayerStateData player in state.Players)
             {
                 string status = player.IsBankrupt ? "BANKRUPT" : (player.IsConnected ? "ACTIVE" : "DISCONNECTED");
-                builder.AppendLine($"{ShortName(player.Username)} | P{player.Position} | ${player.Money:N0} | {status}");
+                builder.AppendLine($"{ShortName(player.Username)} P{player.Position} ${player.Money:N0} {status}");
             }
         }
 
-        AppendOwnedProperties(builder, state);
+        builder.Append(GetOwnedPropertiesLine(state));
 
         return builder.ToString();
     }
@@ -211,35 +229,44 @@ public class NetworkManager : MonoBehaviour
     private string BuildActionLogText(GameStateData state)
     {
         StringBuilder builder = new StringBuilder();
-        builder.AppendLine("Action log:");
+        builder.AppendLine("Log:");
+
+        if (!string.IsNullOrWhiteSpace(state.LastActionMessage))
+        {
+            builder.AppendLine($"Now: {CompactLine(state.LastActionMessage, 56)}");
+        }
+        else if (!string.IsNullOrWhiteSpace(lastClientActionStatus))
+        {
+            builder.AppendLine(lastClientActionStatus);
+        }
 
         if (state.ActionLog == null || state.ActionLog.Count == 0)
         {
-            builder.AppendLine("No actions yet.");
+            if (string.IsNullOrWhiteSpace(state.LastActionMessage) &&
+                string.IsNullOrWhiteSpace(lastClientActionStatus))
+            {
+                builder.AppendLine("No actions.");
+            }
+
             return builder.ToString();
         }
 
-        int startIndex = Math.Max(0, state.ActionLog.Count - 5);
+        int startIndex = Math.Max(0, state.ActionLog.Count - 2);
 
         for (int i = startIndex; i < state.ActionLog.Count; i++)
         {
-            string logLine = state.ActionLog[i];
-
-            if (logLine.Length > 62)
-                logLine = logLine.Substring(0, 62) + "...";
-
-            builder.AppendLine(logLine);
+            builder.AppendLine(CompactLine(state.ActionLog[i], 56));
         }
 
         return builder.ToString();
     }
 
-    private void AppendOwnedProperties(StringBuilder builder, GameStateData state)
+    private string GetOwnedPropertiesLine(GameStateData state)
     {
         if (state.Properties == null || state.Players == null)
-            return;
+            return "Owned: None";
 
-        builder.AppendLine("Owned:");
+        StringBuilder builder = new StringBuilder("Owned: ");
         int count = 0;
 
         foreach (KeyValuePair<int, GamePropertyStateData> propertyPair in state.Properties)
@@ -250,17 +277,17 @@ public class NetworkManager : MonoBehaviour
                 continue;
 
             string ownerName = GetPlayerNameByIndex(state, property.OwnerPlayerIndex);
-            builder.Append($"{property.PositionIndex}:{property.Name}->{ShortName(ownerName)}  ");
+            builder.Append($"{property.PositionIndex}->{ShortName(ownerName)} ");
             count++;
 
-            if (count >= 5)
+            if (count >= 3)
                 break;
         }
 
         if (count == 0)
             builder.Append("None");
 
-        builder.AppendLine();
+        return builder.ToString();
     }
 
     private string GetPlayerNameByIndex(GameStateData state, int playerIndex)
@@ -291,6 +318,22 @@ public class NetworkManager : MonoBehaviour
             return username.Substring(0, 12);
 
         return username;
+    }
+
+    private string CompactLine(string text, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return "";
+
+        string compact = text.Replace("\r", " ").Replace("\n", " ").Trim();
+
+        while (compact.Contains("  "))
+            compact = compact.Replace("  ", " ");
+
+        if (compact.Length <= maxLength)
+            return compact;
+
+        return compact.Substring(0, maxLength) + "...";
     }
 
     private void UpdateGameplayButtons()
@@ -457,6 +500,8 @@ public class NetworkManager : MonoBehaviour
         };
 
         SendPacket(packet);
+        lastClientActionStatus = "Sent: Roll";
+        UpdateGameStateOverlayText();
         Debug.Log("[NetworkManager] Đã gửi yêu cầu DiceRoll bằng phím R.");
     }
 
@@ -473,6 +518,8 @@ public class NetworkManager : MonoBehaviour
         };
 
         SendPacket(packet);
+        lastClientActionStatus = "Sent: End turn";
+        UpdateGameStateOverlayText();
         Debug.Log("[NetworkManager] Đã gửi yêu cầu END_TURN bằng phím E.");
     }
 
@@ -489,7 +536,49 @@ public class NetworkManager : MonoBehaviour
         };
 
         SendPacket(packet);
+        lastClientActionStatus = "Sent: Buy";
+        UpdateGameStateOverlayText();
         Debug.Log("[NetworkManager] Đã gửi yêu cầu BUY_PROPERTY bằng phím B.");
+    }
+
+    public void SendGameChatMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        string trimmedMessage = message.Replace("\r", " ").Replace("\n", " ").Trim();
+
+        if (trimmedMessage.Length > 160)
+            trimmedMessage = trimmedMessage.Substring(0, 160);
+
+        var packet = new
+        {
+            Type = "GAME_CHAT",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username,
+                Message = trimmedMessage
+            }
+        };
+
+        SendPacket(packet);
+    }
+
+    private void AddGameChatMessage(ChatMessageData chatMessage)
+    {
+        if (chatMessage == null || string.IsNullOrWhiteSpace(chatMessage.Message))
+            return;
+
+        if (string.IsNullOrWhiteSpace(chatMessage.Username))
+            chatMessage.Username = "Player";
+
+        gameChatMessages.Add(chatMessage);
+
+        while (gameChatMessages.Count > MaxChatMessages)
+            gameChatMessages.RemoveAt(0);
+
+        GameChatMessageReceived?.Invoke(chatMessage);
     }
 
     public async void StartListeningToServer()
@@ -665,6 +754,7 @@ public class NetworkManager : MonoBehaviour
 
                         SyncServerClock(gameState);
                         GameSession.Initialize(roomId, mapName, players, gameState);
+                        gameChatMessages.Clear();
 
                         Debug.Log(
                             $"[NetworkManager] GAME_STARTING Room={roomId}, Map={mapName}, " +
@@ -684,6 +774,9 @@ public class NetworkManager : MonoBehaviour
                         SyncServerClock(gameState);
                         GameSession.UpdateState(gameState);
                         lastGameActionError = "";
+                        lastClientActionStatus = "";
+                        UpdateGameStateOverlayText();
+                        UpdateGameplayButtons();
 
                         Debug.Log(
                             $"[NetworkManager] GAME_STATE_UPDATE Room={gameState?.RoomId ?? "N/A"}, " +
@@ -694,10 +787,20 @@ public class NetworkManager : MonoBehaviour
                         break;
                     }
 
+                case "CHAT_MESSAGE":
+                    {
+                        ChatMessageData chatMessage = data["Payload"]?.ToObject<ChatMessageData>();
+                        AddGameChatMessage(chatMessage);
+                        break;
+                    }
+
                 case "GAME_ACTION_FAILED":
                     {
                         string message = data["Payload"]?["Message"]?.ToString() ?? "Hành động không hợp lệ.";
                         lastGameActionError = message;
+                        lastClientActionStatus = "";
+                        UpdateGameStateOverlayText();
+                        UpdateGameplayButtons();
                         Debug.LogWarning($"[NetworkManager] GAME_ACTION_FAILED: {message}");
                         break;
                     }

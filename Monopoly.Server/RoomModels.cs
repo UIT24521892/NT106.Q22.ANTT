@@ -45,6 +45,9 @@ namespace Monopoly.Server
         public int LastDice1 { get; set; }
         public int LastDice2 { get; set; }
         public int LastDiceTotal { get; set; }
+        public int LastMovedPlayerIndex { get; set; } = -1;
+        public int LastMoveFromPosition { get; set; } = -1;
+        public int LastMoveToPosition { get; set; } = -1;
         public string LastActionMessage { get; set; } = "";
         public bool HasRolledThisTurn { get; set; }
         public int TurnDurationSeconds { get; set; } = 45;
