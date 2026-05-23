@@ -1008,6 +1008,7 @@ namespace Monopoly.Server
                         room.GameState.LastMovedPlayerIndex = player.PlayerIndex;
                         room.GameState.LastMoveFromPosition = player.Position;
                         room.GameState.LastMoveToPosition = player.Position;
+                        room.GameState.LastFinalPosition = player.Position;
                         room.GameState.HasRolledThisTurn = true;
 
                         actionMessages.Add($"{player.Username} đang ở Đảo Hoang và bị mất lượt này.");
@@ -1020,12 +1021,12 @@ namespace Monopoly.Server
                         int diceTotal = dice1 + dice2;
                         int oldPosition = player.Position;
                         int rawPosition = oldPosition + diceTotal;
-                        int newPosition = rawPosition % boardSize;
+                        int diceLandingPosition = rawPosition % boardSize;
                         actionMessages.Add(
-                            $"{player.Username} đổ {dice1} + {dice2} = {diceTotal}, đi từ ô {oldPosition} đến ô {newPosition}."
+                            $"{player.Username} đổ {dice1} + {dice2} = {diceTotal}, đi từ ô {oldPosition} đến ô {diceLandingPosition}."
                         );
 
-                        player.Position = newPosition;
+                        player.Position = diceLandingPosition;
 
                         if (rawPosition >= boardSize)
                         {
@@ -1034,7 +1035,7 @@ namespace Monopoly.Server
                             actionMessages.Add($"{player.Username} đi qua Bắt Đầu và nhận {startBonus:N0}.");
                         }
 
-                        if (room.GameState.Properties.TryGetValue(newPosition, out GamePropertyState landedProperty) &&
+                        if (room.GameState.Properties.TryGetValue(diceLandingPosition, out GamePropertyState landedProperty) &&
                             landedProperty.OwnerPlayerIndex >= 0 &&
                             landedProperty.OwnerPlayerIndex != player.PlayerIndex)
                         {
@@ -1043,7 +1044,7 @@ namespace Monopoly.Server
                             );
 
                             if (owner != null &&
-                                BoardDatabase.Squares.TryGetValue(newPosition, out var landedSquare) &&
+                                BoardDatabase.Squares.TryGetValue(diceLandingPosition, out var landedSquare) &&
                                 landedSquare.RentPrices.Count > 0)
                             {
                                 long rent = landedSquare.RentPrices[0] * landedProperty.Multiplier;
@@ -1063,17 +1064,19 @@ namespace Monopoly.Server
                             }
                         }
 
-                        ApplySpecialSquareEffectUnsafe(room.GameState, player, newPosition, actionMessages);
+                        ApplySpecialSquareEffectUnsafe(room.GameState, player, diceLandingPosition, actionMessages);
+                        int finalPosition = player.Position;
 
                         room.GameState.LastDice1 = dice1;
                         room.GameState.LastDice2 = dice2;
                         room.GameState.LastDiceTotal = diceTotal;
                         room.GameState.LastMovedPlayerIndex = player.PlayerIndex;
                         room.GameState.LastMoveFromPosition = oldPosition;
-                        room.GameState.LastMoveToPosition = newPosition;
+                        room.GameState.LastMoveToPosition = diceLandingPosition;
+                        room.GameState.LastFinalPosition = finalPosition;
                         Console.WriteLine(
                             $"[DICE] Room={roomId}, Player={player.Username}, " +
-                            $"Dice={dice1}+{dice2}, Position={oldPosition}->{newPosition}, Money={player.Money}"
+                            $"Dice={dice1}+{dice2}, DiceLanding={oldPosition}->{diceLandingPosition}, FinalPos={finalPosition}, Money={player.Money}"
                         );
                     }
 
@@ -1606,6 +1609,7 @@ namespace Monopoly.Server
                 LastMovedPlayerIndex = -1,
                 LastMoveFromPosition = -1,
                 LastMoveToPosition = -1,
+                LastFinalPosition = -1,
                 TurnDurationSeconds = TurnDurationSeconds,
                 IsFinished = false,
                 WinnerUsername = ""

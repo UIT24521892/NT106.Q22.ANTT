@@ -25,6 +25,7 @@ public class GameStateData
     public int LastMovedPlayerIndex;
     public int LastMoveFromPosition;
     public int LastMoveToPosition;
+    public int LastFinalPosition;
     public string LastActionMessage;
     public bool HasRolledThisTurn;
     public int TurnDurationSeconds;

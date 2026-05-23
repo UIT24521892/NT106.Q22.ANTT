@@ -778,6 +778,13 @@ public class NetworkManager : MonoBehaviour
                         UpdateGameStateOverlayText();
                         UpdateGameplayButtons();
 
+                        BoardTokenManager tokenManager = FindObjectOfType<BoardTokenManager>();
+
+                        if (tokenManager != null)
+                        {
+                            tokenManager.NotifyStateUpdate(gameState);
+                        }
+
                         Debug.Log(
                             $"[NetworkManager] GAME_STATE_UPDATE Room={gameState?.RoomId ?? "N/A"}, " +
                             $"Turn={gameState?.TurnNumber ?? 0}, CurrentTurn={gameState?.CurrentTurnUsername ?? "N/A"}, " +

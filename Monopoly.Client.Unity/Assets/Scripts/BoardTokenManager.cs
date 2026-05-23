@@ -16,12 +16,13 @@ public class BoardTokenManager : MonoBehaviour
     [SerializeField] private bool reversePathDirection = true;
 
     private readonly Dictionary<int, TokenView> tokensByPlayerIndex = new Dictionary<int, TokenView>();
-    private readonly Dictionary<int, int> lastPositionsByPlayerIndex = new Dictionary<int, int>();
+    private readonly Dictionary<int, int> displayPositionByPlayerIndex = new Dictionary<int, int>();
     private readonly List<Vector2> boardPath = new List<Vector2>();
 
     private Sprite circleSprite;
     private RectTransform canvasRect;
     private string lastAnimatedMoveKey = "";
+    private bool isInitialized;
 
     public static BoardTokenManager EnsureExists()
     {
@@ -37,17 +38,120 @@ public class BoardTokenManager : MonoBehaviour
     private void Start()
     {
         Initialize();
-        ApplyState(GameSession.CurrentState, false);
+        SnapToCurrentState();
     }
 
     private void Update()
     {
-        ApplyState(GameSession.CurrentState, true);
+        SnapIdleTokensToCurrentState();
+    }
+
+    public void NotifyStateUpdate(GameStateData state)
+    {
+        if (state == null || state.Players == null)
+            return;
+
+        Initialize();
+
+        if (boardPath.Count != BoardSquareCount || tokenLayer == null)
+            return;
+
+        Dictionary<int, int> slotByPlayer = BuildSlotByPosition(state.Players);
+
+        foreach (GamePlayerStateData player in state.Players)
+        {
+            if (player == null || player.IsBankrupt)
+                continue;
+
+            TokenView token = GetOrCreateToken(player);
+            int slot = GetSameTileSlot(player, slotByPlayer);
+
+            if (CanUseServerMove(state, player))
+            {
+                int fromPosition = NormalizePosition(state.LastMoveFromPosition);
+                int diceLandingPosition = NormalizePosition(state.LastMoveToPosition);
+                int finalPosition = NormalizePosition(
+                    state.LastFinalPosition >= 0 ? state.LastFinalPosition : player.Position
+                );
+                string moveKey = $"{state.TurnNumber}:{player.PlayerIndex}:{fromPosition}:{diceLandingPosition}:{finalPosition}:{state.LastDiceTotal}";
+
+                if (lastAnimatedMoveKey != moveKey)
+                {
+                    int visualFrom = displayPositionByPlayerIndex.TryGetValue(player.PlayerIndex, out int displayPosition)
+                        ? displayPosition
+                        : fromPosition;
+
+                    if (token.MoveRoutine != null)
+                        StopCoroutine(token.MoveRoutine);
+
+                    token.Rect.anchoredPosition = GetTokenTarget(visualFrom, slot);
+                    token.Rect.localScale = Vector3.one;
+                    displayPositionByPlayerIndex[player.PlayerIndex] = visualFrom;
+
+                    token.MoveRoutine = StartCoroutine(
+                        AnimateMoveSequence(token, player.PlayerIndex, visualFrom, diceLandingPosition, finalPosition, slot)
+                    );
+                    lastAnimatedMoveKey = moveKey;
+
+                    Debug.Log(
+                        $"[BoardTokenManager] Animate P{player.PlayerIndex + 1}: " +
+                        $"{visualFrom}->{diceLandingPosition}, final={finalPosition}, dice={state.LastDiceTotal}"
+                    );
+                }
+            }
+            else if (token.MoveRoutine == null)
+            {
+                int position = NormalizePosition(player.Position);
+                token.Rect.anchoredPosition = GetTokenTarget(position, slot);
+                token.Rect.localScale = Vector3.one;
+                displayPositionByPlayerIndex[player.PlayerIndex] = position;
+            }
+
+            token.SetOnlineState(player.IsConnected);
+        }
+    }
+
+    private void SnapToCurrentState()
+    {
+        NotifyStateUpdate(GameSession.CurrentState);
+    }
+
+    private void SnapIdleTokensToCurrentState()
+    {
+        GameStateData state = GameSession.CurrentState;
+
+        if (state == null || state.Players == null)
+            return;
+
+        Initialize();
+
+        if (boardPath.Count != BoardSquareCount || tokenLayer == null)
+            return;
+
+        Dictionary<int, int> slotByPlayer = BuildSlotByPosition(state.Players);
+
+        foreach (GamePlayerStateData player in state.Players)
+        {
+            if (player == null || player.IsBankrupt)
+                continue;
+
+            TokenView token = GetOrCreateToken(player);
+
+            if (token.MoveRoutine != null)
+                continue;
+
+            int position = NormalizePosition(player.Position);
+            int slot = GetSameTileSlot(player, slotByPlayer);
+            token.Rect.anchoredPosition = GetTokenTarget(position, slot);
+            token.Rect.localScale = Vector3.one;
+            token.SetOnlineState(player.IsConnected);
+            displayPositionByPlayerIndex[player.PlayerIndex] = position;
+        }
     }
 
     private void Initialize()
     {
-        if (tokenLayer != null && boardPath.Count == BoardSquareCount)
+        if (isInitialized && tokenLayer != null && boardPath.Count == BoardSquareCount)
             return;
 
         Canvas canvas = FindObjectOfType<Canvas>();
@@ -69,6 +173,7 @@ public class BoardTokenManager : MonoBehaviour
             circleSprite = CreateCircleSprite(64, Color.white);
 
         BuildBoardPathFromTileButtons(canvas);
+        isInitialized = boardPath.Count == BoardSquareCount;
     }
 
     private RectTransform CreateTokenLayer(RectTransform parent)
@@ -104,8 +209,7 @@ public class BoardTokenManager : MonoBehaviour
             if (rect == null)
                 continue;
 
-            Vector2 localPoint = WorldToTokenLayerPoint(rect, canvas);
-            points.Add(localPoint);
+            points.Add(WorldToTokenLayerPoint(rect, canvas));
         }
 
         if (points.Count < BoardSquareCount)
@@ -297,49 +401,6 @@ public class BoardTokenManager : MonoBehaviour
         points.AddRange(tail);
     }
 
-    private void ApplyState(GameStateData state, bool animateChanges)
-    {
-        if (state == null || state.Players == null)
-            return;
-
-        Initialize();
-
-        if (boardPath.Count != BoardSquareCount || tokenLayer == null)
-            return;
-
-        Dictionary<int, int> slotByPosition = BuildSlotByPosition(state.Players);
-
-        foreach (GamePlayerStateData player in state.Players)
-        {
-            if (player == null || player.IsBankrupt)
-                continue;
-
-            TokenView token = GetOrCreateToken(player);
-            int position = NormalizePosition(player.Position);
-            Vector2 target = GetTokenTarget(position, GetSameTileSlot(player, slotByPosition));
-
-            if (!lastPositionsByPlayerIndex.TryGetValue(player.PlayerIndex, out int oldPosition))
-            {
-                token.Rect.anchoredPosition = target;
-                token.Rect.localScale = Vector3.one;
-            }
-            else if (oldPosition != position)
-            {
-                int slot = GetSameTileSlot(player, slotByPosition);
-                List<Vector2> path = BuildAuthoritativeMovePath(state, player, oldPosition, position, slot);
-                token.MoveRoutine = RestartMoveRoutine(token.MoveRoutine, AnimateToken(token, path, target));
-            }
-            else if (token.MoveRoutine == null)
-            {
-                token.Rect.anchoredPosition = target;
-                token.Rect.localScale = Vector3.one;
-            }
-
-            token.SetOnlineState(player.IsConnected);
-            lastPositionsByPlayerIndex[player.PlayerIndex] = position;
-        }
-    }
-
     private Dictionary<int, int> BuildSlotByPosition(List<GamePlayerStateData> players)
     {
         Dictionary<int, int> countByPosition = new Dictionary<int, int>();
@@ -407,75 +468,102 @@ public class BoardTokenManager : MonoBehaviour
         return token;
     }
 
-    private Coroutine RestartMoveRoutine(Coroutine currentRoutine, IEnumerator routine)
+    public bool TryGetPlayerTokenWorldPosition(string username, out Vector3 worldPosition)
     {
-        if (currentRoutine != null)
-            StopCoroutine(currentRoutine);
+        worldPosition = Vector3.zero;
 
-        return StartCoroutine(routine);
-    }
+        if (string.IsNullOrWhiteSpace(username))
+            return false;
 
-    private List<Vector2> BuildAuthoritativeMovePath(
-        GameStateData state,
-        GamePlayerStateData player,
-        int oldPosition,
-        int finalPosition,
-        int slot)
-    {
-        if (CanUseServerMove(state, player))
+        GameStateData state = GameSession.CurrentState;
+
+        if (state == null || state.Players == null)
+            return false;
+
+        foreach (GamePlayerStateData player in state.Players)
         {
-            int fromPosition = NormalizePosition(state.LastMoveFromPosition);
-            int toPosition = NormalizePosition(state.LastMoveToPosition);
-            string moveKey = $"{state.TurnNumber}:{state.LastMovedPlayerIndex}:{fromPosition}:{toPosition}:{state.LastDiceTotal}";
+            if (player == null || !string.Equals(player.Username, username, StringComparison.OrdinalIgnoreCase))
+                continue;
 
-            if (lastAnimatedMoveKey != moveKey)
-            {
-                lastAnimatedMoveKey = moveKey;
-                return BuildMovePath(fromPosition, toPosition, slot);
-            }
+            if (!tokensByPlayerIndex.TryGetValue(player.PlayerIndex, out TokenView token) || token.Rect == null)
+                return false;
+
+            worldPosition = token.Rect.position;
+            return true;
         }
 
-        return BuildMovePath(oldPosition, finalPosition, slot);
+        return false;
     }
 
     private bool CanUseServerMove(GameStateData state, GamePlayerStateData player)
     {
         return state != null &&
             player != null &&
+            state.HasRolledThisTurn &&
+            state.CurrentTurnPlayerIndex == player.PlayerIndex &&
             state.LastMovedPlayerIndex == player.PlayerIndex &&
             state.LastDiceTotal > 0 &&
             state.LastMoveFromPosition >= 0 &&
             state.LastMoveToPosition >= 0;
     }
 
-    private IEnumerator AnimateToken(TokenView token, List<Vector2> path, Vector2 finalTarget)
+    private IEnumerator AnimateMoveSequence(
+        TokenView token,
+        int playerIndex,
+        int visualFromPosition,
+        int diceLandingPosition,
+        int finalPosition,
+        int slot)
     {
         token.Rect.SetAsLastSibling();
 
-        foreach (Vector2 target in path)
+        List<Vector2> dicePath = BuildMovePath(visualFromPosition, diceLandingPosition, slot);
+
+        foreach (Vector2 target in dicePath)
+            yield return AnimateStep(token, target);
+
+        if (finalPosition != diceLandingPosition)
         {
-            Vector2 start = token.Rect.anchoredPosition;
-            float elapsed = 0f;
-
-            while (elapsed < stepDuration)
-            {
-                float t = Mathf.Clamp01(elapsed / stepDuration);
-                float eased = Mathf.SmoothStep(0f, 1f, t);
-                Vector2 position = Vector2.Lerp(start, target, eased);
-                position.y += Mathf.Sin(t * Mathf.PI) * bobHeight;
-                token.Rect.anchoredPosition = position;
-                token.Rect.localScale = Vector3.one * (1f + Mathf.Sin(t * Mathf.PI) * 0.08f);
-
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
-
-            token.Rect.anchoredPosition = target;
+            yield return new WaitForSeconds(0.45f);
+            yield return BlinkToken(token);
+            token.Rect.anchoredPosition = GetTokenTarget(finalPosition, slot);
         }
 
         token.Rect.localScale = Vector3.one;
-        token.Rect.anchoredPosition = finalTarget;
+        displayPositionByPlayerIndex[playerIndex] = finalPosition;
         token.MoveRoutine = null;
+    }
+
+    private IEnumerator AnimateStep(TokenView token, Vector2 target)
+    {
+        Vector2 start = token.Rect.anchoredPosition;
+        float elapsed = 0f;
+
+        while (elapsed < stepDuration)
+        {
+            float t = Mathf.Clamp01(elapsed / stepDuration);
+            float eased = Mathf.SmoothStep(0f, 1f, t);
+            Vector2 position = Vector2.Lerp(start, target, eased);
+            position.y += Mathf.Sin(t * Mathf.PI) * bobHeight;
+            token.Rect.anchoredPosition = position;
+            token.Rect.localScale = Vector3.one * (1f + Mathf.Sin(t * Mathf.PI) * 0.08f);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        token.Rect.anchoredPosition = target;
+    }
+
+    private IEnumerator BlinkToken(TokenView token)
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            token.Rect.localScale = Vector3.one * 1.18f;
+            yield return new WaitForSeconds(0.08f);
+            token.Rect.localScale = Vector3.one;
+            yield return new WaitForSeconds(0.08f);
+        }
     }
 
     private List<Vector2> BuildMovePath(int fromPosition, int toPosition, int slot)
