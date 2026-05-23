@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using TMPro;
@@ -12,6 +13,7 @@ public class GameChatUI : MonoBehaviour
     private TextMeshProUGUI chatLogText;
     private TMP_InputField inputField;
     private Button sendButton;
+    private RectTransform bubbleLayer;
 
     public static GameChatUI EnsureExists()
     {
@@ -81,9 +83,24 @@ public class GameChatUI : MonoBehaviour
 
         inputField = CreateInputField(panelRect);
         sendButton = CreateSendButton(panelRect);
+        bubbleLayer = CreateBubbleLayer(canvasRect);
 
         inputField.onSubmit.AddListener(_ => SendCurrentMessage());
         sendButton.onClick.AddListener(SendCurrentMessage);
+    }
+
+    private RectTransform CreateBubbleLayer(RectTransform parent)
+    {
+        GameObject layerObject = new GameObject("Runtime_ChatBubbles", typeof(RectTransform), typeof(CanvasRenderer));
+        RectTransform rect = layerObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.SetAsLastSibling();
+        return rect;
     }
 
     private TextMeshProUGUI CreateText(string name, Transform parent, string value, float fontSize, FontStyles style)
@@ -196,6 +213,91 @@ public class GameChatUI : MonoBehaviour
     private void OnChatMessageReceived(ChatMessageData message)
     {
         RefreshChatLog();
+        ShowChatBubble(message);
+    }
+
+    private void ShowChatBubble(ChatMessageData message)
+    {
+        if (message == null || string.IsNullOrWhiteSpace(message.Message) || bubbleLayer == null)
+            return;
+
+        Canvas canvas = bubbleLayer.GetComponentInParent<Canvas>();
+
+        if (canvas == null)
+            return;
+
+        Vector2 anchoredPosition = new Vector2(0f, 150f);
+        BoardTokenManager tokenManager = FindObjectOfType<BoardTokenManager>();
+
+        if (tokenManager != null && tokenManager.TryGetPlayerTokenWorldPosition(message.Username, out Vector3 tokenWorldPosition))
+        {
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(uiCamera, tokenWorldPosition);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(bubbleLayer, screenPoint, uiCamera, out anchoredPosition);
+            anchoredPosition += new Vector2(0f, 64f);
+        }
+
+        GameObject bubbleObject = new GameObject("Bubble_Chat", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(CanvasGroup));
+        RectTransform bubbleRect = bubbleObject.GetComponent<RectTransform>();
+        bubbleRect.SetParent(bubbleLayer, false);
+        bubbleRect.anchorMin = new Vector2(0.5f, 0.5f);
+        bubbleRect.anchorMax = new Vector2(0.5f, 0.5f);
+        bubbleRect.pivot = new Vector2(0.5f, 0f);
+        bubbleRect.anchoredPosition = anchoredPosition;
+        bubbleRect.sizeDelta = new Vector2(260f, 58f);
+
+        Image bubbleImage = bubbleObject.GetComponent<Image>();
+        bubbleImage.color = new Color(1f, 1f, 1f, 0.92f);
+        bubbleImage.raycastTarget = false;
+
+        TextMeshProUGUI text = CreateText("Txt_BubbleMessage", bubbleRect, BuildBubbleText(message), 16f, FontStyles.Bold);
+        text.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        SetStretchWithPadding(text.rectTransform, 10f, 7f, 10f, 7f);
+
+        StartCoroutine(AnimateBubble(bubbleRect, bubbleObject.GetComponent<CanvasGroup>()));
+    }
+
+    private IEnumerator AnimateBubble(RectTransform bubbleRect, CanvasGroup canvasGroup)
+    {
+        const float visibleSeconds = 2.4f;
+        const float fadeSeconds = 0.35f;
+        Vector2 startPosition = bubbleRect.anchoredPosition;
+        float elapsed = 0f;
+
+        canvasGroup.alpha = 1f;
+
+        while (elapsed < visibleSeconds)
+        {
+            bubbleRect.anchoredPosition = startPosition + new Vector2(0f, elapsed * 10f);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        elapsed = 0f;
+
+        while (elapsed < fadeSeconds)
+        {
+            float t = Mathf.Clamp01(elapsed / fadeSeconds);
+            canvasGroup.alpha = 1f - t;
+            bubbleRect.anchoredPosition = startPosition + new Vector2(0f, visibleSeconds * 10f + t * 12f);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        Destroy(bubbleRect.gameObject);
+    }
+
+    private string BuildBubbleText(ChatMessageData message)
+    {
+        string text = message.Message.Trim();
+
+        if (text.Length > 70)
+            text = text.Substring(0, 67) + "...";
+
+        return $"{ShortName(message.Username)}: {text}";
     }
 
     private void RefreshChatLog()
