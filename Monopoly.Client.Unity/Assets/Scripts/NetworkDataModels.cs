@@ -68,7 +68,10 @@ public class GamePropertyStateData
     public int PositionIndex;
     public string Name;
     public string Type;
+    public string ColorSet;
+    public string LineIndex;
     public long BuyPrice;
+    public List<long> RentPrices;
     public int OwnerPlayerIndex;
     public int HouseCount;
     public bool HasHotel;

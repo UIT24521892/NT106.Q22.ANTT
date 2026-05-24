@@ -19,6 +19,7 @@ public class GameSceneUIBinder : MonoBehaviour
         Register();
         BoardTokenManager.EnsureExists();
         GameChatUI.EnsureExists();
+        BoardTileInfoUI.EnsureExists();
     }
 
     private void OnDestroy()

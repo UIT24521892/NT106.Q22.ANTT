@@ -81,7 +81,10 @@ namespace Monopoly.Server
         public int PositionIndex { get; set; }
         public string Name { get; set; } = "";
         public string Type { get; set; } = "";
+        public string ColorSet { get; set; } = "";
+        public string LineIndex { get; set; } = "";
         public long BuyPrice { get; set; }
+        public List<long> RentPrices { get; set; } = new List<long>();
         public int OwnerPlayerIndex { get; set; } = -1;
         public int HouseCount { get; set; }
         public bool HasHotel { get; set; }
