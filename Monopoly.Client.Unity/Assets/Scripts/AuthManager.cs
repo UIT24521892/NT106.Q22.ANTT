@@ -11,6 +11,7 @@ public class AuthManager : MonoBehaviour
     [Header("Panels")]
     [SerializeField] private GameObject authPanel;     // Login Panel cũ
     [SerializeField] private GameObject registerPanel; // Register Panel mới bạn vừa tạo
+    [SerializeField] private GameObject introPanel;
 
     // --- PHẦN SỬA ĐỔI 2: Tách biệt các ô nhập liệu ---
     [Header("Login Fields (AuthPanel)")]
@@ -60,9 +61,10 @@ public class AuthManager : MonoBehaviour
         // 1. Luôn đưa về trạng thái Đăng nhập khi khởi đầu Scene
         isLoginMode = true;
 
-        // 2. Ép buộc hiển thị đúng các Panel để tránh lỗi màn hình trống
-        if (authPanel != null) authPanel.SetActive(true);
+
+        if (authPanel != null) authPanel.SetActive(false); 
         if (registerPanel != null) registerPanel.SetActive(false);
+        if (introPanel != null) introPanel.SetActive(false); // Ẩn IntroPanel lúc đầu, sẽ bật lên sau khi kết nối xong
 
         // 3. Xử lý màn hình Splash (màn hình chờ kết nối)
         // Tìm đối tượng SplashPanel trong Scene mới
@@ -71,14 +73,13 @@ public class AuthManager : MonoBehaviour
         // Nếu NetworkManager đã kết nối thành công từ trước (trường hợp vừa Logout)
         if (NetworkManager.ServerStream != null && NetworkManager.ClientSocket != null && NetworkManager.ClientSocket.Connected)
         {
-            // Tắt luôn SplashPanel vì mạng đã sẵn sàng rồi
+            // Tắt luôn SplashPanel và hiện IntroPanel
             if (splash != null) splash.SetActive(false);
-            Debug.Log("AuthManager: Da co ket noi san, tat Splash va hien Login.");
+            if (introPanel != null) introPanel.SetActive(true); // THÊM DÒNG NÀY
+            Debug.Log("AuthManager: Da co ket noi san, tat Splash va hien Intro.");
         }
         else
         {
-            // Trường hợp mới mở game lần đầu, để SplashPanel hiện lên 
-            // cho đến khi NetworkManager kết nối xong và ra lệnh tắt.
             if (splash != null) splash.SetActive(true);
         }
     }
@@ -97,6 +98,12 @@ public class AuthManager : MonoBehaviour
         ClearMessage(); // Xóa thông báo cũ của trang Reg trước khi sang Login
         authPanel.SetActive(true);
         registerPanel.SetActive(false);
+    }
+
+    public void OnBtnEnterGameClicked()
+    {
+        if (introPanel != null) introPanel.SetActive(false); // Ẩn màn hình Intro đi
+        if (authPanel != null) authPanel.SetActive(true);    // Hiện màn hình Đăng nhập (AuthPanel) lên
     }
 
     public async void OnActionClicked()
