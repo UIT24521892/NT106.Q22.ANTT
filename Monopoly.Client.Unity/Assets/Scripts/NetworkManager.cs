@@ -25,7 +25,8 @@ public class NetworkManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI txtStatus;
     [SerializeField] private GameObject splashPanel;
     [SerializeField] private GameObject authPanel;
-
+    [SerializeField] private GameObject introPanel;
+    
     public static TcpClient ClientSocket;
     public static NetworkStream ServerStream;
 
@@ -433,8 +434,11 @@ public class NetworkManager : MonoBehaviour
             if (splashPanel != null)
                 splashPanel.SetActive(false);
 
+            if (introPanel != null)
+                introPanel.SetActive(true);
+
             if (authPanel != null)
-                authPanel.SetActive(true);
+                authPanel.SetActive(false);
 
             Debug.Log("[NetworkManager] Kết nối TCP thành công.");
 
