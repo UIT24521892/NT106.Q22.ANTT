@@ -33,6 +33,11 @@ public class GameStateData
     public long ServerUtcTicks;
     public bool IsFinished;
     public string WinnerUsername;
+    public int WorldChampionshipPosition;
+    public bool IsWaitingForCardChoice;
+    public string PendingCardEffectCode;
+    public string PendingCardPlayerUsername;
+    public bool ForceDoubleThisTurn;
     public List<string> ActionLog;
 
     public List<GamePlayerStateData> Players;
@@ -60,6 +65,15 @@ public class GamePlayerStateData
     public bool IsConnected;
     public int ConsecutiveDoubles;
     public int JailTurnsLeft;
+    public bool HasFreeRentCard;
+    public bool HasEscapeIslandCard;
+    public bool HasFlightCard;
+    public bool HasFreeUpgradeCard;
+    public bool HasForceDoubleCard;
+    public bool IsOnIsland;
+    public int SkipTurnsLeft;
+    public string SkipReason;
+    public string LastDrawnCardId;
 }
 
 [System.Serializable]

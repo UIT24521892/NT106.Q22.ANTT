@@ -10,6 +10,9 @@ public class GameChatUI : MonoBehaviour
 {
     private const int MaxVisibleMessages = 8;
 
+    private RectTransform panelRect;
+    private Button toggleButton;
+    private Button closeButton;
     private TextMeshProUGUI chatLogText;
     private TMP_InputField inputField;
     private Button sendButton;
@@ -51,8 +54,10 @@ public class GameChatUI : MonoBehaviour
 
         RectTransform canvasRect = canvas.transform as RectTransform;
 
+        toggleButton = CreateToggleButton(canvasRect);
+
         GameObject panelObject = new GameObject("Panel_GameChat", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        RectTransform panelRect = panelObject.GetComponent<RectTransform>();
+        panelRect = panelObject.GetComponent<RectTransform>();
         panelRect.SetParent(canvasRect, false);
         panelRect.anchorMin = new Vector2(1f, 0f);
         panelRect.anchorMax = new Vector2(1f, 0f);
@@ -70,7 +75,10 @@ public class GameChatUI : MonoBehaviour
         titleRect.anchorMax = new Vector2(1f, 1f);
         titleRect.pivot = new Vector2(0.5f, 1f);
         titleRect.anchoredPosition = new Vector2(0f, -8f);
-        titleRect.sizeDelta = new Vector2(-20f, 28f);
+        titleRect.sizeDelta = new Vector2(-72f, 28f);
+
+        closeButton = CreateCloseButton(panelRect);
+        closeButton.onClick.AddListener(ClosePanel);
 
         chatLogText = CreateText("Txt_ChatLog", panelRect, "", 15f, FontStyles.Normal);
         RectTransform logRect = chatLogText.rectTransform;
@@ -87,6 +95,54 @@ public class GameChatUI : MonoBehaviour
 
         inputField.onSubmit.AddListener(_ => SendCurrentMessage());
         sendButton.onClick.AddListener(SendCurrentMessage);
+        panelRect.gameObject.SetActive(false);
+    }
+
+    private Button CreateToggleButton(Transform parent)
+    {
+        GameObject buttonObject = new GameObject("Btn_ToggleChat", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(parent, false);
+        buttonRect.anchorMin = new Vector2(1f, 0f);
+        buttonRect.anchorMax = new Vector2(1f, 0f);
+        buttonRect.pivot = new Vector2(1f, 0f);
+        buttonRect.anchoredPosition = new Vector2(-20f, 20f);
+        buttonRect.sizeDelta = new Vector2(110f, 42f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0f, 0f, 0f, 0.62f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(OpenPanel);
+
+        TextMeshProUGUI label = CreateText("Text", buttonRect, "Chat", 18f, FontStyles.Bold);
+        label.alignment = TextAlignmentOptions.Center;
+        SetStretchWithPadding(label.rectTransform, 0f, 0f, 0f, 0f);
+        return button;
+    }
+
+    private Button CreateCloseButton(Transform parent)
+    {
+        GameObject buttonObject = new GameObject("Btn_CloseChat", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(parent, false);
+        buttonRect.anchorMin = new Vector2(1f, 1f);
+        buttonRect.anchorMax = new Vector2(1f, 1f);
+        buttonRect.pivot = new Vector2(1f, 1f);
+        buttonRect.anchoredPosition = new Vector2(-10f, -8f);
+        buttonRect.sizeDelta = new Vector2(42f, 32f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0.78f, 0.12f, 0.1f, 0.95f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+
+        TextMeshProUGUI label = CreateText("Text", buttonRect, "X", 16f, FontStyles.Bold);
+        label.alignment = TextAlignmentOptions.Center;
+        SetStretchWithPadding(label.rectTransform, 0f, 0f, 0f, 0f);
+        return button;
     }
 
     private RectTransform CreateBubbleLayer(RectTransform parent)
@@ -193,6 +249,32 @@ public class GameChatUI : MonoBehaviour
 
         NetworkManager.Instance.GameChatMessageReceived -= OnChatMessageReceived;
         NetworkManager.Instance.GameChatMessageReceived += OnChatMessageReceived;
+    }
+
+    private void OpenPanel()
+    {
+        if (panelRect != null)
+        {
+            panelRect.gameObject.SetActive(true);
+            panelRect.SetAsLastSibling();
+        }
+
+        if (toggleButton != null)
+            toggleButton.gameObject.SetActive(false);
+
+        RefreshChatLog();
+
+        if (inputField != null)
+            inputField.ActivateInputField();
+    }
+
+    private void ClosePanel()
+    {
+        if (panelRect != null)
+            panelRect.gameObject.SetActive(false);
+
+        if (toggleButton != null)
+            toggleButton.gameObject.SetActive(true);
     }
 
     private void SendCurrentMessage()

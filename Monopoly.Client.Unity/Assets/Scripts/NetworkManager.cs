@@ -545,6 +545,43 @@ public class NetworkManager : MonoBehaviour
         Debug.Log("[NetworkManager] Đã gửi yêu cầu BUY_PROPERTY bằng phím B.");
     }
 
+    public void SendBuildPropertyRequest(int positionIndex)
+    {
+        var packet = new
+        {
+            Type = "BUILD_PROPERTY",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username,
+                PositionIndex = positionIndex
+            }
+        };
+
+        SendPacket(packet);
+        lastClientActionStatus = "Sent: Build";
+        UpdateGameStateOverlayText();
+        Debug.Log($"[NetworkManager] Sent BUILD_PROPERTY for position {positionIndex}.");
+    }
+
+    public void SendResumeGameRequest()
+    {
+        if (PlayerSession.Instance == null)
+            return;
+
+        var packet = new
+        {
+            Type = "RESUME_GAME",
+            Payload = new
+            {
+                Username = PlayerSession.Instance.Username
+            }
+        };
+
+        SendPacket(packet);
+        Debug.Log("[NetworkManager] Sent RESUME_GAME.");
+    }
+
     public void SendGameChatMessage(string message)
     {
         if (string.IsNullOrWhiteSpace(message))
@@ -789,6 +826,8 @@ public class NetworkManager : MonoBehaviour
                             tokenManager.NotifyStateUpdate(gameState);
                         }
 
+                        PlayerHandUI.EnsureExists().Refresh(gameState);
+
                         Debug.Log(
                             $"[NetworkManager] GAME_STATE_UPDATE Room={gameState?.RoomId ?? "N/A"}, " +
                             $"Turn={gameState?.TurnNumber ?? 0}, CurrentTurn={gameState?.CurrentTurnUsername ?? "N/A"}, " +
@@ -798,10 +837,35 @@ public class NetworkManager : MonoBehaviour
                         break;
                     }
 
+                case "RESUME_GAME_NONE":
+                    {
+                        string message = data["Payload"]?["Message"]?.ToString() ?? "No resumable game.";
+                        Debug.Log($"[NetworkManager] RESUME_GAME_NONE: {message}");
+                        break;
+                    }
+
                 case "CHAT_MESSAGE":
                     {
                         ChatMessageData chatMessage = data["Payload"]?.ToObject<ChatMessageData>();
                         AddGameChatMessage(chatMessage);
+                        break;
+                    }
+
+                case "CARD_DRAWN":
+                    {
+                        string drawnByUsername = data["Payload"]?["DrawnByUsername"]?.ToString() ?? "";
+                        string cardId = data["Payload"]?["CardId"]?.ToString() ?? "";
+                        string cardName = data["Payload"]?["CardName"]?.ToString() ?? "";
+                        string cardType = data["Payload"]?["CardType"]?.ToString() ?? "";
+                        string detailEffect = data["Payload"]?["DetailEffect"]?.ToString() ?? "";
+
+                        ChanceCardUI.EnsureExists()
+                            .ShowCard(drawnByUsername, cardId, cardName, cardType, detailEffect);
+
+                        Debug.Log(
+                            $"[NetworkManager] CARD_DRAWN By={drawnByUsername}, " +
+                            $"Card={cardName}, Type={cardType}, Effect={detailEffect}"
+                        );
                         break;
                     }
 

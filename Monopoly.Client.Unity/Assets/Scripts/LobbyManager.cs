@@ -102,6 +102,7 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Instance != null)
         {
             NetworkManager.Instance.StartListeningToServer();
+            NetworkManager.Instance.SendResumeGameRequest();
         }
         // Khởi tạo slider với giá trị hợp lệ
         InitSliders();
