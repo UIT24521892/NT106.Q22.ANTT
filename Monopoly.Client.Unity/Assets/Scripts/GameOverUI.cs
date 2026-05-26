@@ -12,7 +12,7 @@ public class GameOverUI : MonoBehaviour
     private GameObject root;
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI matchText;
-    private TextMeshProUGUI rankingText;
+    private TextMeshProUGUI contentText;
 
     public static GameOverUI EnsureExists()
     {
@@ -46,7 +46,18 @@ public class GameOverUI : MonoBehaviour
         matchText.text = string.IsNullOrWhiteSpace(gameOver?.MatchId)
             ? "Match: N/A"
             : $"Match: {gameOver.MatchId}";
-        rankingText.text = BuildRankingText(gameOver?.Rankings);
+        contentText.text = BuildRankingText(gameOver?.Rankings);
+        root.SetActive(true);
+    }
+
+    public void ShowLeaderboard(LeaderboardData leaderboard)
+    {
+        if (root == null)
+            BuildUi();
+
+        titleText.text = "Bảng xếp hạng";
+        matchText.text = "Top người chơi toàn server";
+        contentText.text = BuildLeaderboardText(leaderboard?.Entries);
         root.SetActive(true);
     }
 
@@ -79,10 +90,57 @@ public class GameOverUI : MonoBehaviour
         return builder.ToString();
     }
 
+    private string BuildLeaderboardText(List<LeaderboardEntryData> entries)
+    {
+        if (entries == null || entries.Count == 0)
+            return "Chưa có dữ liệu bảng xếp hạng.";
+
+        StringBuilder builder = new StringBuilder();
+
+        foreach (LeaderboardEntryData entry in entries)
+        {
+            if (entry == null)
+                continue;
+
+            string name = string.IsNullOrWhiteSpace(entry.DisplayName)
+                ? entry.UserId
+                : entry.DisplayName;
+
+            builder.Append("#")
+                .Append(entry.Rank)
+                .Append("  ")
+                .Append(name)
+                .Append("  |  ")
+                .Append(entry.Score)
+                .Append(" điểm")
+                .Append("  |  Thắng ")
+                .Append(entry.Wins)
+                .Append("/")
+                .Append(entry.TotalMatches)
+                .AppendLine();
+        }
+
+        return builder.ToString();
+    }
+
     private void Hide()
     {
         if (root != null)
             root.SetActive(false);
+    }
+
+    private void RequestLeaderboard()
+    {
+        if (NetworkManager.Instance == null)
+        {
+            ShowLeaderboard(null);
+            return;
+        }
+
+        titleText.text = "Bảng xếp hạng";
+        matchText.text = "Đang tải...";
+        contentText.text = "";
+        NetworkManager.Instance.RequestLeaderboard();
     }
 
     private void ReturnToLobby()
@@ -126,16 +184,19 @@ public class GameOverUI : MonoBehaviour
         panelRect.anchorMin = new Vector2(0.5f, 0.5f);
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
         panelRect.pivot = new Vector2(0.5f, 0.5f);
-        panelRect.sizeDelta = new Vector2(520f, 360f);
+        panelRect.sizeDelta = new Vector2(580f, 410f);
         panelRect.anchoredPosition = Vector2.zero;
 
-        titleText = CreateText(panel.transform, "Txt_Title", new Vector2(0f, 125f), new Vector2(460f, 46f), 30, TextAlignmentOptions.Center);
+        titleText = CreateText(panel.transform, "Txt_Title", new Vector2(0f, 150f), new Vector2(520f, 46f), 30, TextAlignmentOptions.Center);
         titleText.fontStyle = FontStyles.Bold;
 
-        matchText = CreateText(panel.transform, "Txt_MatchId", new Vector2(0f, 83f), new Vector2(460f, 26f), 15, TextAlignmentOptions.Center);
-        rankingText = CreateText(panel.transform, "Txt_Rankings", new Vector2(0f, -20f), new Vector2(440f, 160f), 22, TextAlignmentOptions.TopLeft);
+        matchText = CreateText(panel.transform, "Txt_MatchId", new Vector2(0f, 108f), new Vector2(520f, 26f), 15, TextAlignmentOptions.Center);
+        contentText = CreateText(panel.transform, "Txt_Content", new Vector2(0f, -15f), new Vector2(500f, 210f), 22, TextAlignmentOptions.TopLeft);
 
-        Button lobbyButton = CreateButton(panel.transform, "Btn_ReturnLobby", "Về Lobby", new Vector2(0f, -135f), new Vector2(190f, 48f));
+        Button leaderboardButton = CreateButton(panel.transform, "Btn_Leaderboard", "Bảng xếp hạng", new Vector2(-115f, -165f), new Vector2(210f, 48f));
+        leaderboardButton.onClick.AddListener(RequestLeaderboard);
+
+        Button lobbyButton = CreateButton(panel.transform, "Btn_ReturnLobby", "Về Lobby", new Vector2(125f, -165f), new Vector2(170f, 48f));
         lobbyButton.onClick.AddListener(ReturnToLobby);
     }
 

@@ -70,6 +70,23 @@ public class RankingEntryData
 }
 
 [System.Serializable]
+public class LeaderboardData
+{
+    public List<LeaderboardEntryData> Entries;
+}
+
+[System.Serializable]
+public class LeaderboardEntryData
+{
+    public string UserId;
+    public string DisplayName;
+    public int Rank;
+    public int Score;
+    public int Wins;
+    public int TotalMatches;
+}
+
+[System.Serializable]
 public class GamePlayerStateData
 {
     public string Username;

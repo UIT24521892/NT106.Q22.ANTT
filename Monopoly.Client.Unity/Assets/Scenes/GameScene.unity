@@ -800,7 +800,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 699508650486384570, guid: 5e771bd2088fb934a9ba18c37aed48cb, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 970820532852626778, guid: 5e771bd2088fb934a9ba18c37aed48cb, type: 3}
       propertyPath: m_Pivot.x
@@ -896,7 +896,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1073844396527233104, guid: 5e771bd2088fb934a9ba18c37aed48cb, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 47.857143
+      value: 47.857147
       objectReference: {fileID: 0}
     - target: {fileID: 1073844396527233104, guid: 5e771bd2088fb934a9ba18c37aed48cb, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -1792,7 +1792,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8836412308707107739, guid: 5e771bd2088fb934a9ba18c37aed48cb, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 47.857143
+      value: 47.857147
       objectReference: {fileID: 0}
     - target: {fileID: 8836412308707107739, guid: 5e771bd2088fb934a9ba18c37aed48cb, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -2138,7 +2138,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -562.84, y: -504.82}
-  m_SizeDelta: {x: 73.68, y: 70.34}
+  m_SizeDelta: {x: 65, y: 65}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &493975327
 MonoBehaviour:
@@ -2618,7 +2618,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -347.36, y: -503.49}
-  m_SizeDelta: {x: 66.96, y: 67.675}
+  m_SizeDelta: {x: 65, y: 65}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &750866534
 MonoBehaviour:
@@ -4826,7 +4826,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -455, y: -503.49}
-  m_SizeDelta: {x: 73.68, y: 67.67}
+  m_SizeDelta: {x: 65, y: 65}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1401481640
 MonoBehaviour:

@@ -271,6 +271,10 @@ namespace Monopoly.Server
                         await HandleGameChatAsync(packet, connection);
                         break;
 
+                    case "GET_LEADERBOARD":
+                        await HandleGetLeaderboardAsync(connection);
+                        break;
+
                     default:
                         Console.WriteLine($"[CẢNH BÁO] Packet không xác định: {packetType}");
                         break;
@@ -308,6 +312,7 @@ namespace Monopoly.Server
                 if (parts.Length >= 3)
                 {
                     connection.Uid = parts[1];
+                    connection.IdToken = parts[2];
 
                     // Khi login, username có thể rỗng vì ô Username đang ẩn.
                     // Tạm dùng email làm username nếu chưa có username.
@@ -1686,7 +1691,7 @@ namespace Monopoly.Server
         {
             GameState gameState;
             bool shouldBroadcastGameOver = false;
-            List<object> rankings = new List<object>();
+            List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
             string matchId = "";
 
             lock (_lock)
@@ -1734,7 +1739,7 @@ namespace Monopoly.Server
             }
         }
 
-        private static async Task BroadcastGameOverAsync(string roomId, string matchId, List<object> rankings)
+        private static async Task BroadcastGameOverAsync(string roomId, string matchId, List<GameOverRankingResult> rankings)
         {
             await BroadcastToRoomAsync(roomId, new
             {
@@ -1747,6 +1752,8 @@ namespace Monopoly.Server
             });
 
             Console.WriteLine($"[GAME_OVER_PACKET] Room={roomId}, MatchId={matchId}");
+
+            await PersistMatchResultsAsync(matchId, rankings);
         }
 
         private static async Task BroadcastCardDrawnAsync(string roomId, CardDrawEvent cardDrawEvent)
@@ -1766,6 +1773,46 @@ namespace Monopoly.Server
                     CardName = cardDrawEvent.CardName,
                     CardType = cardDrawEvent.CardType,
                     DetailEffect = cardDrawEvent.DetailEffect
+                }
+            });
+        }
+
+        private static async Task PersistMatchResultsAsync(string matchId, List<GameOverRankingResult> rankings)
+        {
+            foreach (GameOverRankingResult ranking in rankings)
+            {
+                if (string.IsNullOrWhiteSpace(ranking.UserId) || string.IsNullOrWhiteSpace(ranking.IdToken))
+                {
+                    Console.WriteLine($"[MATCH_RESULT_SKIP] Missing Firebase identity for {ranking.DisplayName}.");
+                    continue;
+                }
+
+                bool success = await _firebaseApi.UpdatePlayerMatchResultAsync(
+                    ranking.UserId,
+                    ranking.IdToken,
+                    ranking.DisplayName,
+                    ranking.Rank,
+                    ranking.ScoreEarned,
+                    matchId
+                );
+
+                if (!success)
+                {
+                    Console.WriteLine($"[MATCH_RESULT_FAIL] User={ranking.DisplayName}, Rank={ranking.Rank}");
+                }
+            }
+        }
+
+        private static async Task HandleGetLeaderboardAsync(ClientConnection connection)
+        {
+            List<LeaderboardEntry> entries = await _firebaseApi.GetLeaderboardAsync(connection.IdToken, 10);
+
+            await SendJsonPacketAsync(connection.Stream, new
+            {
+                Type = "LEADERBOARD_DATA",
+                Payload = new
+                {
+                    Entries = entries
                 }
             });
         }
@@ -2532,7 +2579,7 @@ namespace Monopoly.Server
         }
 
         // Chỉ gọi hàm này bên trong lock(_lock).
-        private static List<object> BuildGameOverRankingsUnsafe(GameState gameState)
+        private static List<GameOverRankingResult> BuildGameOverRankingsUnsafe(GameState gameState)
         {
             List<GamePlayerState> rankedPlayers = gameState.Players
                 .Where(p => !p.IsBot)
@@ -2541,22 +2588,53 @@ namespace Monopoly.Server
                 .ThenBy(p => p.PlayerIndex)
                 .ToList();
 
-            List<object> rankings = new List<object>();
+            List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
 
             for (int i = 0; i < rankedPlayers.Count; i++)
             {
                 GamePlayerState player = rankedPlayers[i];
+                ClientConnection playerConnection = _clients.Values
+                    .FirstOrDefault(c => c.Username == player.Username);
 
-                rankings.Add(new
+                rankings.Add(new GameOverRankingResult
                 {
-                    UserId = player.Username,
+                    UserId = string.IsNullOrWhiteSpace(playerConnection?.Uid)
+                        ? player.Username
+                        : playerConnection.Uid,
                     DisplayName = player.Username,
                     Rank = i + 1,
-                    ScoreEarned = 0
+                    ScoreEarned = GetScoreForRank(i + 1),
+                    IdToken = playerConnection?.IdToken ?? ""
                 });
             }
 
             return rankings;
+        }
+
+        private static int GetScoreForRank(int rank)
+        {
+            switch (rank)
+            {
+                case 1:
+                    return 100;
+                case 2:
+                    return 50;
+                case 3:
+                    return 20;
+                default:
+                    return 5;
+            }
+        }
+
+        private class GameOverRankingResult
+        {
+            public string UserId { get; set; } = "";
+            public string DisplayName { get; set; } = "";
+            public int Rank { get; set; }
+            public int ScoreEarned { get; set; }
+
+            [JsonIgnore]
+            public string IdToken { get; set; } = "";
         }
 
         // Chỉ gọi hàm này bên trong lock(_lock).

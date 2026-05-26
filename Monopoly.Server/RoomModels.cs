@@ -10,6 +10,7 @@ namespace Monopoly.Server
 
         public string Uid { get; set; }
         public string Username { get; set; }
+        public string IdToken { get; set; }
         public string CurrentRoomId { get; set; }
     }
 

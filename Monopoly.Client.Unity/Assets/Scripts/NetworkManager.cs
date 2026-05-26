@@ -47,6 +47,7 @@ public class NetworkManager : MonoBehaviour
 
     public event Action<ChatMessageData> GameChatMessageReceived;
     public event Action<GameOverData> GameOverReceived;
+    public event Action<LeaderboardData> LeaderboardReceived;
 
     private void Awake()
     {
@@ -625,6 +626,17 @@ public class NetworkManager : MonoBehaviour
         SendPacket(packet);
     }
 
+    public void RequestLeaderboard()
+    {
+        var packet = new
+        {
+            Type = "GET_LEADERBOARD",
+            Payload = new { }
+        };
+
+        SendPacket(packet);
+    }
+
     private void AddGameChatMessage(ChatMessageData chatMessage)
     {
         if (chatMessage == null || string.IsNullOrWhiteSpace(chatMessage.Message))
@@ -894,6 +906,15 @@ public class NetworkManager : MonoBehaviour
                         GameOverReceived?.Invoke(gameOver);
                         GameOverUI.EnsureExists().Show(gameOver);
                         Debug.Log($"[NetworkManager] GAME_OVER MatchId={gameOver?.MatchId ?? "N/A"}");
+                        break;
+                    }
+
+                case "LEADERBOARD_DATA":
+                    {
+                        LeaderboardData leaderboard = data["Payload"]?.ToObject<LeaderboardData>();
+                        LeaderboardReceived?.Invoke(leaderboard);
+                        GameOverUI.EnsureExists().ShowLeaderboard(leaderboard);
+                        Debug.Log($"[NetworkManager] LEADERBOARD_DATA Entries={leaderboard?.Entries?.Count ?? 0}");
                         break;
                     }
 
