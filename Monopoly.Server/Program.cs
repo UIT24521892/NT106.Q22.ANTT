@@ -1685,6 +1685,9 @@ namespace Monopoly.Server
         private static async Task BroadcastGameStateAsync(string roomId, string message)
         {
             GameState gameState;
+            bool shouldBroadcastGameOver = false;
+            List<object> rankings = new List<object>();
+            string matchId = "";
 
             lock (_lock)
             {
@@ -1695,6 +1698,17 @@ namespace Monopoly.Server
 
                 gameState = room.GameState;
                 gameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
+
+                if (gameState.IsFinished && !gameState.GameOverBroadcasted)
+                {
+                    if (string.IsNullOrWhiteSpace(gameState.MatchId))
+                        gameState.MatchId = Guid.NewGuid().ToString("N");
+
+                    rankings = BuildGameOverRankingsUnsafe(gameState);
+                    matchId = gameState.MatchId;
+                    gameState.GameOverBroadcasted = true;
+                    shouldBroadcastGameOver = true;
+                }
             }
 
             await BroadcastToRoomAsync(roomId, new
@@ -1713,6 +1727,26 @@ namespace Monopoly.Server
                 $"Turn={gameState.TurnNumber}, CurrentTurn={gameState.CurrentTurnUsername}, " +
                 $"Message={message}"
             );
+
+            if (shouldBroadcastGameOver)
+            {
+                await BroadcastGameOverAsync(roomId, matchId, rankings);
+            }
+        }
+
+        private static async Task BroadcastGameOverAsync(string roomId, string matchId, List<object> rankings)
+        {
+            await BroadcastToRoomAsync(roomId, new
+            {
+                Type = "GAME_OVER",
+                Payload = new
+                {
+                    MatchId = matchId,
+                    Rankings = rankings
+                }
+            });
+
+            Console.WriteLine($"[GAME_OVER_PACKET] Room={roomId}, MatchId={matchId}");
         }
 
         private static async Task BroadcastCardDrawnAsync(string roomId, CardDrawEvent cardDrawEvent)
@@ -1822,6 +1856,8 @@ namespace Monopoly.Server
                 TurnDurationSeconds = TurnDurationSeconds,
                 IsFinished = false,
                 WinnerUsername = "",
+                MatchId = Guid.NewGuid().ToString("N"),
+                GameOverBroadcasted = false,
                 WorldChampionshipPosition = 16,
                 IsWaitingForCardChoice = false,
                 PendingCardEffectCode = "",
@@ -1841,6 +1877,7 @@ namespace Monopoly.Server
                     Position = 0,
                     Money = 2000000,
                     IsBankrupt = false,
+                    BankruptcyOrder = 0,
                     IsConnected = !player.IsBot,
                     ConsecutiveDoubles = 0,
                     JailTurnsLeft = 0,
@@ -2022,16 +2059,17 @@ namespace Monopoly.Server
             }
 
             long rent = GetCurrentRentUnsafe(landedProperty);
+            long paidAmount = Math.Min(rent, Math.Max(0, player.Money));
             player.Money -= rent;
-            owner.Money += rent;
+            owner.Money += paidAmount;
 
             actionMessages.Add(
-                $"{player.Username} trả {rent:N0} tiền thuê {landedProperty.Name} cho {owner.Username}."
+                $"{player.Username} trả {paidAmount:N0}/{rent:N0} tiền thuê {landedProperty.Name} cho {owner.Username}."
             );
 
             Console.WriteLine(
                 $"[RENT] Room={gameState.RoomId}, From={player.Username}, To={owner.Username}, " +
-                $"Property={landedProperty.Name}, Rent={rent}, " +
+                $"Property={landedProperty.Name}, Rent={rent}, Paid={paidAmount}, " +
                 $"PayerMoney={player.Money}, OwnerMoney={owner.Money}"
             );
         }
@@ -2366,14 +2404,12 @@ namespace Monopoly.Server
             GamePlayerState currentPlayer,
             List<string> actionMessages)
         {
-            if (currentPlayer.Money < 0 && !currentPlayer.IsBankrupt)
+            foreach (GamePlayerState player in gameState.Players.OrderBy(p => p.PlayerIndex))
             {
-                currentPlayer.IsBankrupt = true;
-                actionMessages.Add($"{currentPlayer.Username} đã phá sản.");
-
-                Console.WriteLine(
-                    $"[BANKRUPT] Player={currentPlayer.Username}, Money={currentPlayer.Money}"
-                );
+                if (player.Money < 0 && !player.IsBankrupt)
+                {
+                    HandleBankruptcyUnsafe(gameState, player, actionMessages);
+                }
             }
 
             List<GamePlayerState> activeHumanPlayers = gameState.Players
@@ -2388,12 +2424,13 @@ namespace Monopoly.Server
                 gameState.HasRolledThisTurn = true;
                 gameState.TurnEndsAtUtcTicks = 0;
                 actionMessages.Add($"{gameState.WinnerUsername} thắng trận.");
+                actionMessages.Add($"Xếp hạng: {BuildRankingSummaryUnsafe(gameState)}");
 
                 Console.WriteLine($"[GAME_OVER] Winner={gameState.WinnerUsername}");
                 return;
             }
 
-            if (currentPlayer.IsBankrupt && !gameState.IsFinished)
+            if (currentPlayer != null && currentPlayer.IsBankrupt && !gameState.IsFinished)
             {
                 GamePlayerState nextPlayer = GetNextTurnPlayerUnsafe(gameState);
 
@@ -2410,6 +2447,116 @@ namespace Monopoly.Server
                     $"Next={nextPlayer.Username}, Turn={gameState.TurnNumber}"
                 );
             }
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static void HandleBankruptcyUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            List<string> actionMessages)
+        {
+            player.IsBankrupt = true;
+            player.BankruptcyOrder = GetNextBankruptcyOrderUnsafe(gameState);
+            player.Money = 0;
+            player.HasFreeRentCard = false;
+            player.HasEscapeIslandCard = false;
+            player.HasFlightCard = false;
+            player.HasFreeUpgradeCard = false;
+            player.HasForceDoubleCard = false;
+            player.IsOnIsland = false;
+            player.JailTurnsLeft = 0;
+            player.SkipTurnsLeft = 0;
+            player.SkipReason = "";
+
+            int releasedProperties = ReleasePlayerPropertiesUnsafe(gameState, player.PlayerIndex);
+            actionMessages.Add($"{player.Username} đã phá sản và mất {releasedProperties} ô đất.");
+
+            Console.WriteLine(
+                $"[BANKRUPT] Player={player.Username}, Order={player.BankruptcyOrder}, ReleasedProperties={releasedProperties}"
+            );
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static int GetNextBankruptcyOrderUnsafe(GameState gameState)
+        {
+            int maxOrder = 0;
+
+            foreach (GamePlayerState player in gameState.Players)
+            {
+                if (player.BankruptcyOrder > maxOrder)
+                    maxOrder = player.BankruptcyOrder;
+            }
+
+            return maxOrder + 1;
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static int ReleasePlayerPropertiesUnsafe(GameState gameState, int ownerPlayerIndex)
+        {
+            int releasedCount = 0;
+
+            foreach (GamePropertyState property in gameState.Properties.Values)
+            {
+                if (property.OwnerPlayerIndex != ownerPlayerIndex)
+                    continue;
+
+                property.OwnerPlayerIndex = -1;
+                property.HouseCount = 0;
+                property.HasHotel = false;
+                property.Multiplier = 1;
+                property.PowerOutageTurn = 0;
+                releasedCount++;
+            }
+
+            return releasedCount;
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static string BuildRankingSummaryUnsafe(GameState gameState)
+        {
+            List<GamePlayerState> rankedPlayers = gameState.Players
+                .Where(p => !p.IsBot)
+                .OrderBy(p => p.IsBankrupt ? 1 : 0)
+                .ThenByDescending(p => p.IsBankrupt ? p.BankruptcyOrder : int.MaxValue)
+                .ThenBy(p => p.PlayerIndex)
+                .ToList();
+
+            List<string> parts = new List<string>();
+
+            for (int i = 0; i < rankedPlayers.Count; i++)
+            {
+                parts.Add($"#{i + 1} {rankedPlayers[i].Username}");
+            }
+
+            return string.Join(", ", parts);
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static List<object> BuildGameOverRankingsUnsafe(GameState gameState)
+        {
+            List<GamePlayerState> rankedPlayers = gameState.Players
+                .Where(p => !p.IsBot)
+                .OrderBy(p => p.IsBankrupt ? 1 : 0)
+                .ThenByDescending(p => p.IsBankrupt ? p.BankruptcyOrder : int.MaxValue)
+                .ThenBy(p => p.PlayerIndex)
+                .ToList();
+
+            List<object> rankings = new List<object>();
+
+            for (int i = 0; i < rankedPlayers.Count; i++)
+            {
+                GamePlayerState player = rankedPlayers[i];
+
+                rankings.Add(new
+                {
+                    UserId = player.Username,
+                    DisplayName = player.Username,
+                    Rank = i + 1,
+                    ScoreEarned = 0
+                });
+            }
+
+            return rankings;
         }
 
         // Chỉ gọi hàm này bên trong lock(_lock).

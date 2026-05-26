@@ -22,6 +22,7 @@ public class GameSceneUIBinder : MonoBehaviour
         BoardTileInfoUI.EnsureExists();
         PlayerHandUI.EnsureExists().Refresh(GameSession.CurrentState);
         PlayerInfoLayerUI.EnsureExists();
+        GameOverUI.EnsureExists();
     }
 
     private void OnDestroy()

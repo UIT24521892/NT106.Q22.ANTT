@@ -54,6 +54,22 @@ public class ChatMessageData
 }
 
 [System.Serializable]
+public class GameOverData
+{
+    public string MatchId;
+    public List<RankingEntryData> Rankings;
+}
+
+[System.Serializable]
+public class RankingEntryData
+{
+    public string UserId;
+    public string DisplayName;
+    public int Rank;
+    public int ScoreEarned;
+}
+
+[System.Serializable]
 public class GamePlayerStateData
 {
     public string Username;
@@ -62,6 +78,7 @@ public class GamePlayerStateData
     public int Position;
     public long Money;
     public bool IsBankrupt;
+    public int BankruptcyOrder;
     public bool IsConnected;
     public int ConsecutiveDoubles;
     public int JailTurnsLeft;

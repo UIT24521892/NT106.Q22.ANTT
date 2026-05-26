@@ -46,6 +46,7 @@ public class NetworkManager : MonoBehaviour
     private readonly List<ChatMessageData> gameChatMessages = new List<ChatMessageData>();
 
     public event Action<ChatMessageData> GameChatMessageReceived;
+    public event Action<GameOverData> GameOverReceived;
 
     private void Awake()
     {
@@ -386,6 +387,9 @@ public class NetworkManager : MonoBehaviour
         if (property.Type != "City" && property.Type != "Resort")
             return false;
 
+
+
+
         return localPlayer.Money >= property.BuyPrice;
     }
 
@@ -600,6 +604,21 @@ public class NetworkManager : MonoBehaviour
                 RoomId = GameSession.RoomId,
                 Username = PlayerSession.Instance?.Username,
                 Message = trimmedMessage
+            }
+        };
+
+        SendPacket(packet);
+    }
+
+    public void SendLeaveRoomRequest()
+    {
+        var packet = new
+        {
+            Type = "LEAVE_ROOM",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username
             }
         };
 
@@ -866,6 +885,15 @@ public class NetworkManager : MonoBehaviour
                             $"[NetworkManager] CARD_DRAWN By={drawnByUsername}, " +
                             $"Card={cardName}, Type={cardType}, Effect={detailEffect}"
                         );
+                        break;
+                    }
+
+                case "GAME_OVER":
+                    {
+                        GameOverData gameOver = data["Payload"]?.ToObject<GameOverData>();
+                        GameOverReceived?.Invoke(gameOver);
+                        GameOverUI.EnsureExists().Show(gameOver);
+                        Debug.Log($"[NetworkManager] GAME_OVER MatchId={gameOver?.MatchId ?? "N/A"}");
                         break;
                     }
 
