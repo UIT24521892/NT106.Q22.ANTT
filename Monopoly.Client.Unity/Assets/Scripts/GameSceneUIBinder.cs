@@ -20,6 +20,7 @@ public class GameSceneUIBinder : MonoBehaviour
         BoardTokenManager.EnsureExists();
         GameChatUI.EnsureExists();
         BoardTileInfoUI.EnsureExists();
+        PropertyBuildMarkerUI.EnsureExists();
         PlayerHandUI.EnsureExists().Refresh(GameSession.CurrentState);
         PlayerInfoLayerUI.EnsureExists();
         GameOverUI.EnsureExists();
