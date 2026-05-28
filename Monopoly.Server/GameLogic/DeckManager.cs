@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using Monopoly.Shared.Models.Constants;
-
+using Monopoly.Shared.Models.Configs.Models;
+using Monopoly.Shared.Models.Configs.StaticData;
 namespace Monopoly.Server.GameLogic
 {
     public class DeckManager
