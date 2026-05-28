@@ -14,7 +14,12 @@ public class BoardTileInfoUI : MonoBehaviour
     private RectTransform popupRoot;
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI bodyText;
+    private TextMeshProUGUI actionHintText;
     private Button closeButton;
+    private Button buildButton;
+    private RectTransform markerClickLayer;
+    private int currentPopupPosition = -1;
+    private float nextPopupRefreshTime;
 
     public static BoardTileInfoUI EnsureExists()
     {
@@ -31,6 +36,18 @@ public class BoardTileInfoUI : MonoBehaviour
     {
         BuildPopupUi();
         RegisterBoardButtons();
+    }
+
+    private void Update()
+    {
+        if (popupRoot == null || !popupRoot.gameObject.activeSelf || currentPopupPosition < 0)
+            return;
+
+        if (Time.unscaledTime < nextPopupRefreshTime)
+            return;
+
+        nextPopupRefreshTime = Time.unscaledTime + 0.35f;
+        RefreshCurrentPopup();
     }
 
     private void BuildPopupUi()
@@ -52,31 +69,47 @@ public class BoardTileInfoUI : MonoBehaviour
         popupRoot.anchorMax = new Vector2(0.5f, 0.5f);
         popupRoot.pivot = new Vector2(0.5f, 0.5f);
         popupRoot.anchoredPosition = Vector2.zero;
-        popupRoot.sizeDelta = new Vector2(470f, 430f);
+        popupRoot.sizeDelta = new Vector2(500f, 470f);
 
         Image rootImage = rootObject.GetComponent<Image>();
         rootImage.color = new Color(0.07f, 0.08f, 0.09f, 0.94f);
         rootImage.raycastTarget = true;
 
-        titleText = CreateText("Txt_TileTitle", popupRoot, "", 26f, FontStyles.Bold);
+        titleText = CreateText("Txt_TileTitle", popupRoot, "", 24f, FontStyles.Bold);
         titleText.alignment = TextAlignmentOptions.TopLeft;
         titleText.color = new Color(1f, 0.86f, 0.42f, 1f);
         SetRect(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(20f, -18f), new Vector2(-74f, 54f));
 
-        bodyText = CreateText("Txt_TileBody", popupRoot, "", 18f, FontStyles.Normal);
+        bodyText = CreateText("Txt_TileBody", popupRoot, "", 15f, FontStyles.Normal);
         bodyText.alignment = TextAlignmentOptions.TopLeft;
         bodyText.enableWordWrapping = true;
         bodyText.overflowMode = TextOverflowModes.Ellipsis;
-        SetRect(bodyText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(0f, -22f), new Vector2(-40f, -104f));
+        bodyText.lineSpacing = 2f;
+        SetRect(bodyText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(-40f, -118f));
 
         closeButton = CreateButton("Btn_CloseTilePopup", popupRoot, "X", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(44f, 38f));
         closeButton.onClick.AddListener(HidePopup);
+
+        actionHintText = CreateText("Txt_TileActionHint", popupRoot, "", 14f, FontStyles.Normal);
+        actionHintText.alignment = TextAlignmentOptions.MidlineLeft;
+        actionHintText.color = new Color(0.82f, 0.9f, 1f, 1f);
+        SetRect(actionHintText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-80f, 62f), new Vector2(-204f, 34f));
+
+        buildButton = CreateButton("Btn_BuildProperty", popupRoot, "Nâng cấp", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-20f, 20f), new Vector2(150f, 44f));
+        buildButton.onClick.AddListener(SendBuildRequest);
+        SetButtonColor(buildButton, new Color(0.18f, 0.62f, 0.25f, 0.98f));
 
         popupRoot.gameObject.SetActive(false);
     }
 
     private void RegisterBoardButtons()
     {
+        if (TryRegisterMarkerClickZones())
+        {
+            Debug.Log($"[BoardTileInfoUI] Registered {buttonsByPosition.Count} marker tile click zones.");
+            return;
+        }
+
         GameObject boardContainer = FindSceneObjectByName("BoardContainer");
 
         if (boardContainer == null)
@@ -122,6 +155,72 @@ public class BoardTileInfoUI : MonoBehaviour
         }
 
         Debug.Log($"[BoardTileInfoUI] Registered {buttonsByPosition.Count} board tile buttons.");
+    }
+
+    private bool TryRegisterMarkerClickZones()
+    {
+        Canvas canvas = FindObjectOfType<Canvas>();
+
+        if (canvas == null)
+            return false;
+
+        RectTransform canvasRect = canvas.transform as RectTransform;
+
+        if (canvasRect == null)
+            return false;
+
+        buttonsByPosition.Clear();
+
+        GameObject layerObject = new GameObject("Runtime_BoardTileClickZones", typeof(RectTransform), typeof(CanvasRenderer));
+        markerClickLayer = layerObject.GetComponent<RectTransform>();
+        markerClickLayer.SetParent(canvasRect, false);
+        markerClickLayer.anchorMin = Vector2.zero;
+        markerClickLayer.anchorMax = Vector2.one;
+        markerClickLayer.offsetMin = Vector2.zero;
+        markerClickLayer.offsetMax = Vector2.zero;
+        markerClickLayer.pivot = new Vector2(0.5f, 0.5f);
+        markerClickLayer.SetAsLastSibling();
+
+        for (int position = 0; position < BoardSquareCount; position++)
+        {
+            Transform marker = FindBoardPointMarker(position);
+
+            if (marker == null)
+            {
+                Destroy(markerClickLayer.gameObject);
+                markerClickLayer = null;
+                buttonsByPosition.Clear();
+                return false;
+            }
+
+            RectTransform markerRect = marker as RectTransform;
+            Vector3 worldCenter = markerRect != null ? GetRectWorldCenter(markerRect) : marker.position;
+            Vector2 anchoredPosition = WorldPositionToCanvasPoint(worldCenter, canvas);
+            Vector2 size = markerRect != null ? markerRect.rect.size : new Vector2(88f, 88f);
+            size = new Vector2(Mathf.Max(48f, size.x), Mathf.Max(48f, size.y));
+
+            int capturedPosition = position;
+            GameObject zoneObject = new GameObject($"Btn_TileZone_{position:00}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            RectTransform zoneRect = zoneObject.GetComponent<RectTransform>();
+            zoneRect.SetParent(markerClickLayer, false);
+            zoneRect.anchorMin = new Vector2(0.5f, 0.5f);
+            zoneRect.anchorMax = new Vector2(0.5f, 0.5f);
+            zoneRect.pivot = new Vector2(0.5f, 0.5f);
+            zoneRect.anchoredPosition = anchoredPosition;
+            zoneRect.sizeDelta = size;
+
+            Image image = zoneObject.GetComponent<Image>();
+            image.color = new Color(1f, 1f, 1f, 0.01f);
+            image.raycastTarget = true;
+
+            Button button = zoneObject.GetComponent<Button>();
+            button.targetGraphic = image;
+            button.onClick.AddListener(() => ShowTileInfo(capturedPosition));
+
+            buttonsByPosition[capturedPosition] = button;
+        }
+
+        return buttonsByPosition.Count == BoardSquareCount;
     }
 
     private Dictionary<int, Button> TryMapButtonsByMarkers(List<Button> boardButtons)
@@ -206,50 +305,92 @@ public class BoardTileInfoUI : MonoBehaviour
         return mappedButtons;
     }
 
-    private void ShowTileInfo(int position)
+    public void ShowTileInfo(int position)
+    {
+        currentPopupPosition = position;
+        RefreshCurrentPopup();
+        popupRoot.SetAsLastSibling();
+        popupRoot.gameObject.SetActive(true);
+    }
+
+    private void RefreshCurrentPopup()
     {
         GameStateData state = GameSession.CurrentState;
 
         if (state == null || state.Properties == null)
         {
-            ShowFallback("Chua co du lieu", "Chua nhan du lieu tran dau tu server.");
+            ShowFallback("Chưa có dữ liệu", "Chưa nhận dữ liệu trận đấu từ server.");
             return;
         }
 
-        if (!state.Properties.TryGetValue(position, out GamePropertyStateData property) || property == null)
+        if (!state.Properties.TryGetValue(currentPopupPosition, out GamePropertyStateData property) || property == null)
         {
-            ShowFallback($"O {position}", "Khong tim thay thong tin o nay trong GameState.Properties.");
+            ShowFallback($"Ô {currentPopupPosition}", "Không tìm thấy thông tin ô này trong GameState.Properties.");
             return;
         }
 
-        titleText.text = $"{property.Name}  |  O {property.PositionIndex}";
-        bodyText.text = BuildTileDescription(property, state);
-        popupRoot.SetAsLastSibling();
-        popupRoot.gameObject.SetActive(true);
+        titleText.text = $"{property.Name}  |  Ô {property.PositionIndex}";
+        Color popupTextColor = GetPopupTextColor(property);
+        string popupTextColorHex = ColorUtility.ToHtmlStringRGB(popupTextColor);
+
+        titleText.richText = true;
+        bodyText.richText = true;
+        titleText.text = $"<color=#{popupTextColorHex}>{titleText.text}</color>";
+        bodyText.text = $"<color=#{popupTextColorHex}>{BuildTileDescription(property, state)}</color>";
+        ApplyPopupTextColor(property);
+        RefreshBuildButton(property, state);
+        ApplyPopupTextColor(property);
+    }
+
+    private void ApplyPopupTextColor(GamePropertyStateData property)
+    {
+        Color textColor = GetPopupTextColor(property);
+
+        if (titleText != null)
+            titleText.color = textColor;
+
+        if (bodyText != null)
+            bodyText.color = textColor;
+
+        if (actionHintText != null)
+            actionHintText.color = textColor;
+    }
+
+    private Color GetPopupTextColor(GamePropertyStateData property)
+    {
+        if (property != null &&
+            (property.Type == "City" || property.Type == "Resort") &&
+            TryGetMonopolyColor(property.ColorSet, out Color monopolyColor))
+        {
+            return monopolyColor;
+        }
+
+        return new Color(1f, 0.86f, 0.42f, 1f);
     }
 
     private string BuildTileDescription(GamePropertyStateData property, GameStateData state)
     {
         StringBuilder builder = new StringBuilder();
-        builder.AppendLine($"Loai: {DescribeType(property.Type)}");
+        builder.AppendLine($"Loại: {DescribeType(property.Type)}");
 
         if (!string.IsNullOrWhiteSpace(property.ColorSet))
-            builder.AppendLine($"Nhom mau: {property.ColorSet}");
+            builder.AppendLine($"Nhóm màu: {property.ColorSet}");
 
         if (!string.IsNullOrWhiteSpace(property.LineIndex))
-            builder.AppendLine($"Canh ban co: {property.LineIndex}");
-
-        builder.AppendLine();
+            builder.AppendLine($"Cạnh bàn cờ: {property.LineIndex}");
 
         if (property.Type == "City" || property.Type == "Resort")
         {
-            builder.AppendLine($"Gia mua: {FormatMoney(property.BuyPrice)}");
-            builder.AppendLine($"Chu so huu: {GetOwnerName(property.OwnerPlayerIndex, state)}");
-            builder.AppendLine($"Cap hien tai: {DescribeUpgradeLevel(property)}");
-            builder.AppendLine($"He so tien thue: x{Math.Max(1, property.Multiplier)}");
-            builder.AppendLine($"Tien thue hien tai: {FormatMoney(GetCurrentRent(property))}");
-            builder.AppendLine();
-            builder.AppendLine("Bang tien thue:");
+            builder.AppendLine($"Giá mua: {FormatMoney(property.BuyPrice)}");
+            builder.AppendLine($"Chủ sở hữu: {GetOwnerName(property.OwnerPlayerIndex, state)}");
+            builder.AppendLine($"Cấp hiện tại: {DescribeUpgradeLevel(property)}");
+            builder.AppendLine($"Hệ số tiền thuê: x{Math.Max(1, property.Multiplier)}");
+            builder.AppendLine($"Tiền thuê hiện tại: {FormatMoney(GetCurrentRent(property))}");
+
+            if (property.Type == "City" && !property.HasHotel)
+                builder.AppendLine($"Chi phí nâng cấp tiếp theo: {FormatMoney(GetBuildCost(property))}");
+
+            builder.AppendLine("Bảng tiền thuê:");
             builder.Append(BuildRentTable(property));
         }
         else
@@ -263,17 +404,17 @@ public class BoardTileInfoUI : MonoBehaviour
     private string BuildRentTable(GamePropertyStateData property)
     {
         if (property.RentPrices == null || property.RentPrices.Count == 0)
-            return "Khong co bang tien thue.";
+            return "Không có bảng tiền thuê.";
 
         string[] labels = property.Type == "Resort"
-            ? new[] { "Mac dinh" }
-            : new[] { "Dat trong", "1 nha", "2 nha", "3 nha", "Khach san" };
+            ? new[] { "Mặc định" }
+            : new[] { "Đất trống", "1 nhà", "2 nhà", "3 nhà", "Khách sạn" };
 
         StringBuilder builder = new StringBuilder();
 
         for (int i = 0; i < property.RentPrices.Count; i++)
         {
-            string label = i < labels.Length ? labels[i] : $"Cap {i}";
+            string label = i < labels.Length ? labels[i] : $"Cấp {i}";
             builder.AppendLine($"{label}: {FormatMoney(property.RentPrices[i])}");
         }
 
@@ -295,18 +436,141 @@ public class BoardTileInfoUI : MonoBehaviour
     private string DescribeUpgradeLevel(GamePropertyStateData property)
     {
         if (property.HasHotel)
-            return "Khach san";
+            return "Khách sạn";
 
         if (property.HouseCount > 0)
-            return $"{property.HouseCount} nha";
+            return $"{property.HouseCount} nhà";
 
-        return "Dat trong";
+        return "Đất trống";
+    }
+
+    private long GetBuildCost(GamePropertyStateData property)
+    {
+        if (property == null || property.Type != "City" || property.BuyPrice <= 0 || property.HasHotel)
+            return 0;
+
+        return property.HouseCount >= 3 ? property.BuyPrice : Math.Max(1, property.BuyPrice / 2);
+    }
+
+    private void RefreshBuildButton(GamePropertyStateData property, GameStateData state)
+    {
+        if (buildButton == null || actionHintText == null)
+            return;
+
+        bool canBuild = CanBuildProperty(property, state, out string reason, out long buildCost);
+        buildButton.gameObject.SetActive(property != null && property.Type == "City");
+        buildButton.interactable = canBuild;
+
+        TextMeshProUGUI buttonText = buildButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        if (buttonText != null)
+            buttonText.text = "Nâng cấp";
+
+        actionHintText.text = reason;
+    }
+
+    private bool CanBuildProperty(GamePropertyStateData property, GameStateData state, out string reason, out long buildCost)
+    {
+        buildCost = GetBuildCost(property);
+
+        if (property == null)
+        {
+            reason = "";
+            return false;
+        }
+
+        if (property.Type != "City")
+        {
+            reason = "Chỉ thành phố mới có thể nâng cấp.";
+            return false;
+        }
+
+        if (state == null || state.IsFinished)
+        {
+            reason = "Trận đấu không còn đang diễn ra.";
+            return false;
+        }
+
+        GamePlayerStateData localPlayer = GetLocalPlayer(state);
+
+        if (localPlayer == null)
+        {
+            reason = "Không tìm thấy người chơi hiện tại.";
+            return false;
+        }
+
+        if (!localPlayer.IsConnected || localPlayer.IsBankrupt)
+        {
+            reason = "Người chơi hiện tại không thể thao tác.";
+            return false;
+        }
+
+        if (localPlayer.PlayerIndex != state.CurrentTurnPlayerIndex)
+        {
+            reason = "Chỉ nâng cấp trong lượt của bạn.";
+            return false;
+        }
+
+        if (property.OwnerPlayerIndex != localPlayer.PlayerIndex)
+        {
+            reason = property.OwnerPlayerIndex < 0 ? "Đất này chưa có chủ." : "Bạn không sở hữu đất này.";
+            return false;
+        }
+
+        if (property.HasHotel)
+        {
+            reason = "Đất này đã đạt cấp khách sạn.";
+            return false;
+        }
+
+        if (buildCost <= 0)
+        {
+            reason = "Không có chi phí nâng cấp hợp lệ.";
+            return false;
+        }
+
+        if (localPlayer.Money < buildCost)
+        {
+            reason = $"Cần {FormatMoney(buildCost)}, bạn chỉ có {FormatMoney(localPlayer.Money)}.";
+            return false;
+        }
+
+        reason = $"Có thể nâng cấp với giá {FormatMoney(buildCost)}.";
+        return true;
+    }
+
+    private GamePlayerStateData GetLocalPlayer(GameStateData state)
+    {
+        string username = PlayerSession.Instance?.Username ?? "";
+
+        if (state == null || state.Players == null || string.IsNullOrWhiteSpace(username))
+            return null;
+
+        foreach (GamePlayerStateData player in state.Players)
+        {
+            if (player != null && string.Equals(player.Username, username, StringComparison.OrdinalIgnoreCase))
+                return player;
+        }
+
+        return null;
+    }
+
+    private void SendBuildRequest()
+    {
+        if (currentPopupPosition < 0 || NetworkManager.Instance == null)
+            return;
+
+        if (buildButton != null)
+            buildButton.interactable = false;
+
+        NetworkManager.Instance.SendBuildPropertyRequest(currentPopupPosition);
+        actionHintText.text = "Đã gửi yêu cầu nâng cấp lên server...";
     }
 
     private string GetOwnerName(int ownerPlayerIndex, GameStateData state)
     {
         if (ownerPlayerIndex < 0)
-            return "Chua co chu";
+            return "Chưa có chủ";
 
         if (state.Players != null)
         {
@@ -324,15 +588,15 @@ public class BoardTileInfoUI : MonoBehaviour
     {
         switch (type)
         {
-            case "Start": return "Bat dau";
-            case "City": return "Thanh pho";
-            case "Resort": return "Khu nghi duong";
-            case "Tax": return "Thue";
-            case "Chance": return "Co hoi";
-            case "LostIsland": return "Dao hoang";
-            case "WorldChampionship": return "Giai vo dich";
-            case "WorldTour": return "Du lich the gioi";
-            default: return string.IsNullOrWhiteSpace(type) ? "Khong xac dinh" : type;
+            case "Start": return "Bắt đầu";
+            case "City": return "Thành phố";
+            case "Resort": return "Khu nghỉ dưỡng";
+            case "Tax": return "Thuế";
+            case "Chance": return "Cơ hội";
+            case "LostIsland": return "Đảo hoang";
+            case "WorldChampionship": return "Giải vô địch";
+            case "WorldTour": return "Du lịch thế giới";
+            default: return string.IsNullOrWhiteSpace(type) ? "Không xác định" : type;
         }
     }
 
@@ -341,19 +605,19 @@ public class BoardTileInfoUI : MonoBehaviour
         switch (type)
         {
             case "Start":
-                return "Di qua hoac dung tai o Bat Dau se nhan tien thuong theo luat server.";
+                return "Đi qua hoặc dừng tại ô Bắt Đầu sẽ nhận tiền thưởng theo luật server.";
             case "Tax":
-                return "Nguoi choi dung tai o nay se nop thue.";
+                return "Người chơi dừng tại ô này sẽ nộp thuế.";
             case "Chance":
-                return "Nguoi choi rut the Co Hoi, co the nhan tien, bi phat, ve Start hoac toi Dao Hoang.";
+                return "Người chơi rút thẻ Cơ Hội, có thể nhận tiền, bị phạt, về Start hoặc tới Đảo Hoang.";
             case "LostIsland":
-                return "Nguoi choi vao Dao Hoang se bi mat luot ke tiep.";
+                return "Người chơi vào Đảo Hoang sẽ bị mất lượt kế tiếp.";
             case "WorldChampionship":
-                return "Nguoi choi nhan tien thuong Giai Vo Dich.";
+                return "Người chơi nhận tiền thưởng Giải Vô Địch.";
             case "WorldTour":
-                return "Nguoi choi nhan tien thuong Du Lich The Gioi.";
+                return "Người chơi nhận tiền thưởng Du Lịch Thế Giới.";
             default:
-                return "O dac biet, khong the mua.";
+                return "Ô đặc biệt, không thể mua.";
         }
     }
 
@@ -361,6 +625,14 @@ public class BoardTileInfoUI : MonoBehaviour
     {
         titleText.text = title;
         bodyText.text = body;
+        currentPopupPosition = -1;
+
+        if (buildButton != null)
+            buildButton.gameObject.SetActive(false);
+
+        if (actionHintText != null)
+            actionHintText.text = "";
+
         popupRoot.SetAsLastSibling();
         popupRoot.gameObject.SetActive(true);
     }
@@ -433,6 +705,14 @@ public class BoardTileInfoUI : MonoBehaviour
         text.alignment = TextAlignmentOptions.Center;
         SetRect(text.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         return button;
+    }
+
+    private void SetButtonColor(Button button, Color color)
+    {
+        if (button == null || button.targetGraphic == null)
+            return;
+
+        button.targetGraphic.color = color;
     }
 
     private void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 sizeDelta)
@@ -549,9 +829,43 @@ public class BoardTileInfoUI : MonoBehaviour
         points.AddRange(tail);
     }
 
+    private bool TryGetMonopolyColor(string colorSet, out Color color)
+    {
+        switch ((colorSet ?? "").Trim().ToLowerInvariant())
+        {
+            case "pink":
+                color = new Color(1f, 0.38f, 0.72f, 1f);
+                return true;
+            case "yellow":
+                color = new Color(1f, 0.84f, 0.16f, 1f);
+                return true;
+            case "blue":
+                color = new Color(0.26f, 0.58f, 1f, 1f);
+                return true;
+            case "green":
+                color = new Color(0.26f, 0.88f, 0.45f, 1f);
+                return true;
+            case "brown":
+                color = new Color(0.72f, 0.48f, 0.28f, 1f);
+                return true;
+            case "purple":
+                color = new Color(0.76f, 0.45f, 1f, 1f);
+                return true;
+            case "orange":
+                color = new Color(1f, 0.53f, 0.18f, 1f);
+                return true;
+            case "cyan":
+                color = new Color(0.16f, 0.86f, 0.95f, 1f);
+                return true;
+            default:
+                color = Color.white;
+                return false;
+        }
+    }
+
     private string FormatMoney(long amount)
     {
-        return amount > 0 ? $"${amount:N0}" : "N/A";
+        return amount >= 0 ? $"${amount:N0}" : "Không có";
     }
 
     private string ShortName(string username)

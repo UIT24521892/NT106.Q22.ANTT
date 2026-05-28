@@ -10,6 +10,7 @@ namespace Monopoly.Server
 
         public string Uid { get; set; }
         public string Username { get; set; }
+        public string IdToken { get; set; }
         public string CurrentRoomId { get; set; }
     }
 
@@ -56,6 +57,13 @@ namespace Monopoly.Server
         public long ServerUtcTicks { get; set; }
         public bool IsFinished { get; set; }
         public string WinnerUsername { get; set; } = "";
+        public string MatchId { get; set; } = "";
+        public bool GameOverBroadcasted { get; set; }
+        public int WorldChampionshipPosition { get; set; } = 16;
+        public bool IsWaitingForCardChoice { get; set; }
+        public string PendingCardEffectCode { get; set; } = "";
+        public string PendingCardPlayerUsername { get; set; } = "";
+        public bool ForceDoubleThisTurn { get; set; }
         public List<string> ActionLog { get; set; } = new List<string>();
 
         public List<GamePlayerState> Players { get; set; } = new List<GamePlayerState>();
@@ -71,9 +79,19 @@ namespace Monopoly.Server
         public int Position { get; set; }
         public long Money { get; set; }
         public bool IsBankrupt { get; set; }
+        public int BankruptcyOrder { get; set; }
         public bool IsConnected { get; set; } = true;
         public int ConsecutiveDoubles { get; set; }
         public int JailTurnsLeft { get; set; }
+        public bool HasFreeRentCard { get; set; }
+        public bool HasEscapeIslandCard { get; set; }
+        public bool HasFlightCard { get; set; }
+        public bool HasFreeUpgradeCard { get; set; }
+        public bool HasForceDoubleCard { get; set; }
+        public bool IsOnIsland { get; set; }
+        public int SkipTurnsLeft { get; set; }
+        public string SkipReason { get; set; } = "";
+        public string LastDrawnCardId { get; set; } = "";
     }
 
     public class GamePropertyState

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -157,6 +159,151 @@ namespace Monopoly.Server
             }
         }
 
+        public async Task<bool> UpdatePlayerMatchResultAsync(
+            string uid,
+            string idToken,
+            string displayName,
+            int rank,
+            int scoreEarned,
+            string matchId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(uid) || string.IsNullOrWhiteSpace(idToken))
+                    return false;
+
+                string userUrl = $"{DB_URL_BASE}/USERS/{uid}.json?auth={idToken}";
+                var userResponse = await _http.GetAsync(userUrl);
+                string userBody = await userResponse.Content.ReadAsStringAsync();
+
+                int currentPoint = 0;
+                int currentWins = 0;
+                int currentLosses = 0;
+
+                if (userResponse.IsSuccessStatusCode &&
+                    !string.IsNullOrWhiteSpace(userBody) &&
+                    userBody != "null")
+                {
+                    JObject user = JObject.Parse(userBody);
+                    currentPoint = user["Point"]?.Value<int>() ?? 0;
+                    currentWins = user["TotalWins"]?.Value<int>() ?? 0;
+                    currentLosses = user["TotalLosses"]?.Value<int>() ?? 0;
+                }
+
+                var patchData = new
+                {
+                    Username = displayName,
+                    Point = currentPoint + scoreEarned,
+                    TotalWins = currentWins + (rank == 1 ? 1 : 0),
+                    TotalLosses = currentLosses + (rank == 1 ? 0 : 1),
+                    UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+
+                var patchRequest = new HttpRequestMessage(new HttpMethod("PATCH"), userUrl)
+                {
+                    Content = new StringContent(JsonConvert.SerializeObject(patchData), Encoding.UTF8, "application/json")
+                };
+
+                var patchResponse = await _http.SendAsync(patchRequest);
+                string patchBody = await patchResponse.Content.ReadAsStringAsync();
+
+                if (!patchResponse.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[MATCH RESULT ERROR] Firebase patch rejected: {patchBody}");
+                    return false;
+                }
+
+                string historyUrl = $"{DB_URL_BASE}/USERS/{uid}/MatchHistory/{matchId}.json?auth={idToken}";
+                var historyData = new
+                {
+                    Rank = rank,
+                    ScoreEarned = scoreEarned,
+                    PlayedAt = DateTime.UtcNow.ToString("O")
+                };
+
+                var historyContent = new StringContent(
+                    JsonConvert.SerializeObject(historyData), Encoding.UTF8, "application/json");
+
+                var historyResponse = await _http.PutAsync(historyUrl, historyContent);
+                string historyBody = await historyResponse.Content.ReadAsStringAsync();
+
+                if (!historyResponse.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[MATCH HISTORY ERROR] Firebase put rejected: {historyBody}");
+                    return false;
+                }
+
+                Console.WriteLine(
+                    $"[MATCH RESULT] User={displayName}, Rank={rank}, ScoreEarned={scoreEarned}, Match={matchId}"
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MATCH RESULT ERROR] Exception: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task<List<LeaderboardEntry>> GetLeaderboardAsync(string idToken, int limit = 10)
+        {
+            List<LeaderboardEntry> entries = new List<LeaderboardEntry>();
+
+            try
+            {
+                string authQuery = string.IsNullOrWhiteSpace(idToken) ? "" : $"&auth={idToken}";
+                string url = $"{DB_URL_BASE}/USERS.json?orderBy=%22Point%22&limitToLast={limit}{authQuery}";
+
+                var response = await _http.GetAsync(url);
+                string body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode || string.IsNullOrWhiteSpace(body) || body == "null")
+                {
+                    Console.WriteLine($"[LEADERBOARD ERROR] Firebase response: {body}");
+                    return entries;
+                }
+
+                JObject root = JObject.Parse(body);
+
+                foreach (JProperty property in root.Properties())
+                {
+                    JObject user = property.Value as JObject;
+
+                    if (user == null)
+                        continue;
+
+                    int wins = user["TotalWins"]?.Value<int>() ?? 0;
+                    int losses = user["TotalLosses"]?.Value<int>() ?? 0;
+
+                    entries.Add(new LeaderboardEntry
+                    {
+                        UserId = property.Name,
+                        DisplayName = user["Username"]?.ToString() ?? property.Name,
+                        Score = user["Point"]?.Value<int>() ?? 0,
+                        Wins = wins,
+                        TotalMatches = wins + losses
+                    });
+                }
+
+                return entries
+                    .OrderByDescending(e => e.Score)
+                    .ThenByDescending(e => e.Wins)
+                    .Take(limit)
+                    .Select((entry, index) =>
+                    {
+                        entry.Rank = index + 1;
+                        return entry;
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[LEADERBOARD ERROR] Exception: {ex.Message}");
+                return entries;
+            }
+        }
+
         // ──────────────────────────────────────────────────────
         // HELPER: Phân tích thông điệp lỗi từ Firebase
         // ──────────────────────────────────────────────────────
@@ -173,5 +320,15 @@ namespace Monopoly.Server
                 return "Lỗi không xác định từ Database.";
             }
         }
+    }
+
+    public class LeaderboardEntry
+    {
+        public string UserId { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public int Rank { get; set; }
+        public int Score { get; set; }
+        public int Wins { get; set; }
+        public int TotalMatches { get; set; }
     }
 }

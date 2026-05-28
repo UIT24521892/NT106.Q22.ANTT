@@ -77,9 +77,7 @@ public class BoardTokenManager : MonoBehaviour
 
                 if (lastAnimatedMoveKey != moveKey)
                 {
-                    int visualFrom = displayPositionByPlayerIndex.TryGetValue(player.PlayerIndex, out int displayPosition)
-                        ? displayPosition
-                        : fromPosition;
+                    int visualFrom = fromPosition;
 
                     if (token.MoveRoutine != null)
                         StopCoroutine(token.MoveRoutine);
@@ -532,6 +530,11 @@ public class BoardTokenManager : MonoBehaviour
         token.Rect.localScale = Vector3.one;
         displayPositionByPlayerIndex[playerIndex] = finalPosition;
         token.MoveRoutine = null;
+
+        BoardTileInfoUI tileInfo = FindObjectOfType<BoardTileInfoUI>();
+
+        if (tileInfo != null)
+            tileInfo.ShowTileInfo(finalPosition);
     }
 
     private IEnumerator AnimateStep(TokenView token, Vector2 target)

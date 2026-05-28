@@ -33,6 +33,11 @@ public class GameStateData
     public long ServerUtcTicks;
     public bool IsFinished;
     public string WinnerUsername;
+    public int WorldChampionshipPosition;
+    public bool IsWaitingForCardChoice;
+    public string PendingCardEffectCode;
+    public string PendingCardPlayerUsername;
+    public bool ForceDoubleThisTurn;
     public List<string> ActionLog;
 
     public List<GamePlayerStateData> Players;
@@ -49,6 +54,39 @@ public class ChatMessageData
 }
 
 [System.Serializable]
+public class GameOverData
+{
+    public string MatchId;
+    public List<RankingEntryData> Rankings;
+}
+
+[System.Serializable]
+public class RankingEntryData
+{
+    public string UserId;
+    public string DisplayName;
+    public int Rank;
+    public int ScoreEarned;
+}
+
+[System.Serializable]
+public class LeaderboardData
+{
+    public List<LeaderboardEntryData> Entries;
+}
+
+[System.Serializable]
+public class LeaderboardEntryData
+{
+    public string UserId;
+    public string DisplayName;
+    public int Rank;
+    public int Score;
+    public int Wins;
+    public int TotalMatches;
+}
+
+[System.Serializable]
 public class GamePlayerStateData
 {
     public string Username;
@@ -57,9 +95,19 @@ public class GamePlayerStateData
     public int Position;
     public long Money;
     public bool IsBankrupt;
+    public int BankruptcyOrder;
     public bool IsConnected;
     public int ConsecutiveDoubles;
     public int JailTurnsLeft;
+    public bool HasFreeRentCard;
+    public bool HasEscapeIslandCard;
+    public bool HasFlightCard;
+    public bool HasFreeUpgradeCard;
+    public bool HasForceDoubleCard;
+    public bool IsOnIsland;
+    public int SkipTurnsLeft;
+    public string SkipReason;
+    public string LastDrawnCardId;
 }
 
 [System.Serializable]

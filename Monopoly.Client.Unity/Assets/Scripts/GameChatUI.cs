@@ -4,16 +4,23 @@ using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GameChatUI : MonoBehaviour
 {
     private const int MaxVisibleMessages = 8;
+    private const string ChatPanelPrefabPath = "UI/ChatPanel";
 
+    private RectTransform panelRect;
+    private Button toggleButton;
+    private Button closeButton;
     private TextMeshProUGUI chatLogText;
     private TMP_InputField inputField;
     private Button sendButton;
     private RectTransform bubbleLayer;
+    private readonly List<GameObject> chatWindowObjects = new List<GameObject>();
+    private bool usingScenePanel;
 
     public static GameChatUI EnsureExists()
     {
@@ -28,7 +35,9 @@ public class GameChatUI : MonoBehaviour
 
     private void Start()
     {
-        BuildRuntimeUi();
+        if (!TryBindPrefabPanel() && !TryBindScenePanel())
+            BuildRuntimeUi();
+
         RegisterNetworkEvents();
         RefreshChatLog();
     }
@@ -51,8 +60,10 @@ public class GameChatUI : MonoBehaviour
 
         RectTransform canvasRect = canvas.transform as RectTransform;
 
+        toggleButton = CreateToggleButton(canvasRect);
+
         GameObject panelObject = new GameObject("Panel_GameChat", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        RectTransform panelRect = panelObject.GetComponent<RectTransform>();
+        panelRect = panelObject.GetComponent<RectTransform>();
         panelRect.SetParent(canvasRect, false);
         panelRect.anchorMin = new Vector2(1f, 0f);
         panelRect.anchorMax = new Vector2(1f, 0f);
@@ -70,7 +81,10 @@ public class GameChatUI : MonoBehaviour
         titleRect.anchorMax = new Vector2(1f, 1f);
         titleRect.pivot = new Vector2(0.5f, 1f);
         titleRect.anchoredPosition = new Vector2(0f, -8f);
-        titleRect.sizeDelta = new Vector2(-20f, 28f);
+        titleRect.sizeDelta = new Vector2(-72f, 28f);
+
+        closeButton = CreateCloseButton(panelRect);
+        closeButton.onClick.AddListener(ClosePanel);
 
         chatLogText = CreateText("Txt_ChatLog", panelRect, "", 15f, FontStyles.Normal);
         RectTransform logRect = chatLogText.rectTransform;
@@ -85,8 +99,204 @@ public class GameChatUI : MonoBehaviour
         sendButton = CreateSendButton(panelRect);
         bubbleLayer = CreateBubbleLayer(canvasRect);
 
-        inputField.onSubmit.AddListener(_ => SendCurrentMessage());
+        inputField.onSubmit.AddListener(OnSubmitMessage);
         sendButton.onClick.AddListener(SendCurrentMessage);
+        AddChatWindowObject(panelRect.gameObject);
+        HideChatWindow();
+    }
+
+    private bool TryBindScenePanel()
+    {
+        GameObject chatPanel = FindSceneObjectByName("ChatPanel");
+
+        if (chatPanel == null)
+        {
+            Debug.Log("[GameChatUI] Scene ChatPanel not found. Trying prefab chat UI.");
+            return false;
+        }
+
+        return TryBindChatPanel(chatPanel, "scene ChatPanel");
+    }
+
+    private bool TryBindPrefabPanel()
+    {
+        Canvas canvas = FindObjectOfType<Canvas>();
+
+        if (canvas == null)
+        {
+            Debug.LogWarning("[GameChatUI] Canvas not found.");
+            return false;
+        }
+
+        GameObject prefab = Resources.Load<GameObject>(ChatPanelPrefabPath);
+
+        if (prefab == null)
+        {
+            Debug.Log($"[GameChatUI] Prefab Resources/{ChatPanelPrefabPath}.prefab not found. Trying scene ChatPanel.");
+            return false;
+        }
+
+        DisableSceneChatPanels();
+
+        GameObject chatPanel = Instantiate(prefab, canvas.transform, false);
+        chatPanel.name = "ChatPanel";
+        chatPanel.SetActive(true);
+
+        if (TryBindChatPanel(chatPanel, "prefab ChatPanel"))
+            return true;
+
+        Destroy(chatPanel);
+        return false;
+    }
+
+    private void DisableSceneChatPanels()
+    {
+        GameObject[] objects = Resources.FindObjectsOfTypeAll<GameObject>();
+
+        foreach (GameObject candidate in objects)
+        {
+            if (candidate == null ||
+                candidate.name != "ChatPanel" ||
+                !candidate.scene.IsValid() ||
+                !candidate.scene.isLoaded)
+            {
+                continue;
+            }
+
+            candidate.SetActive(false);
+        }
+    }
+
+    private bool TryBindChatPanel(GameObject chatPanel, string sourceName)
+    {
+        RectTransform chatPanelRect = chatPanel.transform as RectTransform;
+
+        if (chatPanelRect == null)
+        {
+            Debug.LogWarning($"[GameChatUI] {sourceName} has no RectTransform.");
+            return false;
+        }
+
+        Button sceneToggleButton = FindChildComponent<Button>(chatPanel.transform, "Btn_ChatToggle");
+        RectTransform sceneWindow = FindChildRect(chatPanel.transform, "Panel_ChatWindow");
+        TMP_InputField sceneInput = FindChildComponent<TMP_InputField>(chatPanel.transform, "Input_Message");
+        Button sceneSendButton = FindChildComponent<Button>(chatPanel.transform, "Btn_Send");
+        Button sceneCloseButton = FindChildComponent<Button>(chatPanel.transform, "Btn_Close");
+        TextMeshProUGUI sceneChatLog = FindChatLogText(chatPanel.transform);
+        List<string> missingObjects = new List<string>();
+
+        if (sceneToggleButton == null)
+            missingObjects.Add("Btn_ChatToggle Button");
+
+        if (sceneWindow == null)
+            missingObjects.Add("Panel_ChatWindow RectTransform");
+
+        if (sceneInput == null)
+            missingObjects.Add("Input_Message TMP_InputField");
+
+        if (sceneSendButton == null)
+            missingObjects.Add("Btn_Send Button");
+
+        if (sceneCloseButton == null)
+            missingObjects.Add("Btn_Close Button");
+
+        if (sceneChatLog == null)
+            missingObjects.Add("ScrollView_Messages text or Txt_ChatLog TextMeshProUGUI");
+
+        if (missingObjects.Count > 0)
+        {
+            Debug.LogWarning($"[GameChatUI] {sourceName} found but required children/components are missing: {string.Join(", ", missingObjects)}.");
+            return false;
+        }
+
+        Canvas canvas = chatPanel.GetComponentInParent<Canvas>();
+
+        if (canvas == null)
+        {
+            Debug.LogWarning($"[GameChatUI] {sourceName} found but Canvas is missing.");
+            return false;
+        }
+
+        panelRect = sceneWindow;
+        toggleButton = sceneToggleButton;
+        closeButton = sceneCloseButton;
+        inputField = sceneInput;
+        sendButton = sceneSendButton;
+        chatLogText = sceneChatLog;
+        bubbleLayer = FindChildRect(chatPanel.transform, "Runtime_ChatBubbles");
+
+        if (bubbleLayer == null)
+            bubbleLayer = CreateBubbleLayer(canvas.transform as RectTransform);
+
+        chatWindowObjects.Clear();
+        AddChatWindowObject(panelRect.gameObject);
+        AddChatWindowObject(FindChatLogRoot(chatPanel.transform, chatLogText));
+        AddChatWindowObject(inputField.gameObject);
+        AddChatWindowObject(sendButton.gameObject);
+        AddChatWindowObject(closeButton.gameObject);
+
+        toggleButton.onClick.RemoveListener(OpenPanel);
+        closeButton.onClick.RemoveListener(ClosePanel);
+        sendButton.onClick.RemoveListener(SendCurrentMessage);
+        inputField.onSubmit.RemoveListener(OnSubmitMessage);
+
+        toggleButton.onClick.AddListener(OpenPanel);
+        closeButton.onClick.AddListener(ClosePanel);
+        sendButton.onClick.AddListener(SendCurrentMessage);
+        inputField.onSubmit.AddListener(OnSubmitMessage);
+
+        HideChatWindow();
+        toggleButton.gameObject.SetActive(true);
+        usingScenePanel = true;
+        Debug.Log($"[GameChatUI] Bound {sourceName}.");
+        return true;
+    }
+
+    private Button CreateToggleButton(Transform parent)
+    {
+        GameObject buttonObject = new GameObject("Btn_ToggleChat", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(parent, false);
+        buttonRect.anchorMin = new Vector2(1f, 0f);
+        buttonRect.anchorMax = new Vector2(1f, 0f);
+        buttonRect.pivot = new Vector2(1f, 0f);
+        buttonRect.anchoredPosition = new Vector2(-20f, 20f);
+        buttonRect.sizeDelta = new Vector2(110f, 42f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0f, 0f, 0f, 0.62f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(OpenPanel);
+
+        TextMeshProUGUI label = CreateText("Text", buttonRect, "Chat", 18f, FontStyles.Bold);
+        label.alignment = TextAlignmentOptions.Center;
+        SetStretchWithPadding(label.rectTransform, 0f, 0f, 0f, 0f);
+        return button;
+    }
+
+    private Button CreateCloseButton(Transform parent)
+    {
+        GameObject buttonObject = new GameObject("Btn_CloseChat", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(parent, false);
+        buttonRect.anchorMin = new Vector2(1f, 1f);
+        buttonRect.anchorMax = new Vector2(1f, 1f);
+        buttonRect.pivot = new Vector2(1f, 1f);
+        buttonRect.anchoredPosition = new Vector2(-10f, -8f);
+        buttonRect.sizeDelta = new Vector2(42f, 32f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0.78f, 0.12f, 0.1f, 0.95f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+
+        TextMeshProUGUI label = CreateText("Text", buttonRect, "X", 16f, FontStyles.Bold);
+        label.alignment = TextAlignmentOptions.Center;
+        SetStretchWithPadding(label.rectTransform, 0f, 0f, 0f, 0f);
+        return button;
     }
 
     private RectTransform CreateBubbleLayer(RectTransform parent)
@@ -101,6 +311,93 @@ public class GameChatUI : MonoBehaviour
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.SetAsLastSibling();
         return rect;
+    }
+
+    private TextMeshProUGUI FindChatLogText(Transform root)
+    {
+        RectTransform messagesRoot = FindChildRect(root, "ScrollView_Messages");
+
+        if (messagesRoot == null)
+            messagesRoot = FindChildRect(root, "ScrollView_Message");
+
+        if (messagesRoot != null)
+        {
+            TextMeshProUGUI textInScroll = messagesRoot.GetComponentInChildren<TextMeshProUGUI>(true);
+
+            if (textInScroll != null)
+                return textInScroll;
+        }
+
+        TextMeshProUGUI namedText = FindChildComponent<TextMeshProUGUI>(root, "Txt_ChatLog");
+
+        if (namedText != null)
+            return namedText;
+
+        return root.GetComponentInChildren<TextMeshProUGUI>(true);
+    }
+
+    private GameObject FindChatLogRoot(Transform root, TextMeshProUGUI text)
+    {
+        RectTransform messagesRoot = FindChildRect(root, "ScrollView_Messages");
+
+        if (messagesRoot == null)
+            messagesRoot = FindChildRect(root, "ScrollView_Message");
+
+        if (messagesRoot != null)
+            return messagesRoot.gameObject;
+
+        return text == null ? null : text.gameObject;
+    }
+
+    private RectTransform FindChildRect(Transform root, string childName)
+    {
+        Transform child = FindChildByName(root, childName);
+        return child as RectTransform;
+    }
+
+    private T FindChildComponent<T>(Transform root, string childName) where T : Component
+    {
+        Transform child = FindChildByName(root, childName);
+        return child == null ? null : child.GetComponent<T>();
+    }
+
+    private Transform FindChildByName(Transform root, string childName)
+    {
+        if (root == null)
+            return null;
+
+        if (root.name == childName)
+            return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform result = FindChildByName(root.GetChild(i), childName);
+
+            if (result != null)
+                return result;
+        }
+
+        return null;
+    }
+
+    private GameObject FindSceneObjectByName(string objectName)
+    {
+        GameObject[] objects = Resources.FindObjectsOfTypeAll<GameObject>();
+
+        foreach (GameObject candidate in objects)
+        {
+            if (candidate == null ||
+                candidate.name != objectName ||
+                !candidate.scene.IsValid() ||
+                !candidate.scene.isLoaded)
+            {
+                continue;
+            }
+
+            return candidate;
+        }
+
+        return null;
     }
 
     private TextMeshProUGUI CreateText(string name, Transform parent, string value, float fontSize, FontStyles style)
@@ -195,6 +492,75 @@ public class GameChatUI : MonoBehaviour
         NetworkManager.Instance.GameChatMessageReceived += OnChatMessageReceived;
     }
 
+    private void OpenPanel()
+    {
+        ShowChatWindow();
+
+        if (panelRect != null && !usingScenePanel)
+        {
+            panelRect.SetAsLastSibling();
+        }
+
+        if (toggleButton != null)
+            toggleButton.gameObject.SetActive(false);
+
+        RefreshChatLog();
+
+        if (inputField != null)
+            inputField.ActivateInputField();
+    }
+
+    private void ClosePanel()
+    {
+        HideChatWindow();
+
+        if (toggleButton != null)
+            toggleButton.gameObject.SetActive(true);
+    }
+
+    private void ShowChatWindow()
+    {
+        foreach (GameObject windowObject in chatWindowObjects)
+        {
+            if (windowObject != null)
+                windowObject.SetActive(true);
+        }
+    }
+
+    private void HideChatWindow()
+    {
+        foreach (GameObject windowObject in chatWindowObjects)
+        {
+            if (windowObject != null)
+                windowObject.SetActive(false);
+        }
+    }
+
+    private void AddChatWindowObject(GameObject windowObject)
+    {
+        if (windowObject == null)
+            return;
+
+        for (int i = chatWindowObjects.Count - 1; i >= 0; i--)
+        {
+            GameObject existing = chatWindowObjects[i];
+
+            if (existing == null)
+            {
+                chatWindowObjects.RemoveAt(i);
+                continue;
+            }
+
+            if (windowObject.transform.IsChildOf(existing.transform))
+                return;
+
+            if (existing.transform.IsChildOf(windowObject.transform))
+                chatWindowObjects.RemoveAt(i);
+        }
+
+        chatWindowObjects.Add(windowObject);
+    }
+
     private void SendCurrentMessage()
     {
         if (inputField == null || NetworkManager.Instance == null)
@@ -208,6 +574,11 @@ public class GameChatUI : MonoBehaviour
         NetworkManager.Instance.SendGameChatMessage(message);
         inputField.text = "";
         inputField.ActivateInputField();
+    }
+
+    private void OnSubmitMessage(string _)
+    {
+        SendCurrentMessage();
     }
 
     private void OnChatMessageReceived(ChatMessageData message)

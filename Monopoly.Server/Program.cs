@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Monopoly.Server.GameLogic;
 using Monopoly.Shared.Models.Constants;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -25,6 +26,7 @@ namespace Monopoly.Server
 
         private static readonly object _lock = new object();
         private static readonly Random _random = new Random();
+        private static readonly DeckManager _deckManager = new DeckManager();
         private const int TurnDurationSeconds = 45;
 
         static async Task Main(string[] args)
@@ -255,9 +257,22 @@ namespace Monopoly.Server
                         await HandleBuyPropertyAsync(connection);
                         break;
 
+                    case "BUILD_PROPERTY":
+                    case "BuildProperty":
+                        await HandleBuildPropertyAsync(packet, connection);
+                        break;
+
+                    case "RESUME_GAME":
+                        await HandleResumeGameAsync(packet, connection);
+                        break;
+
                     case "GAME_CHAT":
                     case "CHAT_MESSAGE":
                         await HandleGameChatAsync(packet, connection);
+                        break;
+
+                    case "GET_LEADERBOARD":
+                        await HandleGetLeaderboardAsync(connection);
                         break;
 
                     default:
@@ -297,6 +312,7 @@ namespace Monopoly.Server
                 if (parts.Length >= 3)
                 {
                     connection.Uid = parts[1];
+                    connection.IdToken = parts[2];
 
                     // Khi login, username có thể rỗng vì ô Username đang ẩn.
                     // Tạm dùng email làm username nếu chưa có username.
@@ -969,6 +985,7 @@ namespace Monopoly.Server
             string failMessage = "";
             string broadcastMessage = "";
             bool shouldBroadcast = false;
+            List<CardDrawEvent> cardDrawEvents = new List<CardDrawEvent>();
 
             lock (_lock)
             {
@@ -999,9 +1016,16 @@ namespace Monopoly.Server
                     {
                         failMessage = "Bạn đã đổ xúc xắc trong lượt này. Hãy kết thúc lượt.";
                     }
-                    else if (player.JailTurnsLeft > 0)
+                    else if (!player.IsOnIsland && player.SkipTurnsLeft > 0)
                     {
-                        player.JailTurnsLeft--;
+                        player.SkipTurnsLeft--;
+                        string skipMessage = player.SkipReason == "WORLD_TOUR"
+                            ? $"{player.Username} đang chờ chuyến bay Du Lịch Thế Giới và bỏ lượt này."
+                            : $"{player.Username} bị đóng băng giao dịch và bỏ lượt này.";
+
+                        if (player.SkipTurnsLeft == 0)
+                            player.SkipReason = "";
+
                         room.GameState.LastDice1 = 0;
                         room.GameState.LastDice2 = 0;
                         room.GameState.LastDiceTotal = 0;
@@ -1009,9 +1033,7 @@ namespace Monopoly.Server
                         room.GameState.LastMoveFromPosition = player.Position;
                         room.GameState.LastMoveToPosition = player.Position;
                         room.GameState.LastFinalPosition = player.Position;
-                        room.GameState.HasRolledThisTurn = true;
-
-                        actionMessages.Add($"{player.Username} đang ở Đảo Hoang và bị mất lượt này.");
+                        actionMessages.Add(skipMessage);
                     }
                     else
                     {
@@ -1020,64 +1042,46 @@ namespace Monopoly.Server
                         int dice2 = RollDie();
                         int diceTotal = dice1 + dice2;
                         int oldPosition = player.Position;
-                        int rawPosition = oldPosition + diceTotal;
-                        int diceLandingPosition = rawPosition % boardSize;
-                        actionMessages.Add(
-                            $"{player.Username} đổ {dice1} + {dice2} = {diceTotal}, đi từ ô {oldPosition} đến ô {diceLandingPosition}."
-                        );
 
-                        player.Position = diceLandingPosition;
-
-                        if (rawPosition >= boardSize)
+                        if (player.IsOnIsland || player.JailTurnsLeft > 0)
                         {
-                            const long startBonus = 300000;
-                            player.Money += startBonus;
-                            actionMessages.Add($"{player.Username} đi qua Bắt Đầu và nhận {startBonus:N0}.");
-                        }
+                            bool canLeaveIsland = dice1 == dice2;
 
-                        if (room.GameState.Properties.TryGetValue(diceLandingPosition, out GamePropertyState landedProperty) &&
-                            landedProperty.OwnerPlayerIndex >= 0 &&
-                            landedProperty.OwnerPlayerIndex != player.PlayerIndex)
-                        {
-                            GamePlayerState owner = room.GameState.Players.FirstOrDefault(
-                                p => p.PlayerIndex == landedProperty.OwnerPlayerIndex
-                            );
+                            actionMessages.Add($"{player.Username} ở Đảo Hoang và đổ {dice1} + {dice2} = {diceTotal}.");
 
-                            if (owner != null &&
-                                BoardDatabase.Squares.TryGetValue(diceLandingPosition, out var landedSquare) &&
-                                landedSquare.RentPrices.Count > 0)
+                            if (canLeaveIsland)
                             {
-                                long rent = landedSquare.RentPrices[0] * landedProperty.Multiplier;
-
-                                player.Money -= rent;
-                                owner.Money += rent;
-
-                                actionMessages.Add(
-                                    $"{player.Username} trả {rent:N0} tiền thuê {landedProperty.Name} cho {owner.Username}."
-                                );
-
-                                Console.WriteLine(
-                                    $"[RENT] Room={roomId}, From={player.Username}, To={owner.Username}, " +
-                                    $"Property={landedProperty.Name}, Rent={rent}, " +
-                                    $"PayerMoney={player.Money}, OwnerMoney={owner.Money}"
-                                );
+                                player.IsOnIsland = false;
+                                player.JailTurnsLeft = 0;
+                                actionMessages.Add($"{player.Username} lắc đôi và thoát Đảo Hoang.");
+                                MovePlayerByDiceUnsafe(room.GameState, player, oldPosition, dice1, dice2, actionMessages, cardDrawEvents);
+                            }
+                            else if (player.JailTurnsLeft > 1)
+                            {
+                                player.JailTurnsLeft--;
+                                room.GameState.LastDice1 = dice1;
+                                room.GameState.LastDice2 = dice2;
+                                room.GameState.LastDiceTotal = diceTotal;
+                                room.GameState.LastMovedPlayerIndex = player.PlayerIndex;
+                                room.GameState.LastMoveFromPosition = oldPosition;
+                                room.GameState.LastMoveToPosition = oldPosition;
+                                room.GameState.LastFinalPosition = oldPosition;
+                                actionMessages.Add($"{player.Username} chưa lắc đôi, còn {player.JailTurnsLeft} lượt trên Đảo Hoang.");
+                            }
+                            else
+                            {
+                                const long islandExitFee = 200000;
+                                player.Money -= islandExitFee;
+                                player.IsOnIsland = false;
+                                player.JailTurnsLeft = 0;
+                                actionMessages.Add($"{player.Username} trả {islandExitFee:N0} để rời Đảo Hoang.");
+                                MovePlayerByDiceUnsafe(room.GameState, player, oldPosition, dice1, dice2, actionMessages, cardDrawEvents);
                             }
                         }
-
-                        ApplySpecialSquareEffectUnsafe(room.GameState, player, diceLandingPosition, actionMessages);
-                        int finalPosition = player.Position;
-
-                        room.GameState.LastDice1 = dice1;
-                        room.GameState.LastDice2 = dice2;
-                        room.GameState.LastDiceTotal = diceTotal;
-                        room.GameState.LastMovedPlayerIndex = player.PlayerIndex;
-                        room.GameState.LastMoveFromPosition = oldPosition;
-                        room.GameState.LastMoveToPosition = diceLandingPosition;
-                        room.GameState.LastFinalPosition = finalPosition;
-                        Console.WriteLine(
-                            $"[DICE] Room={roomId}, Player={player.Username}, " +
-                            $"Dice={dice1}+{dice2}, DiceLanding={oldPosition}->{diceLandingPosition}, FinalPos={finalPosition}, Money={player.Money}"
-                        );
+                        else
+                        {
+                            MovePlayerByDiceUnsafe(room.GameState, player, oldPosition, dice1, dice2, actionMessages, cardDrawEvents);
+                        }
                     }
 
                     if (string.IsNullOrWhiteSpace(failMessage))
@@ -1101,6 +1105,11 @@ namespace Monopoly.Server
 
             if (shouldBroadcast)
             {
+                foreach (CardDrawEvent cardDrawEvent in cardDrawEvents)
+                {
+                    await BroadcastCardDrawnAsync(roomId, cardDrawEvent);
+                }
+
                 await BroadcastGameStateAsync(roomId, broadcastMessage);
             }
         }
@@ -1276,6 +1285,190 @@ namespace Monopoly.Server
             {
                 await BroadcastGameStateAsync(roomId, broadcastMessage);
             }
+        }
+
+        private static async Task HandleBuildPropertyAsync(JObject packet, ClientConnection connection)
+        {
+            string roomId = connection.CurrentRoomId;
+            JObject payload = GetPayloadObject(packet);
+            int positionIndex = payload["PositionIndex"]?.Value<int>() ?? -1;
+
+            if (string.IsNullOrWhiteSpace(roomId))
+            {
+                await SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận nào.");
+                return;
+            }
+
+            string failMessage = "";
+            string broadcastMessage = "";
+            bool shouldBroadcast = false;
+
+            lock (_lock)
+            {
+                if (!_rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
+                {
+                    failMessage = "Trận đấu không tồn tại hoặc chưa bắt đầu.";
+                }
+                else if (room.GameState.IsFinished)
+                {
+                    failMessage = $"Trận đấu đã kết thúc. Người thắng: {room.GameState.WinnerUsername}.";
+                }
+                else
+                {
+                    GamePlayerState player = room.GameState.Players.FirstOrDefault(
+                        p => p.Username == connection.Username && !p.IsBot && p.IsConnected && !p.IsBankrupt
+                    );
+
+                    if (player == null)
+                    {
+                        failMessage = "Không tìm thấy người chơi trong trận.";
+                    }
+                    else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
+                    {
+                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
+                    }
+                    else if (!room.GameState.Properties.TryGetValue(positionIndex, out GamePropertyState property))
+                    {
+                        failMessage = "Không tìm thấy thông tin ô đất.";
+                    }
+                    else if (property.Type != "City")
+                    {
+                        failMessage = $"Ô {property.Name} không thể xây nhà.";
+                    }
+                    else if (property.OwnerPlayerIndex != player.PlayerIndex)
+                    {
+                        failMessage = $"Bạn không sở hữu {property.Name}.";
+                    }
+                    else if (property.HasHotel)
+                    {
+                        failMessage = $"{property.Name} đã có khách sạn.";
+                    }
+                    else
+                    {
+                        long buildCost = GetBuildCostUnsafe(property);
+
+                        if (buildCost <= 0)
+                        {
+                            failMessage = $"{property.Name} chưa có chi phí nâng cấp hợp lệ.";
+                        }
+                        else if (player.Money < buildCost)
+                        {
+                            failMessage = $"Bạn không đủ tiền để nâng cấp {property.Name}.";
+                        }
+                        else
+                        {
+                            player.Money -= buildCost;
+
+                            if (property.HouseCount >= 3)
+                            {
+                                property.HouseCount = 3;
+                                property.HasHotel = true;
+                            }
+                            else
+                            {
+                                property.HouseCount++;
+                            }
+
+                            room.GameState.LastActionMessage =
+                                $"{player.Username} nâng cấp {property.Name} lên {DescribePropertyLevelUnsafe(property)} với giá {buildCost:N0}.";
+                            AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+
+                            broadcastMessage = room.GameState.LastActionMessage;
+                            shouldBroadcast = true;
+
+                            Console.WriteLine(
+                                $"[BUILD_PROPERTY] Room={roomId}, Player={player.Username}, " +
+                                $"Property={property.Name}, Position={property.PositionIndex}, " +
+                                $"Cost={buildCost}, Level={DescribePropertyLevelUnsafe(property)}, MoneyLeft={player.Money}"
+                            );
+                        }
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(failMessage))
+            {
+                await SendGameActionFailedAsync(connection, failMessage);
+                return;
+            }
+
+            if (shouldBroadcast)
+            {
+                await BroadcastGameStateAsync(roomId, broadcastMessage);
+            }
+        }
+
+        private static async Task HandleResumeGameAsync(JObject packet, ClientConnection connection)
+        {
+            JObject payload = GetPayloadObject(packet);
+            string username = payload["Username"]?.ToString() ?? connection.Username;
+            Room resumeRoomSnapshot = null;
+            string roomId = "";
+            string failMessage = "";
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                await SendJsonPacketAsync(connection.Stream, new
+                {
+                    Type = "RESUME_GAME_NONE",
+                    Payload = new { Message = "Không có phiên người chơi để khôi phục." }
+                });
+                return;
+            }
+
+            lock (_lock)
+            {
+                foreach (Room room in _rooms.Values)
+                {
+                    if (!room.IsStarted || room.GameState == null || room.GameState.IsFinished)
+                        continue;
+
+                    GamePlayerState disconnectedPlayer = room.GameState.Players.FirstOrDefault(
+                        p => p.Username == username && !p.IsBot && !p.IsConnected
+                    );
+
+                    if (disconnectedPlayer == null)
+                        continue;
+
+                    disconnectedPlayer.IsConnected = true;
+                    connection.Username = username;
+                    connection.CurrentRoomId = room.RoomId;
+                    room.GameState.LastActionMessage = $"{username} đã kết nối lại trận.";
+                    AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                    resumeRoomSnapshot = room;
+                    roomId = room.RoomId;
+                    break;
+                }
+
+                if (resumeRoomSnapshot == null)
+                    failMessage = "Không có trận đang chờ kết nối lại.";
+            }
+
+            if (resumeRoomSnapshot == null)
+            {
+                await SendJsonPacketAsync(connection.Stream, new
+                {
+                    Type = "RESUME_GAME_NONE",
+                    Payload = new { Message = failMessage }
+                });
+                return;
+            }
+
+            resumeRoomSnapshot.GameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
+
+            await SendJsonPacketAsync(connection.Stream, new
+            {
+                Type = "GAME_STARTING",
+                Payload = new
+                {
+                    RoomId = resumeRoomSnapshot.RoomId,
+                    MapName = resumeRoomSnapshot.MapName,
+                    Players = resumeRoomSnapshot.Players,
+                    GameState = resumeRoomSnapshot.GameState
+                }
+            });
+
+            await BroadcastGameStateAsync(roomId, $"{username} đã kết nối lại trận.");
         }
 
         private static async Task HandleLeaveRoomAsync(ClientConnection connection, bool sendLeaveSuccess)
@@ -1497,6 +1690,9 @@ namespace Monopoly.Server
         private static async Task BroadcastGameStateAsync(string roomId, string message)
         {
             GameState gameState;
+            bool shouldBroadcastGameOver = false;
+            List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
+            string matchId = "";
 
             lock (_lock)
             {
@@ -1507,6 +1703,17 @@ namespace Monopoly.Server
 
                 gameState = room.GameState;
                 gameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
+
+                if (gameState.IsFinished && !gameState.GameOverBroadcasted)
+                {
+                    if (string.IsNullOrWhiteSpace(gameState.MatchId))
+                        gameState.MatchId = Guid.NewGuid().ToString("N");
+
+                    rankings = BuildGameOverRankingsUnsafe(gameState);
+                    matchId = gameState.MatchId;
+                    gameState.GameOverBroadcasted = true;
+                    shouldBroadcastGameOver = true;
+                }
             }
 
             await BroadcastToRoomAsync(roomId, new
@@ -1525,6 +1732,89 @@ namespace Monopoly.Server
                 $"Turn={gameState.TurnNumber}, CurrentTurn={gameState.CurrentTurnUsername}, " +
                 $"Message={message}"
             );
+
+            if (shouldBroadcastGameOver)
+            {
+                await BroadcastGameOverAsync(roomId, matchId, rankings);
+            }
+        }
+
+        private static async Task BroadcastGameOverAsync(string roomId, string matchId, List<GameOverRankingResult> rankings)
+        {
+            await BroadcastToRoomAsync(roomId, new
+            {
+                Type = "GAME_OVER",
+                Payload = new
+                {
+                    MatchId = matchId,
+                    Rankings = rankings
+                }
+            });
+
+            Console.WriteLine($"[GAME_OVER_PACKET] Room={roomId}, MatchId={matchId}");
+
+            await PersistMatchResultsAsync(matchId, rankings);
+        }
+
+        private static async Task BroadcastCardDrawnAsync(string roomId, CardDrawEvent cardDrawEvent)
+        {
+            if (cardDrawEvent == null)
+            {
+                return;
+            }
+
+            await BroadcastToRoomAsync(roomId, new
+            {
+                Type = "CARD_DRAWN",
+                Payload = new
+                {
+                    DrawnByUsername = cardDrawEvent.DrawnByUsername,
+                    CardId = cardDrawEvent.CardId,
+                    CardName = cardDrawEvent.CardName,
+                    CardType = cardDrawEvent.CardType,
+                    DetailEffect = cardDrawEvent.DetailEffect
+                }
+            });
+        }
+
+        private static async Task PersistMatchResultsAsync(string matchId, List<GameOverRankingResult> rankings)
+        {
+            foreach (GameOverRankingResult ranking in rankings)
+            {
+                if (string.IsNullOrWhiteSpace(ranking.UserId) || string.IsNullOrWhiteSpace(ranking.IdToken))
+                {
+                    Console.WriteLine($"[MATCH_RESULT_SKIP] Missing Firebase identity for {ranking.DisplayName}.");
+                    continue;
+                }
+
+                bool success = await _firebaseApi.UpdatePlayerMatchResultAsync(
+                    ranking.UserId,
+                    ranking.IdToken,
+                    ranking.DisplayName,
+                    ranking.Rank,
+                    ranking.ScoreEarned,
+                    matchId
+                );
+
+                if (!success)
+                {
+                    Console.WriteLine($"[MATCH_RESULT_FAIL] User={ranking.DisplayName}, Rank={ranking.Rank}");
+                }
+            }
+        }
+
+        private static async Task HandleGetLeaderboardAsync(ClientConnection connection)
+        {
+            List<LeaderboardEntry> entries = await _firebaseApi.GetLeaderboardAsync(connection.IdToken, 10);
+
+            await SendJsonPacketAsync(connection.Stream, new
+            {
+                Type = "LEADERBOARD_DATA",
+                Payload = new
+                {
+                    Entries = entries
+                }
+            });
         }
 
         private static async Task BroadcastToRoomAsync(string roomId, object packet)
@@ -1612,7 +1902,14 @@ namespace Monopoly.Server
                 LastFinalPosition = -1,
                 TurnDurationSeconds = TurnDurationSeconds,
                 IsFinished = false,
-                WinnerUsername = ""
+                WinnerUsername = "",
+                MatchId = Guid.NewGuid().ToString("N"),
+                GameOverBroadcasted = false,
+                WorldChampionshipPosition = 16,
+                IsWaitingForCardChoice = false,
+                PendingCardEffectCode = "",
+                PendingCardPlayerUsername = "",
+                ForceDoubleThisTurn = false
             };
 
             ResetTurnTimerUnsafe(gameState);
@@ -1627,9 +1924,19 @@ namespace Monopoly.Server
                     Position = 0,
                     Money = 2000000,
                     IsBankrupt = false,
+                    BankruptcyOrder = 0,
                     IsConnected = !player.IsBot,
                     ConsecutiveDoubles = 0,
-                    JailTurnsLeft = 0
+                    JailTurnsLeft = 0,
+                    HasFreeRentCard = false,
+                    HasEscapeIslandCard = false,
+                    HasFlightCard = false,
+                    HasFreeUpgradeCard = false,
+                    HasForceDoubleCard = false,
+                    IsOnIsland = false,
+                    SkipTurnsLeft = 0,
+                    SkipReason = "",
+                    LastDrawnCardId = ""
                 });
             }
 
@@ -1670,12 +1977,15 @@ namespace Monopoly.Server
             GameState gameState,
             GamePlayerState player,
             int position,
-            List<string> actionMessages)
+            List<string> actionMessages,
+            List<CardDrawEvent> cardDrawEvents)
         {
             if (!BoardDatabase.Squares.TryGetValue(position, out var square))
             {
                 return;
             }
+
+            bool isChampionshipPosition = position == gameState.WorldChampionshipPosition;
 
             switch (square.Type)
             {
@@ -1686,25 +1996,175 @@ namespace Monopoly.Server
                     break;
 
                 case "Chance":
-                    ApplyChanceEffectUnsafe(gameState, player, actionMessages);
+                    ApplyChanceEffectUnsafe(gameState, player, actionMessages, cardDrawEvents);
                     break;
 
                 case "LostIsland":
-                    player.JailTurnsLeft = Math.Max(player.JailTurnsLeft, 1);
-                    actionMessages.Add($"{player.Username} vào Đảo Hoang và sẽ mất lượt kế tiếp.");
+                    SendPlayerToIslandUnsafe(player);
+                    actionMessages.Add($"{player.Username} vào Đảo Hoang và có 3 lượt để lắc đôi thoát ra.");
                     break;
 
                 case "WorldChampionship":
-                    const long championshipReward = 150000;
-                    player.Money += championshipReward;
-                    actionMessages.Add($"{player.Username} nhận thưởng Giải Vô Địch {championshipReward:N0}.");
+                    ApplyWorldChampionshipUnsafe(gameState, player, actionMessages);
+                    isChampionshipPosition = false;
                     break;
 
                 case "WorldTour":
-                    const long tourBonus = 100000;
-                    player.Money += tourBonus;
-                    actionMessages.Add($"{player.Username} nhận thưởng Du Lịch Thế Giới {tourBonus:N0}.");
+                    player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
+                    player.SkipReason = "WORLD_TOUR";
+                    actionMessages.Add($"{player.Username} đến Du Lịch Thế Giới và sẽ bỏ lượt kế tiếp.");
                     break;
+            }
+
+            if (isChampionshipPosition)
+            {
+                ApplyWorldChampionshipUnsafe(gameState, player, actionMessages);
+            }
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static void MovePlayerByDiceUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            int oldPosition,
+            int dice1,
+            int dice2,
+            List<string> actionMessages,
+            List<CardDrawEvent> cardDrawEvents)
+        {
+            int boardSize = BoardDatabase.Squares.Count;
+            int diceTotal = dice1 + dice2;
+            int rawPosition = oldPosition + diceTotal;
+            int diceLandingPosition = rawPosition % boardSize;
+
+            actionMessages.Add(
+                $"{player.Username} đi từ ô {oldPosition} đến ô {diceLandingPosition}."
+            );
+
+            player.Position = diceLandingPosition;
+
+            if (rawPosition >= boardSize)
+            {
+                const long startBonus = 300000;
+                player.Money += startBonus;
+                actionMessages.Add($"{player.Username} đi qua Bắt Đầu và nhận {startBonus:N0}.");
+            }
+
+            ApplyRentOnLandingUnsafe(gameState, player, diceLandingPosition, actionMessages);
+            ApplySpecialSquareEffectUnsafe(gameState, player, diceLandingPosition, actionMessages, cardDrawEvents);
+
+            gameState.LastDice1 = dice1;
+            gameState.LastDice2 = dice2;
+            gameState.LastDiceTotal = diceTotal;
+            gameState.LastMovedPlayerIndex = player.PlayerIndex;
+            gameState.LastMoveFromPosition = oldPosition;
+            gameState.LastMoveToPosition = diceLandingPosition;
+            gameState.LastFinalPosition = player.Position;
+
+            Console.WriteLine(
+                $"[DICE] Room={gameState.RoomId}, Player={player.Username}, " +
+                $"Dice={dice1}+{dice2}, DiceLanding={oldPosition}->{diceLandingPosition}, FinalPos={player.Position}, Money={player.Money}"
+            );
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static void ApplyRentOnLandingUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            int position,
+            List<string> actionMessages)
+        {
+            if (!gameState.Properties.TryGetValue(position, out GamePropertyState landedProperty) ||
+                landedProperty.OwnerPlayerIndex < 0 ||
+                landedProperty.OwnerPlayerIndex == player.PlayerIndex)
+            {
+                return;
+            }
+
+            GamePlayerState owner = gameState.Players.FirstOrDefault(
+                p => p.PlayerIndex == landedProperty.OwnerPlayerIndex
+            );
+
+            if (owner == null ||
+                !BoardDatabase.Squares.TryGetValue(position, out var landedSquare) ||
+                landedSquare.RentPrices.Count == 0)
+            {
+                return;
+            }
+
+            if (landedProperty.PowerOutageTurn >= gameState.TurnNumber)
+            {
+                actionMessages.Add($"{landedProperty.Name} đang mất điện, miễn tiền thuê lượt này.");
+                return;
+            }
+
+            if (player.HasFreeRentCard)
+            {
+                player.HasFreeRentCard = false;
+                actionMessages.Add($"{player.Username} dùng Khiên Miễn Trừ, không phải trả tiền thuê {landedProperty.Name}.");
+                return;
+            }
+
+            long rent = GetCurrentRentUnsafe(landedProperty);
+            long paidAmount = Math.Min(rent, Math.Max(0, player.Money));
+            player.Money -= rent;
+            owner.Money += paidAmount;
+
+            actionMessages.Add(
+                $"{player.Username} trả {paidAmount:N0}/{rent:N0} tiền thuê {landedProperty.Name} cho {owner.Username}."
+            );
+
+            Console.WriteLine(
+                $"[RENT] Room={gameState.RoomId}, From={player.Username}, To={owner.Username}, " +
+                $"Property={landedProperty.Name}, Rent={rent}, Paid={paidAmount}, " +
+                $"PayerMoney={player.Money}, OwnerMoney={owner.Money}"
+            );
+        }
+
+        private static void SendPlayerToIslandUnsafe(GamePlayerState player)
+        {
+            player.Position = 24;
+            player.IsOnIsland = true;
+            player.JailTurnsLeft = Math.Max(player.JailTurnsLeft, 3);
+            player.SkipTurnsLeft = 0;
+            player.SkipReason = "";
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static void ApplyWorldChampionshipUnsafe(
+            GameState gameState,
+            GamePlayerState winner,
+            List<string> actionMessages)
+        {
+            const long championshipFee = 100000;
+            long totalCollected = 0;
+
+            foreach (GamePlayerState other in gameState.Players)
+            {
+                if (other == null ||
+                    other.PlayerIndex == winner.PlayerIndex ||
+                    other.IsBankrupt)
+                {
+                    continue;
+                }
+
+                long amount = Math.Min(championshipFee, Math.Max(0, other.Money));
+
+                if (amount <= 0)
+                    continue;
+
+                other.Money -= amount;
+                winner.Money += amount;
+                totalCollected += amount;
+            }
+
+            if (totalCollected > 0)
+            {
+                actionMessages.Add($"{winner.Username} thắng Giải Vô Địch và thu {totalCollected:N0} từ các đối thủ.");
+            }
+            else
+            {
+                actionMessages.Add($"{winner.Username} đến Giải Vô Địch nhưng không thu được tiền.");
             }
         }
 
@@ -1712,36 +2172,217 @@ namespace Monopoly.Server
         private static void ApplyChanceEffectUnsafe(
             GameState gameState,
             GamePlayerState player,
-            List<string> actionMessages)
+            List<string> actionMessages,
+            List<CardDrawEvent> cardDrawEvents)
         {
-            int effect = _random.Next(0, 4);
+            ChanceCardConfig card = _deckManager.DrawCard();
 
-            switch (effect)
+            if (card == null)
             {
-                case 0:
-                    const long jackpot = 200000;
-                    player.Money += jackpot;
-                    actionMessages.Add($"{player.Username} rút thẻ Cơ Hội: Trúng thưởng {jackpot:N0}.");
-                    break;
+                actionMessages.Add($"{player.Username} rút thẻ Cơ Hội nhưng không có dữ liệu thẻ.");
+                return;
+            }
 
-                case 1:
+            player.LastDrawnCardId = card.ID;
+            cardDrawEvents.Add(new CardDrawEvent
+            {
+                DrawnByUsername = player.Username,
+                CardId = card.ID,
+                CardName = card.Name,
+                CardType = card.Type,
+                DetailEffect = card.DetailEffect
+            });
+
+            actionMessages.Add($"{player.Username} rút thẻ Cơ Hội: {card.Name}.");
+
+            switch (card.EffectCode)
+            {
+                case "FINE":
                     const long fine = 100000;
                     player.Money -= fine;
-                    actionMessages.Add($"{player.Username} rút thẻ Cơ Hội: Bị phạt {fine:N0}.");
+                    actionMessages.Add($"Bị phạt {fine:N0}.");
                     break;
 
-                case 2:
-                    player.Position = 0;
-                    player.Money += 300000;
-                    actionMessages.Add($"{player.Username} rút thẻ Cơ Hội: Về ô Bắt Đầu và nhận 300,000.");
+                case "JACKPOT":
+                    const long jackpot = 500000;
+                    player.Money += jackpot;
+                    actionMessages.Add($"Nhận thưởng {jackpot:N0}.");
+                    break;
+
+                case "GO_TO_JAIL":
+                    player.Position = 24;
+                    SendPlayerToIslandUnsafe(player);
+                    actionMessages.Add("Đi tới Đảo Hoang.");
+                    break;
+
+                case "SKIP_TURN":
+                    player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
+                    player.SkipReason = "CARD_SKIP";
+                    actionMessages.Add("Bị đóng băng giao dịch, bỏ lượt kế tiếp.");
+                    break;
+
+                case "TAX_PENALTY":
+                    long penalty = (player.Money / 10 / 1000) * 1000;
+                    player.Money -= penalty;
+                    actionMessages.Add($"Nộp phạt thuế {penalty:N0}.");
+                    break;
+
+                case "CHARITY_PAY":
+                    ApplyCharityPayUnsafe(gameState, player, actionMessages);
+                    break;
+
+                case "GO_TO_WORLD_TOUR":
+                    player.Position = 8;
+                    player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
+                    player.SkipReason = "WORLD_TOUR";
+                    actionMessages.Add("Bay đến Du Lịch Thế Giới và chờ cất cánh lượt sau.");
+                    break;
+
+                case "FREE_RENT":
+                    player.HasFreeRentCard = true;
+                    actionMessages.Add("Nhận Khiên Miễn Trừ, tự động dùng khi phải trả tiền thuê.");
+                    break;
+
+                case "FLIGHT":
+                    player.HasFlightCard = true;
+                    actionMessages.Add("Nhận thẻ Bay, có thể dùng ở lượt sau.");
+                    break;
+
+                case "ESCAPE_ISLAND":
+                    player.HasEscapeIslandCard = true;
+                    actionMessages.Add("Nhận thẻ thoát Đảo Hoang.");
+                    break;
+
+                case "FREE_UPGRADE":
+                    player.HasFreeUpgradeCard = true;
+                    actionMessages.Add("Nhận thẻ nâng cấp miễn phí.");
+                    break;
+
+                case "FORCE_DOUBLE":
+                    player.HasForceDoubleCard = true;
+                    actionMessages.Add("Nhận thẻ Xúc Xắc Ma Thuật.");
+                    break;
+
+                case "EARTHQUAKE":
+                    ApplyEarthquakeAutoTargetUnsafe(gameState, player, actionMessages);
+                    break;
+
+                case "POWER_OUTAGE":
+                    ApplyPowerOutageAutoTargetUnsafe(gameState, player, actionMessages);
+                    break;
+
+                case "MOVE_CHAMPIONSHIP":
+                    ApplyMoveChampionshipAutoTargetUnsafe(gameState, player, actionMessages);
                     break;
 
                 default:
-                    player.Position = 24;
-                    player.JailTurnsLeft = Math.Max(player.JailTurnsLeft, 1);
-                    actionMessages.Add($"{player.Username} rút thẻ Cơ Hội: Đi tới Đảo Hoang và mất lượt kế tiếp.");
+                    actionMessages.Add($"Hiệu ứng {card.EffectCode} chưa được hỗ trợ.");
                     break;
             }
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static void ApplyCharityPayUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            List<string> actionMessages)
+        {
+            long totalPaid = 0;
+
+            foreach (GamePlayerState other in gameState.Players)
+            {
+                if (other == null ||
+                    other.PlayerIndex == player.PlayerIndex ||
+                    other.IsBankrupt ||
+                    player.Money <= 0)
+                {
+                    continue;
+                }
+
+                long amount = Math.Min(50000, player.Money);
+                player.Money -= amount;
+                other.Money += amount;
+                totalPaid += amount;
+            }
+
+            actionMessages.Add($"{player.Username} từ thiện {totalPaid:N0} cho các đối thủ.");
+        }
+
+        // Tạm dùng target tự động cho Phase 2. Phase 5 sẽ đổi sang client chọn target.
+        private static void ApplyEarthquakeAutoTargetUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            List<string> actionMessages)
+        {
+            GamePropertyState target = gameState.Properties.Values
+                .Where(p => p.Type == "City" &&
+                            p.OwnerPlayerIndex >= 0 &&
+                            p.OwnerPlayerIndex != player.PlayerIndex &&
+                            (p.HasHotel || p.HouseCount > 0))
+                .OrderByDescending(p => p.HasHotel ? 4 : p.HouseCount)
+                .FirstOrDefault();
+
+            if (target == null)
+            {
+                actionMessages.Add("Không có thành phố đối thủ đủ điều kiện để Động Đất phá hủy.");
+                return;
+            }
+
+            if (target.HasHotel)
+            {
+                target.HasHotel = false;
+                target.HouseCount = 3;
+            }
+            else
+            {
+                target.HouseCount = Math.Max(0, target.HouseCount - 1);
+            }
+
+            actionMessages.Add($"Động Đất làm {target.Name} giảm 1 cấp.");
+        }
+
+        // Tạm dùng target tự động cho Phase 2. Phase 5 sẽ đổi sang client chọn target.
+        private static void ApplyPowerOutageAutoTargetUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            List<string> actionMessages)
+        {
+            GamePropertyState target = gameState.Properties.Values
+                .Where(p => p.OwnerPlayerIndex >= 0 &&
+                            p.OwnerPlayerIndex != player.PlayerIndex &&
+                            (p.Type == "City" || p.Type == "Resort"))
+                .OrderByDescending(GetCurrentRentUnsafe)
+                .FirstOrDefault();
+
+            if (target == null)
+            {
+                actionMessages.Add("Không có đất đối thủ đủ điều kiện để cúp điện.");
+                return;
+            }
+
+            target.PowerOutageTurn = gameState.TurnNumber + 2;
+            actionMessages.Add($"{target.Name} bị cúp điện trong 2 lượt.");
+        }
+
+        // Tạm dùng target tự động cho Phase 2. Phase 5 sẽ đổi sang client chọn target.
+        private static void ApplyMoveChampionshipAutoTargetUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            List<string> actionMessages)
+        {
+            GamePropertyState target = gameState.Properties.Values
+                .Where(p => p.Type == "City" && p.OwnerPlayerIndex == player.PlayerIndex)
+                .OrderByDescending(GetCurrentRentUnsafe)
+                .FirstOrDefault();
+
+            if (target == null)
+            {
+                actionMessages.Add("Không có thành phố thuộc sở hữu để dời Giải Vô Địch.");
+                return;
+            }
+
+            gameState.WorldChampionshipPosition = target.PositionIndex;
+            actionMessages.Add($"Dời Giải Vô Địch về {target.Name}.");
         }
 
         // Chỉ gọi hàm này bên trong lock(_lock).
@@ -1760,20 +2401,62 @@ namespace Monopoly.Server
             }
         }
 
+        private static long GetCurrentRentUnsafe(GamePropertyState property)
+        {
+            if (property == null || property.RentPrices == null || property.RentPrices.Count == 0)
+            {
+                return 0;
+            }
+
+            int rentIndex = property.HasHotel
+                ? property.RentPrices.Count - 1
+                : Math.Max(0, Math.Min(property.HouseCount, property.RentPrices.Count - 1));
+
+            return property.RentPrices[rentIndex] * Math.Max(1, property.Multiplier);
+        }
+
+        private static long GetBuildCostUnsafe(GamePropertyState property)
+        {
+            if (property == null || property.Type != "City" || property.BuyPrice <= 0 || property.HasHotel)
+            {
+                return 0;
+            }
+
+            return property.HouseCount >= 3 ? property.BuyPrice : Math.Max(1, property.BuyPrice / 2);
+        }
+
+        private static string DescribePropertyLevelUnsafe(GamePropertyState property)
+        {
+            if (property == null)
+            {
+                return "không xác định";
+            }
+
+            if (property.HasHotel)
+            {
+                return "khách sạn";
+            }
+
+            if (property.HouseCount > 0)
+            {
+                return $"{property.HouseCount} nhà";
+            }
+
+            return "đất trống";
+        }
+
         // Chỉ gọi hàm này bên trong lock(_lock).
         private static void ResolveBankruptcyAndWinnerUnsafe(
             GameState gameState,
             GamePlayerState currentPlayer,
             List<string> actionMessages)
         {
-            if (currentPlayer.Money < 0 && !currentPlayer.IsBankrupt)
+            foreach (GamePlayerState player in gameState.Players.OrderBy(p => p.PlayerIndex))
             {
-                currentPlayer.IsBankrupt = true;
-                actionMessages.Add($"{currentPlayer.Username} đã phá sản.");
-
-                Console.WriteLine(
-                    $"[BANKRUPT] Player={currentPlayer.Username}, Money={currentPlayer.Money}"
-                );
+                if (player.Money < 0 && !player.IsBankrupt)
+                {
+                    HandleBankruptcyUnsafe(gameState, player, actionMessages);
+                }
             }
 
             List<GamePlayerState> activeHumanPlayers = gameState.Players
@@ -1788,12 +2471,13 @@ namespace Monopoly.Server
                 gameState.HasRolledThisTurn = true;
                 gameState.TurnEndsAtUtcTicks = 0;
                 actionMessages.Add($"{gameState.WinnerUsername} thắng trận.");
+                actionMessages.Add($"Xếp hạng: {BuildRankingSummaryUnsafe(gameState)}");
 
                 Console.WriteLine($"[GAME_OVER] Winner={gameState.WinnerUsername}");
                 return;
             }
 
-            if (currentPlayer.IsBankrupt && !gameState.IsFinished)
+            if (currentPlayer != null && currentPlayer.IsBankrupt && !gameState.IsFinished)
             {
                 GamePlayerState nextPlayer = GetNextTurnPlayerUnsafe(gameState);
 
@@ -1810,6 +2494,147 @@ namespace Monopoly.Server
                     $"Next={nextPlayer.Username}, Turn={gameState.TurnNumber}"
                 );
             }
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static void HandleBankruptcyUnsafe(
+            GameState gameState,
+            GamePlayerState player,
+            List<string> actionMessages)
+        {
+            player.IsBankrupt = true;
+            player.BankruptcyOrder = GetNextBankruptcyOrderUnsafe(gameState);
+            player.Money = 0;
+            player.HasFreeRentCard = false;
+            player.HasEscapeIslandCard = false;
+            player.HasFlightCard = false;
+            player.HasFreeUpgradeCard = false;
+            player.HasForceDoubleCard = false;
+            player.IsOnIsland = false;
+            player.JailTurnsLeft = 0;
+            player.SkipTurnsLeft = 0;
+            player.SkipReason = "";
+
+            int releasedProperties = ReleasePlayerPropertiesUnsafe(gameState, player.PlayerIndex);
+            actionMessages.Add($"{player.Username} đã phá sản và mất {releasedProperties} ô đất.");
+
+            Console.WriteLine(
+                $"[BANKRUPT] Player={player.Username}, Order={player.BankruptcyOrder}, ReleasedProperties={releasedProperties}"
+            );
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static int GetNextBankruptcyOrderUnsafe(GameState gameState)
+        {
+            int maxOrder = 0;
+
+            foreach (GamePlayerState player in gameState.Players)
+            {
+                if (player.BankruptcyOrder > maxOrder)
+                    maxOrder = player.BankruptcyOrder;
+            }
+
+            return maxOrder + 1;
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static int ReleasePlayerPropertiesUnsafe(GameState gameState, int ownerPlayerIndex)
+        {
+            int releasedCount = 0;
+
+            foreach (GamePropertyState property in gameState.Properties.Values)
+            {
+                if (property.OwnerPlayerIndex != ownerPlayerIndex)
+                    continue;
+
+                property.OwnerPlayerIndex = -1;
+                property.HouseCount = 0;
+                property.HasHotel = false;
+                property.Multiplier = 1;
+                property.PowerOutageTurn = 0;
+                releasedCount++;
+            }
+
+            return releasedCount;
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static string BuildRankingSummaryUnsafe(GameState gameState)
+        {
+            List<GamePlayerState> rankedPlayers = gameState.Players
+                .Where(p => !p.IsBot)
+                .OrderBy(p => p.IsBankrupt ? 1 : 0)
+                .ThenByDescending(p => p.IsBankrupt ? p.BankruptcyOrder : int.MaxValue)
+                .ThenBy(p => p.PlayerIndex)
+                .ToList();
+
+            List<string> parts = new List<string>();
+
+            for (int i = 0; i < rankedPlayers.Count; i++)
+            {
+                parts.Add($"#{i + 1} {rankedPlayers[i].Username}");
+            }
+
+            return string.Join(", ", parts);
+        }
+
+        // Chỉ gọi hàm này bên trong lock(_lock).
+        private static List<GameOverRankingResult> BuildGameOverRankingsUnsafe(GameState gameState)
+        {
+            List<GamePlayerState> rankedPlayers = gameState.Players
+                .Where(p => !p.IsBot)
+                .OrderBy(p => p.IsBankrupt ? 1 : 0)
+                .ThenByDescending(p => p.IsBankrupt ? p.BankruptcyOrder : int.MaxValue)
+                .ThenBy(p => p.PlayerIndex)
+                .ToList();
+
+            List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
+
+            for (int i = 0; i < rankedPlayers.Count; i++)
+            {
+                GamePlayerState player = rankedPlayers[i];
+                ClientConnection playerConnection = _clients.Values
+                    .FirstOrDefault(c => c.Username == player.Username);
+
+                rankings.Add(new GameOverRankingResult
+                {
+                    UserId = string.IsNullOrWhiteSpace(playerConnection?.Uid)
+                        ? player.Username
+                        : playerConnection.Uid,
+                    DisplayName = player.Username,
+                    Rank = i + 1,
+                    ScoreEarned = GetScoreForRank(i + 1),
+                    IdToken = playerConnection?.IdToken ?? ""
+                });
+            }
+
+            return rankings;
+        }
+
+        private static int GetScoreForRank(int rank)
+        {
+            switch (rank)
+            {
+                case 1:
+                    return 100;
+                case 2:
+                    return 50;
+                case 3:
+                    return 20;
+                default:
+                    return 5;
+            }
+        }
+
+        private class GameOverRankingResult
+        {
+            public string UserId { get; set; } = "";
+            public string DisplayName { get; set; } = "";
+            public int Rank { get; set; }
+            public int ScoreEarned { get; set; }
+
+            [JsonIgnore]
+            public string IdToken { get; set; } = "";
         }
 
         // Chỉ gọi hàm này bên trong lock(_lock).
@@ -1880,6 +2705,15 @@ namespace Monopoly.Server
             while (_rooms.ContainsKey(roomId));
 
             return roomId;
+        }
+
+        private sealed class CardDrawEvent
+        {
+            public string DrawnByUsername { get; set; } = "";
+            public string CardId { get; set; } = "";
+            public string CardName { get; set; } = "";
+            public string CardType { get; set; } = "";
+            public string DetailEffect { get; set; } = "";
         }
     }
 }
