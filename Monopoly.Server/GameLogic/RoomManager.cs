@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Monopoly.Server.GameLogic
 {
-    internal class RoomManager
+    public static class RoomManager
     {
     }
 }
