@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using System.Text;
@@ -154,8 +154,15 @@ public class AuthManager : MonoBehaviour
                 if (response.StartsWith("SUCCESS"))
                 {
                     string[] parts = response.Split('|');
-                    // Lưu thông tin phiên chơi (UID, Token, Email, Tiền mặc định, Avatar mặc định)
-                    PlayerSession.Initialize(parts[1], parts[2], email, 2000000, "avatar_1");
+                    string sessionUsername = parts.Length >= 5 ? parts[3] : email;
+                    string sessionAvatar = parts.Length >= 5 ? parts[4] : "avatar_1";
+                    long sessionPoint = 0;
+                    if (parts.Length >= 6) {
+                        long.TryParse(parts[5], out sessionPoint);
+                    }
+                    
+                    // Lưu thông tin phiên chơi
+                    PlayerSession.Initialize(parts[1], parts[2], sessionUsername, sessionPoint, sessionAvatar);
                     UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
                 }
                 else

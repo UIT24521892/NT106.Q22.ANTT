@@ -50,7 +50,7 @@ namespace Monopoly.Server.GameLogic.Bots
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
 
             // Nghỉ trước khi đổ xúc xắc
-            await Task.Delay(1000);
+            await Task.Delay(1500);
 
             List<CardDrawEvent> cardEvents = new List<CardDrawEvent>();
             bool hasRolledDouble = false;
@@ -100,12 +100,12 @@ namespace Monopoly.Server.GameLogic.Bots
                 foreach (var evt in cardEvents)
                 {
                     await NetworkSender.BroadcastCardDrawnAsync(room.RoomId, evt);
-                    await Task.Delay(2000);
+                    await Task.Delay(2500);
                 }
             }
 
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
-            await Task.Delay(1500);
+            await Task.Delay(4000);
 
             // Giai đoạn mua/xây nhà và phá sản
             lock (ServerState.Lock)
@@ -175,7 +175,7 @@ namespace Monopoly.Server.GameLogic.Bots
             }
 
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
-            await Task.Delay(1000);
+            await Task.Delay(2500);
 
             // Chuyển lượt
             lock (ServerState.Lock)
