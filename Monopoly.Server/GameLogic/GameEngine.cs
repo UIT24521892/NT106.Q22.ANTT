@@ -144,9 +144,9 @@ namespace Monopoly.Server.GameLogic
                 return;
             }
 
-            if (player.HasFreeRentCard)
+            if (player.IsFreeRentShieldActive)
             {
-                player.HasFreeRentCard = false;
+                player.IsFreeRentShieldActive = false;
                 actionMessages.Add($"{player.Username} dùng Khiên Mi?n Tr?, không ph?i tr? ti?n thuê {landedProperty.Name}.");
                 return;
             }
@@ -281,7 +281,7 @@ namespace Monopoly.Server.GameLogic
 
                 case "FREE_RENT":
                     player.HasFreeRentCard = true;
-                    actionMessages.Add("Nh?n Khiên Mi?n Tr?, t? d?ng dùng khi ph?i tr? ti?n thuê.");
+                    actionMessages.Add("Nh?n Khiên Mi?n Tr?. Dùng th? d? kích ho?t mi?n ti?n thuê l?n sau.");
                     break;
 
                 case "FLIGHT":
@@ -305,15 +305,18 @@ namespace Monopoly.Server.GameLogic
                     break;
 
                 case "EARTHQUAKE":
-                    ApplyEarthquakeAutoTargetUnsafe(gameState, player, actionMessages);
+                    player.HasEarthquakeCard = true;
+                    actionMessages.Add("Nh?n th? Ð?ng Ð?t. Dùng th? d? ch?n thành ph? d?i th? c?n phá h?y.");
                     break;
 
                 case "POWER_OUTAGE":
-                    ApplyPowerOutageAutoTargetUnsafe(gameState, player, actionMessages);
+                    player.HasPowerOutageCard = true;
+                    actionMessages.Add("Nh?n th? Cúp Ði?n. Dùng th? d? ch?n d?t d?i th? b? vô hi?u rent.");
                     break;
 
                 case "MOVE_CHAMPIONSHIP":
-                    ApplyMoveChampionshipAutoTargetUnsafe(gameState, player, actionMessages);
+                    player.HasMoveChampionshipCard = true;
+                    actionMessages.Add("Nh?n th? Ðang Cai Gi?i Ð?u. Dùng th? d? ch?n thành ph? c?a b?n.");
                     break;
 
                 default:
@@ -416,6 +419,384 @@ namespace Monopoly.Server.GameLogic
 
             gameState.WorldChampionshipPosition = target.PositionIndex;
             actionMessages.Add($"D?i Gi?i Vô Ð?ch v? {target.Name}.");
+        }
+        public static string NormalizeCardEffectCode(string cardIdOrEffectCode)
+        {
+            if (string.IsNullOrWhiteSpace(cardIdOrEffectCode))
+                return "";
+
+            string value = cardIdOrEffectCode.Trim();
+
+            if (CardDatabase.Cards.TryGetValue(value, out ChanceCardConfig card))
+                return card.EffectCode ?? "";
+
+            return value.ToUpperInvariant();
+        }
+        public static bool RequiresCardTarget(string effectCode)
+        {
+            switch (NormalizeCardEffectCode(effectCode))
+            {
+                case "FLIGHT":
+                case "FREE_UPGRADE":
+                case "EARTHQUAKE":
+                case "POWER_OUTAGE":
+                case "MOVE_CHAMPIONSHIP":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        public static bool PlayerHasHeldCardUnsafe(GamePlayerState player, string effectCode)
+        {
+            if (player == null)
+                return false;
+
+            switch (NormalizeCardEffectCode(effectCode))
+            {
+                case "FREE_RENT":
+                    return player.HasFreeRentCard;
+                case "ESCAPE_ISLAND":
+                    return player.HasEscapeIslandCard;
+                case "FLIGHT":
+                    return player.HasFlightCard;
+                case "FREE_UPGRADE":
+                    return player.HasFreeUpgradeCard;
+                case "FORCE_DOUBLE":
+                    return player.HasForceDoubleCard;
+                case "EARTHQUAKE":
+                    return player.HasEarthquakeCard;
+                case "POWER_OUTAGE":
+                    return player.HasPowerOutageCard;
+                case "MOVE_CHAMPIONSHIP":
+                    return player.HasMoveChampionshipCard;
+                default:
+                    return false;
+            }
+        }
+        public static List<int> BuildCardTargetPositionsUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                string effectCode)
+        {
+            List<int> targets = new List<int>();
+
+            if (gameState == null || player == null)
+                return targets;
+
+            switch (NormalizeCardEffectCode(effectCode))
+            {
+                case "FLIGHT":
+                    targets.AddRange(BoardDatabase.Squares.Keys.OrderBy(p => p));
+                    break;
+
+                case "FREE_UPGRADE":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.Type == "City" &&
+                                    p.OwnerPlayerIndex == player.PlayerIndex &&
+                                    !p.HasHotel)
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+
+                case "EARTHQUAKE":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.Type == "City" &&
+                                    p.OwnerPlayerIndex >= 0 &&
+                                    p.OwnerPlayerIndex != player.PlayerIndex &&
+                                    (p.HasHotel || p.HouseCount > 0))
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+
+                case "POWER_OUTAGE":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.OwnerPlayerIndex >= 0 &&
+                                    p.OwnerPlayerIndex != player.PlayerIndex &&
+                                    (p.Type == "City" || p.Type == "Resort"))
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+
+                case "MOVE_CHAMPIONSHIP":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.Type == "City" &&
+                                    p.OwnerPlayerIndex == player.PlayerIndex)
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+            }
+
+            return targets;
+        }
+        public static bool TryApplyHeldCardEffectUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                string effectCode,
+                int? targetPosition,
+                List<string> actionMessages,
+                List<CardDrawEvent> cardDrawEvents,
+                out string failMessage)
+        {
+            failMessage = "";
+            effectCode = NormalizeCardEffectCode(effectCode);
+
+            if (gameState == null || player == null)
+            {
+                failMessage = "Khong tim thay trang thai game hoac nguoi choi.";
+                return false;
+            }
+
+            if (!PlayerHasHeldCardUnsafe(player, effectCode))
+            {
+                failMessage = "Ban khong so huu the nay hoac the da duoc dung.";
+                return false;
+            }
+
+            if (RequiresCardTarget(effectCode))
+            {
+                if (!targetPosition.HasValue)
+                {
+                    failMessage = "The nay can chon muc tieu.";
+                    return false;
+                }
+
+                List<int> validTargets = BuildCardTargetPositionsUnsafe(gameState, player, effectCode);
+
+                if (!validTargets.Contains(targetPosition.Value))
+                {
+                    failMessage = "Muc tieu khong hop le cho the nay.";
+                    return false;
+                }
+            }
+
+            switch (effectCode)
+            {
+                case "FREE_RENT":
+                    player.HasFreeRentCard = false;
+                    player.IsFreeRentShieldActive = true;
+                    actionMessages.Add($"{player.Username} kich hoat Khien Mien Tru cho lan tra tien thue tiep theo.");
+                    return true;
+
+                case "ESCAPE_ISLAND":
+                    if (!player.IsOnIsland && player.JailTurnsLeft <= 0)
+                    {
+                        failMessage = "Chi co the dung the thoat Dao Hoang khi dang o Dao Hoang.";
+                        return false;
+                    }
+
+                    player.HasEscapeIslandCard = false;
+                    player.IsOnIsland = false;
+                    player.JailTurnsLeft = 0;
+                    player.SkipTurnsLeft = 0;
+                    player.SkipReason = "";
+                    actionMessages.Add($"{player.Username} dung Truc Thang Cuu Ho va thoat Dao Hoang.");
+                    return true;
+
+                case "FORCE_DOUBLE":
+                    if (gameState.HasRolledThisTurn)
+                    {
+                        failMessage = "Chi co the dung Xuc Xac Ma Thuat truoc khi do xuc xac.";
+                        return false;
+                    }
+
+                    if (!player.IsOnIsland && player.SkipTurnsLeft > 0)
+                    {
+                        failMessage = "Khong the dung Xuc Xac Ma Thuat khi dang bi mat luot.";
+                        return false;
+                    }
+
+                    player.HasForceDoubleCard = false;
+                    gameState.ForceDoubleThisTurn = true;
+                    actionMessages.Add($"{player.Username} kich hoat Xuc Xac Ma Thuat cho lan roll nay.");
+                    return true;
+
+                case "FLIGHT":
+                    return ApplyFlightCardUnsafe(gameState, player, targetPosition.Value, actionMessages, cardDrawEvents, out failMessage);
+
+                case "FREE_UPGRADE":
+                    return ApplyFreeUpgradeCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                case "EARTHQUAKE":
+                    return ApplyEarthquakeCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                case "POWER_OUTAGE":
+                    return ApplyPowerOutageCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                case "MOVE_CHAMPIONSHIP":
+                    return ApplyMoveChampionshipCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                default:
+                    failMessage = $"The {effectCode} chua duoc ho tro trong hand.";
+                    return false;
+            }
+        }
+        private static bool ApplyFlightCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                List<CardDrawEvent> cardDrawEvents,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!BoardDatabase.Squares.ContainsKey(targetPosition))
+            {
+                failMessage = "O dich khong hop le.";
+                return false;
+            }
+
+            int oldPosition = player.Position;
+            int boardSize = BoardDatabase.Squares.Count;
+            player.HasFlightCard = false;
+            player.Position = targetPosition;
+
+            if (targetPosition < oldPosition)
+            {
+                const long startBonus = 300000;
+                player.Money += startBonus;
+                actionMessages.Add($"{player.Username} bay qua Bat Dau va nhan {startBonus:N0}.");
+            }
+
+            actionMessages.Add($"{player.Username} dung Ve May Bay tu o {oldPosition} den o {targetPosition}.");
+            ApplyRentOnLandingUnsafe(gameState, player, targetPosition, actionMessages);
+            ApplySpecialSquareEffectUnsafe(gameState, player, targetPosition, actionMessages, cardDrawEvents);
+
+            gameState.LastDice1 = 0;
+            gameState.LastDice2 = 0;
+            gameState.LastDiceTotal = 0;
+            gameState.LastMovedPlayerIndex = player.PlayerIndex;
+            gameState.LastMoveFromPosition = oldPosition;
+            gameState.LastMoveToPosition = targetPosition;
+            gameState.LastFinalPosition = player.Position;
+            return true;
+        }
+        private static bool ApplyFreeUpgradeCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property))
+            {
+                failMessage = "Khong tim thay o dat can nang cap.";
+                return false;
+            }
+
+            if (property.Type != "City" ||
+                property.OwnerPlayerIndex != player.PlayerIndex ||
+                property.HasHotel)
+            {
+                failMessage = "O dat nay khong the nang cap mien phi.";
+                return false;
+            }
+
+            player.HasFreeUpgradeCard = false;
+
+            if (property.HouseCount >= 3)
+            {
+                property.HouseCount = 3;
+                property.HasHotel = true;
+            }
+            else
+            {
+                property.HouseCount++;
+            }
+
+            actionMessages.Add($"{player.Username} dung Giay Phep Xay Dung nang cap {property.Name} len {DescribePropertyLevelUnsafe(property)} mien phi.");
+            return true;
+        }
+        private static bool ApplyEarthquakeCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property) ||
+                property.Type != "City" ||
+                property.OwnerPlayerIndex < 0 ||
+                property.OwnerPlayerIndex == player.PlayerIndex ||
+                (!property.HasHotel && property.HouseCount <= 0))
+            {
+                failMessage = "Muc tieu Dong Dat khong hop le.";
+                return false;
+            }
+
+            player.HasEarthquakeCard = false;
+
+            if (property.HasHotel)
+            {
+                property.HasHotel = false;
+                property.HouseCount = 3;
+            }
+            else
+            {
+                property.HouseCount = Math.Max(0, property.HouseCount - 1);
+            }
+
+            actionMessages.Add($"{player.Username} dung Dong Dat lam {property.Name} giam 1 cap.");
+            return true;
+        }
+        private static bool ApplyPowerOutageCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property) ||
+                property.OwnerPlayerIndex < 0 ||
+                property.OwnerPlayerIndex == player.PlayerIndex ||
+                (property.Type != "City" && property.Type != "Resort"))
+            {
+                failMessage = "Muc tieu Cup Dien khong hop le.";
+                return false;
+            }
+
+            player.HasPowerOutageCard = false;
+            property.PowerOutageTurn = gameState.TurnNumber + 2;
+            actionMessages.Add($"{player.Username} dung Cup Dien lam {property.Name} mat dien trong 2 luot.");
+            return true;
+        }
+        private static bool ApplyMoveChampionshipCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property) ||
+                property.Type != "City" ||
+                property.OwnerPlayerIndex != player.PlayerIndex)
+            {
+                failMessage = "Muc tieu dang cai giai dau khong hop le.";
+                return false;
+            }
+
+            player.HasMoveChampionshipCard = false;
+            gameState.WorldChampionshipPosition = targetPosition;
+            actionMessages.Add($"{player.Username} doi Giai Vo Dich ve {property.Name}.");
+            return true;
+        }
+        public static void ClearPendingCardChoiceUnsafe(GameState gameState)
+        {
+            if (gameState == null)
+                return;
+
+            gameState.IsWaitingForCardChoice = false;
+            gameState.PendingCardEffectCode = "";
+            gameState.PendingCardPlayerUsername = "";
+            gameState.PendingCardTargetPositions.Clear();
         }
         public static void AddGameLogUnsafe(GameState gameState, string message)
         {
@@ -530,10 +911,14 @@ namespace Monopoly.Server.GameLogic
             player.BankruptcyOrder = GetNextBankruptcyOrderUnsafe(gameState);
             player.Money = 0;
             player.HasFreeRentCard = false;
+            player.IsFreeRentShieldActive = false;
             player.HasEscapeIslandCard = false;
             player.HasFlightCard = false;
             player.HasFreeUpgradeCard = false;
             player.HasForceDoubleCard = false;
+            player.HasEarthquakeCard = false;
+            player.HasPowerOutageCard = false;
+            player.HasMoveChampionshipCard = false;
             player.IsOnIsland = false;
             player.JailTurnsLeft = 0;
             player.SkipTurnsLeft = 0;
@@ -686,6 +1071,7 @@ namespace Monopoly.Server.GameLogic
                 IsWaitingForCardChoice = false,
                 PendingCardEffectCode = "",
                 PendingCardPlayerUsername = "",
+                PendingCardTargetPositions = new List<int>(),
                 ForceDoubleThisTurn = false
             };
 
@@ -706,10 +1092,14 @@ namespace Monopoly.Server.GameLogic
                     ConsecutiveDoubles = 0,
                     JailTurnsLeft = 0,
                     HasFreeRentCard = false,
+                    IsFreeRentShieldActive = false,
                     HasEscapeIslandCard = false,
                     HasFlightCard = false,
                     HasFreeUpgradeCard = false,
                     HasForceDoubleCard = false,
+                    HasEarthquakeCard = false,
+                    HasPowerOutageCard = false,
+                    HasMoveChampionshipCard = false,
                     IsOnIsland = false,
                     SkipTurnsLeft = 0,
                     SkipReason = "",

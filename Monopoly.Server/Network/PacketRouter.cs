@@ -79,6 +79,15 @@ namespace Monopoly.Server.Network
                         await GameHandler.HandleBuildPropertyAsync(packet, connection);
                         break;
 
+                    case "USE_CARD":
+                    case "UseCard":
+                        await GameHandler.HandleUseCardAsync(packet, connection);
+                        break;
+
+                    case "CARD_CHOICE_MADE":
+                        await GameHandler.HandleCardChoiceMadeAsync(packet, connection);
+                        break;
+
                     case "RESUME_GAME":
                         await GameHandler.HandleResumeGameAsync(packet, connection);
                         break;

@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 
 namespace Monopoly.Server.Handles
 {
-    public static class GameHandler
+    public static partial class GameHandler
     {
         private static int RollDie()
         {
@@ -46,6 +46,10 @@ namespace Monopoly.Server.Handles
                 else if (room.GameState.IsFinished)
                 {
                     failMessage = $"Tr?n d?u dã k?t thúc. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
+                }
+                else if (room.GameState.IsWaitingForCardChoice)
+                {
+                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
                 }
                 else
                 {
@@ -89,9 +93,15 @@ namespace Monopoly.Server.Handles
                     {
                         int boardSize = BoardDatabase.Squares.Count;
                         int dice1 = RollDie();
-                        int dice2 = RollDie();
+                        int dice2 = room.GameState.ForceDoubleThisTurn ? dice1 : RollDie();
                         int diceTotal = dice1 + dice2;
                         int oldPosition = player.Position;
+
+                        if (room.GameState.ForceDoubleThisTurn)
+                        {
+                            room.GameState.ForceDoubleThisTurn = false;
+                            actionMessages.Add("${player.Username} dung Xuc Xac Ma Thuat va roll doi ${dice1}.");
+                        }
 
                         if (player.IsOnIsland || player.JailTurnsLeft > 0)
                         {
@@ -187,6 +197,10 @@ namespace Monopoly.Server.Handles
                 {
                     failMessage = $"Tr?n d?u dã k?t thúc. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
                 }
+                else if (room.GameState.IsWaitingForCardChoice)
+                {
+                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
+                }
                 else
                 {
                     GamePlayerState player = room.GameState.Players.FirstOrDefault(
@@ -213,6 +227,7 @@ namespace Monopoly.Server.Handles
                         room.GameState.CurrentTurnUsername = nextPlayer.Username;
                         room.GameState.TurnNumber++;
                         room.GameState.HasRolledThisTurn = false;
+                        room.GameState.ForceDoubleThisTurn = false;
                         GameEngine.ResetTurnTimerUnsafe(room.GameState);
                         room.GameState.LastActionMessage =
                             $"{player.Username} k?t thúc lu?t. Ð?n lu?t {nextPlayer.Username}.";
@@ -263,6 +278,10 @@ namespace Monopoly.Server.Handles
                 else if (room.GameState.IsFinished)
                 {
                     failMessage = $"Tr?n d?u dã k?t thúc. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
+                }
+                else if (room.GameState.IsWaitingForCardChoice)
+                {
+                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
                 }
                 else
                 {
@@ -359,6 +378,10 @@ namespace Monopoly.Server.Handles
                 else if (room.GameState.IsFinished)
                 {
                     failMessage = $"Tr?n d?u dã k?t thúc. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
+                }
+                else if (room.GameState.IsWaitingForCardChoice)
+                {
+                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
                 }
                 else
                 {
@@ -581,6 +604,7 @@ namespace Monopoly.Server.Handles
                         room.GameState.CurrentTurnUsername = nextPlayer.Username;
                         room.GameState.TurnNumber++;
                         room.GameState.HasRolledThisTurn = false;
+                        room.GameState.ForceDoubleThisTurn = false;
                         GameEngine.ResetTurnTimerUnsafe(room.GameState);
                         gameStateMessage += $" Ð?n lu?t {nextPlayer.Username}.";
                     }

@@ -51,6 +51,8 @@ public class NetworkManager : MonoBehaviour
 
     private void Awake()
     {
+        Application.runInBackground = true;
+
         if (Instance != null)
         {
             Destroy(gameObject);
@@ -569,6 +571,70 @@ public class NetworkManager : MonoBehaviour
         Debug.Log($"[NetworkManager] Sent BUILD_PROPERTY for position {positionIndex}.");
     }
 
+    public void SendUseCardRequest(string cardEffectCode)
+    {
+        if (string.IsNullOrWhiteSpace(cardEffectCode))
+            return;
+
+        var packet = new
+        {
+            Type = "USE_CARD",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username,
+                CardId = cardEffectCode
+            }
+        };
+
+        SendPacket(packet);
+        lastClientActionStatus = $"Sent: Use {cardEffectCode}";
+        UpdateGameStateOverlayText();
+        Debug.Log($"[NetworkManager] Sent USE_CARD {cardEffectCode}.");
+    }
+
+    public void SendCardChoiceMade(string cardEffectCode, int positionIndex)
+    {
+        if (string.IsNullOrWhiteSpace(cardEffectCode))
+            return;
+
+        var packet = new
+        {
+            Type = "CARD_CHOICE_MADE",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username,
+                EffectCode = cardEffectCode,
+                PositionIndex = positionIndex
+            }
+        };
+
+        SendPacket(packet);
+        lastClientActionStatus = $"Sent: {cardEffectCode} target {positionIndex}";
+        UpdateGameStateOverlayText();
+        Debug.Log($"[NetworkManager] Sent CARD_CHOICE_MADE {cardEffectCode} -> {positionIndex}.");
+    }
+
+    public void SendCardChoiceCancel(string cardEffectCode)
+    {
+        var packet = new
+        {
+            Type = "CARD_CHOICE_MADE",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username,
+                EffectCode = cardEffectCode,
+                Cancel = true
+            }
+        };
+
+        SendPacket(packet);
+        lastClientActionStatus = $"Sent: Cancel {cardEffectCode}";
+        UpdateGameStateOverlayText();
+    }
+
     public void SendResumeGameRequest()
     {
         if (PlayerSession.Instance == null)
@@ -858,6 +924,7 @@ public class NetworkManager : MonoBehaviour
                         }
 
                         PlayerHandUI.EnsureExists().Refresh(gameState);
+                        BoardTileInfoUI.EnsureExists().SyncCardChoiceState(gameState);
 
                         Debug.Log(
                             $"[NetworkManager] GAME_STATE_UPDATE Room={gameState?.RoomId ?? "N/A"}, " +
@@ -871,7 +938,21 @@ public class NetworkManager : MonoBehaviour
                 case "RESUME_GAME_NONE":
                     {
                         string message = data["Payload"]?["Message"]?.ToString() ?? "No resumable game.";
+                        FindObjectOfType<LobbyManager>()?.OnResumeGameNone(message);
                         Debug.Log($"[NetworkManager] RESUME_GAME_NONE: {message}");
+                        break;
+                    }
+
+                case "REQUEST_CARD_CHOICE":
+                    {
+                        string effectCode = data["Payload"]?["EffectCode"]?.ToString() ?? "";
+                        List<int> validTargets = data["Payload"]?["ValidTargetPositions"]?.ToObject<List<int>>() ??
+                            new List<int>();
+
+                        BoardTileInfoUI.EnsureExists().BeginCardTargetSelection(effectCode, validTargets);
+                        lastClientActionStatus = $"Choose target for {effectCode}";
+                        UpdateGameStateOverlayText();
+                        Debug.Log($"[NetworkManager] REQUEST_CARD_CHOICE {effectCode}, Targets={validTargets.Count}");
                         break;
                     }
 

@@ -33,6 +33,7 @@ namespace Monopoly.Server.Models.State
         public bool IsWaitingForCardChoice { get; set; }
         public string PendingCardEffectCode { get; set; } = "";
         public string PendingCardPlayerUsername { get; set; } = "";
+        public List<int> PendingCardTargetPositions { get; set; } = new List<int>();
         public bool ForceDoubleThisTurn { get; set; }
         public bool IsBotPlaying { get; set; }
         public List<string> ActionLog { get; set; } = new List<string>();

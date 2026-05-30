@@ -17,7 +17,8 @@ namespace Monopoly.Shared.Models.Network.Enums
         DiceRoll,
         BuyProperty,
         EndTurn,
-        UseCard
+        UseCard,
+        CardChoiceMade
         // ... thêm các hành động khác
     }
 }

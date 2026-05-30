@@ -8,7 +8,8 @@ public class PlayerHandUI : MonoBehaviour
 {
     private RectTransform root;
     private TextMeshProUGUI titleText;
-    private readonly List<TextMeshProUGUI> cardTexts = new List<TextMeshProUGUI>();
+    private TextMeshProUGUI statusText;
+    private readonly List<Button> cardButtons = new List<Button>();
 
     public static PlayerHandUI EnsureExists()
     {
@@ -42,25 +43,65 @@ public class PlayerHandUI : MonoBehaviour
         }
 
         List<CardDisplay> cards = BuildHeldCards(localPlayer);
-        root.gameObject.SetActive(cards.Count > 0);
+        bool hasStatus = localPlayer.IsFreeRentShieldActive ||
+            (state != null &&
+             state.IsWaitingForCardChoice &&
+             string.Equals(state.PendingCardPlayerUsername, localPlayer.Username, StringComparison.OrdinalIgnoreCase));
 
-        if (cards.Count == 0)
+        root.gameObject.SetActive(cards.Count > 0 || hasStatus);
+
+        if (!root.gameObject.activeSelf)
             return;
 
-        titleText.text = "Thẻ đang giữ";
+        titleText.text = "The dang giu";
 
-        for (int i = 0; i < cardTexts.Count; i++)
+        if (statusText != null)
         {
+            statusText.text = localPlayer.IsFreeRentShieldActive
+                ? "Khien mien tru dang kich hoat"
+                : (hasStatus ? $"Chon muc tieu cho {state.PendingCardEffectCode}" : "");
+        }
+
+        bool canUseAnyCard = CanUseCards(state, localPlayer);
+
+        for (int i = 0; i < cardButtons.Count; i++)
+        {
+            Button button = cardButtons[i];
+
             if (i >= cards.Count)
             {
-                cardTexts[i].gameObject.SetActive(false);
+                button.gameObject.SetActive(false);
                 continue;
             }
 
             CardDisplay card = cards[i];
-            cardTexts[i].gameObject.SetActive(true);
-            cardTexts[i].text = card.Name;
-            cardTexts[i].color = card.Color;
+            bool canUseCard = canUseAnyCard && CanUseCardNow(card.EffectCode, state, localPlayer);
+
+            button.gameObject.SetActive(true);
+            button.interactable = canUseCard;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(() =>
+            {
+                if (NetworkManager.Instance != null)
+                    NetworkManager.Instance.SendUseCardRequest(card.EffectCode);
+            });
+
+            Image buttonImage = button.GetComponent<Image>();
+
+            if (buttonImage != null)
+            {
+                buttonImage.color = canUseCard
+                    ? new Color(0.12f, 0.26f, 0.34f, 0.96f)
+                    : new Color(0.12f, 0.12f, 0.12f, 0.72f);
+            }
+
+            TextMeshProUGUI buttonText = button.GetComponentInChildren<TextMeshProUGUI>();
+
+            if (buttonText != null)
+            {
+                buttonText.text = card.Name;
+                buttonText.color = card.Color;
+            }
         }
 
         root.SetAsLastSibling();
@@ -88,10 +129,10 @@ public class PlayerHandUI : MonoBehaviour
         root.anchorMax = new Vector2(0f, 0f);
         root.pivot = new Vector2(0f, 0f);
         root.anchoredPosition = new Vector2(12f, 74f);
-        root.sizeDelta = new Vector2(260f, 180f);
+        root.sizeDelta = new Vector2(280f, 282f);
 
         Image rootImage = rootObject.GetComponent<Image>();
-        rootImage.color = new Color(0.05f, 0.07f, 0.09f, 0.62f);
+        rootImage.color = new Color(0.05f, 0.07f, 0.09f, 0.72f);
         rootImage.raycastTarget = false;
 
         titleText = CreateText("Txt_PlayerHandTitle", root, "", 18f, FontStyles.Bold);
@@ -99,13 +140,27 @@ public class PlayerHandUI : MonoBehaviour
         titleText.color = new Color(1f, 0.86f, 0.42f, 1f);
         SetRect(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(12f, -10f), new Vector2(-24f, 28f));
 
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 8; i++)
         {
-            TextMeshProUGUI cardText = CreateText($"Txt_PlayerHandCard_{i + 1}", root, "", 15f, FontStyles.Bold);
-            cardText.alignment = TextAlignmentOptions.TopLeft;
-            SetRect(cardText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(14f, -42f - i * 25f), new Vector2(-28f, 24f));
-            cardTexts.Add(cardText);
+            Button cardButton = CreateButton(
+                $"Btn_PlayerHandCard_{i + 1}",
+                root,
+                "",
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 1f),
+                new Vector2(12f, -42f - i * 27f),
+                new Vector2(-24f, 25f));
+
+            cardButtons.Add(cardButton);
         }
+
+        statusText = CreateText("Txt_PlayerHandStatus", root, "", 12f, FontStyles.Normal);
+        statusText.alignment = TextAlignmentOptions.TopLeft;
+        statusText.color = new Color(0.82f, 0.9f, 1f, 1f);
+        statusText.enableWordWrapping = false;
+        statusText.overflowMode = TextOverflowModes.Ellipsis;
+        SetRect(statusText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(12f, 8f), new Vector2(-24f, 22f));
 
         root.gameObject.SetActive(false);
     }
@@ -113,23 +168,60 @@ public class PlayerHandUI : MonoBehaviour
     private List<CardDisplay> BuildHeldCards(GamePlayerStateData player)
     {
         List<CardDisplay> cards = new List<CardDisplay>();
+        Color cardColor = new Color(1f, 0.78f, 0.18f, 1f);
 
         if (player.HasFreeRentCard)
-            cards.Add(new CardDisplay("Khiên Miễn Trừ", new Color(1f, 0.78f, 0.18f, 1f)));
+            cards.Add(new CardDisplay("Khien Mien Tru", "FREE_RENT", cardColor));
 
         if (player.HasEscapeIslandCard)
-            cards.Add(new CardDisplay("Trực Thăng Cứu Hộ", new Color(1f, 0.78f, 0.18f, 1f)));
+            cards.Add(new CardDisplay("Truc Thang Cuu Ho", "ESCAPE_ISLAND", cardColor));
 
         if (player.HasFlightCard)
-            cards.Add(new CardDisplay("Vé Máy Bay", new Color(1f, 0.78f, 0.18f, 1f)));
+            cards.Add(new CardDisplay("Ve May Bay", "FLIGHT", cardColor));
 
         if (player.HasFreeUpgradeCard)
-            cards.Add(new CardDisplay("Xây Dựng Miễn Phí", new Color(1f, 0.78f, 0.18f, 1f)));
+            cards.Add(new CardDisplay("Xay Dung Mien Phi", "FREE_UPGRADE", cardColor));
 
         if (player.HasForceDoubleCard)
-            cards.Add(new CardDisplay("Xúc Xắc Ma Thuật", new Color(1f, 0.78f, 0.18f, 1f)));
+            cards.Add(new CardDisplay("Xuc Xac Ma Thuat", "FORCE_DOUBLE", cardColor));
+
+        if (player.HasEarthquakeCard)
+            cards.Add(new CardDisplay("Dong Dat", "EARTHQUAKE", cardColor));
+
+        if (player.HasPowerOutageCard)
+            cards.Add(new CardDisplay("Cup Dien", "POWER_OUTAGE", cardColor));
+
+        if (player.HasMoveChampionshipCard)
+            cards.Add(new CardDisplay("Dang Cai Giai Dau", "MOVE_CHAMPIONSHIP", cardColor));
 
         return cards;
+    }
+
+    private bool CanUseCards(GameStateData state, GamePlayerStateData localPlayer)
+    {
+        return state != null &&
+            localPlayer != null &&
+            !state.IsFinished &&
+            !state.IsWaitingForCardChoice &&
+            localPlayer.IsConnected &&
+            !localPlayer.IsBankrupt &&
+            localPlayer.PlayerIndex == state.CurrentTurnPlayerIndex;
+    }
+
+    private bool CanUseCardNow(string effectCode, GameStateData state, GamePlayerStateData localPlayer)
+    {
+        if (!CanUseCards(state, localPlayer))
+            return false;
+
+        switch (effectCode)
+        {
+            case "ESCAPE_ISLAND":
+                return localPlayer.IsOnIsland || localPlayer.JailTurnsLeft > 0;
+            case "FORCE_DOUBLE":
+                return !state.HasRolledThisTurn;
+            default:
+                return true;
+        }
     }
 
     private GamePlayerStateData GetLocalPlayer(GameStateData state)
@@ -165,6 +257,33 @@ public class PlayerHandUI : MonoBehaviour
         return text;
     }
 
+    private Button CreateButton(
+        string name,
+        Transform parent,
+        string label,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 pivot,
+        Vector2 anchoredPosition,
+        Vector2 sizeDelta)
+    {
+        GameObject buttonObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        SetRect(rect, anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0.12f, 0.26f, 0.34f, 0.96f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+
+        TextMeshProUGUI text = CreateText("Text", rect, label, 14f, FontStyles.Bold);
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+        SetRect(text.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(10f, 0f), new Vector2(-20f, 0f));
+        return button;
+    }
+
     private void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 sizeDelta)
     {
         rect.anchorMin = anchorMin;
@@ -177,11 +296,13 @@ public class PlayerHandUI : MonoBehaviour
     private sealed class CardDisplay
     {
         public readonly string Name;
+        public readonly string EffectCode;
         public readonly Color Color;
 
-        public CardDisplay(string name, Color color)
+        public CardDisplay(string name, string effectCode, Color color)
         {
             Name = name;
+            EffectCode = effectCode;
             Color = color;
         }
     }

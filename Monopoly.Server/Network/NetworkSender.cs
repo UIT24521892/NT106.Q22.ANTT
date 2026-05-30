@@ -175,6 +175,26 @@ namespace Monopoly.Server.Network
                 }
             });
         }
+        public static async Task SendCardChoiceRequestAsync(
+            ClientConnection connection,
+            string effectCode,
+            List<int> validTargetPositions)
+        {
+            if (connection == null)
+            {
+                return;
+            }
+
+            await SendJsonPacketAsync(connection.Stream, new
+            {
+                Type = "REQUEST_CARD_CHOICE",
+                Payload = new
+                {
+                    EffectCode = effectCode,
+                    ValidTargetPositions = validTargetPositions ?? new List<int>()
+                }
+            });
+        }
         public static async Task SendGameActionFailedAsync(ClientConnection connection, string message)
         {
             await SendJsonPacketAsync(connection.Stream, new

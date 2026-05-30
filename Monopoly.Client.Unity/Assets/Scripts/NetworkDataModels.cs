@@ -37,6 +37,7 @@ public class GameStateData
     public bool IsWaitingForCardChoice;
     public string PendingCardEffectCode;
     public string PendingCardPlayerUsername;
+    public List<int> PendingCardTargetPositions;
     public bool ForceDoubleThisTurn;
     public List<string> ActionLog;
 
@@ -100,10 +101,14 @@ public class GamePlayerStateData
     public int ConsecutiveDoubles;
     public int JailTurnsLeft;
     public bool HasFreeRentCard;
+    public bool IsFreeRentShieldActive;
     public bool HasEscapeIslandCard;
     public bool HasFlightCard;
     public bool HasFreeUpgradeCard;
     public bool HasForceDoubleCard;
+    public bool HasEarthquakeCard;
+    public bool HasPowerOutageCard;
+    public bool HasMoveChampionshipCard;
     public bool IsOnIsland;
     public int SkipTurnsLeft;
     public string SkipReason;
