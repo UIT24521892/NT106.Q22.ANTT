@@ -31,7 +31,7 @@ namespace Monopoly.Server.Handles
                     Type = "CREATE_ROOM_FAILED",
                     Payload = new
                     {
-                        Message = "Không xác d?nh du?c tên ngu?i choi."
+                        Message = "Không xác định được tên người chơi."
                     }
                 });
 
@@ -45,14 +45,14 @@ namespace Monopoly.Server.Handles
                     Type = "CREATE_ROOM_FAILED",
                     Payload = new
                     {
-                        Message = "B?n dang ? trong m?t phòng khác."
+                        Message = "Bạn đang ở trong một phòng khác."
                     }
                 });
 
                 return;
             }
 
-            // Gi?i h?n an toàn theo UI hi?n t?i: 2-4 ngu?i.
+            // Giới hạn an toàn theo UI hiện tại: 2-4 người.
             if (maxPlayers < 2) maxPlayers = 2;
             if (maxPlayers > 4) maxPlayers = 4;
 
@@ -103,7 +103,7 @@ namespace Monopoly.Server.Handles
                 ServerState.Rooms[roomId] = room;
             }
 
-            Console.WriteLine($"[ROOM] T?o phòng {roomId} b?i {hostUsername}. Max={maxPlayers}, Bot={botCount}, Map={mapName}");
+            Console.WriteLine($"[ROOM] Tạo phòng {roomId} bởi {hostUsername}. Max={maxPlayers}, Bot={botCount}, Map={mapName}");
 
             await NetworkSender.SendJsonPacketAsync(connection.Stream, new
             {
@@ -156,7 +156,7 @@ namespace Monopoly.Server.Handles
                 }
             });
 
-            Console.WriteLine($"[ROOM_LIST] Tr? v? {roomList.Count} phòng.");
+            Console.WriteLine($"[ROOM_LIST] Trả về {roomList.Count} phòng.");
         }
         public static async Task HandleJoinRoomAsync(JObject packet, ClientConnection connection)
         {
@@ -172,7 +172,7 @@ namespace Monopoly.Server.Handles
                     Type = "JOIN_ROOM_FAILED",
                     Payload = new
                     {
-                        Message = "Không xác d?nh du?c tên ngu?i choi."
+                        Message = "Không xác định được tên người chơi."
                     }
                 });
 
@@ -186,7 +186,7 @@ namespace Monopoly.Server.Handles
                     Type = "JOIN_ROOM_FAILED",
                     Payload = new
                     {
-                        Message = "B?n dang ? trong m?t phòng khác."
+                        Message = "Bạn đang ở trong một phòng khác."
                     }
                 });
 
@@ -205,7 +205,7 @@ namespace Monopoly.Server.Handles
                         Type = "JOIN_ROOM_FAILED",
                         Payload = new
                         {
-                            Message = "Phòng không t?n t?i."
+                            Message = "Phòng không tồn tại."
                         }
                     });
 
@@ -225,7 +225,7 @@ namespace Monopoly.Server.Handles
                             Type = "JOIN_ROOM_FAILED",
                             Payload = new
                             {
-                                Message = "Phòng dã b?t d?u."
+                                Message = "Phòng đã bắt đầu."
                             }
                         });
 
@@ -235,7 +235,7 @@ namespace Monopoly.Server.Handles
                     disconnectedPlayer.IsConnected = true;
                     connection.Username = username;
                     connection.CurrentRoomId = roomId;
-                    room.GameState.LastActionMessage = $"{username} dã k?t n?i l?i tr?n.";
+                    room.GameState.LastActionMessage = $"{username} đã kết nối lại trận.";
                     GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
 
                     mapName = room.MapName;
@@ -248,7 +248,7 @@ namespace Monopoly.Server.Handles
                         Type = "JOIN_ROOM_FAILED",
                         Payload = new
                         {
-                            Message = "Phòng dã d?y."
+                            Message = "Phòng đã đầy."
                         }
                     });
 
@@ -261,7 +261,7 @@ namespace Monopoly.Server.Handles
                         Type = "JOIN_ROOM_FAILED",
                         Payload = new
                         {
-                            Message = "Ngu?i choi này dã ? trong phòng."
+                            Message = "Người chơi này đã ở trong phòng."
                         }
                     });
 
@@ -311,7 +311,7 @@ namespace Monopoly.Server.Handles
                         GameState = rejoinRoomSnapshot.GameState
                     }
                 });
-                await NetworkSender.BroadcastGameStateAsync(roomId, $"{username} dã k?t n?i l?i tr?n.");
+                await NetworkSender.BroadcastGameStateAsync(roomId, $"{username} đã kết nối lại trận.");
                 return;
             }
 
@@ -361,7 +361,7 @@ namespace Monopoly.Server.Handles
                     Type = "START_GAME_FAILED",
                     Payload = new
                     {
-                        Message = "B?n chua ? trong phòng nào."
+                        Message = "Bạn chưa ở trong phòng nào."
                     }
                 });
 
@@ -379,7 +379,7 @@ namespace Monopoly.Server.Handles
                         Type = "START_GAME_FAILED",
                         Payload = new
                         {
-                            Message = "Phòng không t?n t?i."
+                            Message = "Phòng không tồn tại."
                         }
                     });
 
@@ -393,7 +393,7 @@ namespace Monopoly.Server.Handles
                         Type = "START_GAME_FAILED",
                         Payload = new
                         {
-                            Message = "Ch? ch? phòng m?i du?c b?t d?u."
+                            Message = "Chỉ chủ phòng mới được bắt đầu."
                         }
                     });
 
@@ -409,14 +409,14 @@ namespace Monopoly.Server.Handles
                         Type = "START_GAME_FAILED",
                         Payload = new
                         {
-                            Message = "V?n còn ngu?i choi chua s?n sàng."
+                            Message = "Vẫn còn người chơi chưa sẵn sàng."
                         }
                     });
 
                     return;
                 }
 
-                // Cho phép: host + bot, ho?c host + client.
+                // Cho phép: host + bot, hoặc host + client.
                 if (room.Players.Count < 2)
                 {
                     _ = NetworkSender.SendJsonPacketAsync(connection.Stream, new
@@ -424,7 +424,7 @@ namespace Monopoly.Server.Handles
                         Type = "START_GAME_FAILED",
                         Payload = new
                         {
-                            Message = "C?n ít nh?t 2 ngu?i choi ho?c bot d? b?t d?u."
+                            Message = "Cần ít nhất 2 người chơi hoặc bot để bắt đầu."
                         }
                     });
 
@@ -436,7 +436,7 @@ namespace Monopoly.Server.Handles
                 roomSnapshot = room;
             }
 
-            Console.WriteLine($"[GAME] Phòng {roomId} b?t d?u game.");
+            Console.WriteLine($"[GAME] Phòng {roomId} bắt đầu game.");
             Console.WriteLine(
                 $"[GAME_STATE] Room={roomSnapshot.GameState.RoomId}, " +
                 $"Players={roomSnapshot.GameState.Players.Count}, " +
@@ -444,7 +444,7 @@ namespace Monopoly.Server.Handles
             );
 
             await NetworkSender.BroadcastGameStartingAsync(roomSnapshot);
-            await NetworkSender.BroadcastGameStateAsync(roomSnapshot.RoomId, "Tr?n d?u dã du?c kh?i t?o.");
+            await NetworkSender.BroadcastGameStateAsync(roomSnapshot.RoomId, "Trận đấu đã được khởi tạo.");
         }
         public static async Task HandleGameChatAsync(JObject packet, ClientConnection connection)
         {
@@ -456,7 +456,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "B?n chua ? trong phòng d? chat.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong phòng để chat.");
                 return;
             }
 
@@ -478,7 +478,7 @@ namespace Monopoly.Server.Handles
 
             if (!canSend)
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "B?n không ? trong phòng này.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn không ở trong phòng này.");
                 return;
             }
 

@@ -36,9 +36,14 @@ namespace Monopoly.Server.Handles
                     connection.Uid = parts[1];
                     connection.IdToken = parts[2];
 
-                    // Khi login, username có thể rỗng vì ô Username đang ẩn.
-                    // Tạm dùng email làm username nếu chưa có username.
-                    connection.Username = string.IsNullOrWhiteSpace(username) ? email : username;
+                    if (parts.Length >= 5)
+                    {
+                        connection.Username = parts[3];
+                    }
+                    else
+                    {
+                        connection.Username = string.IsNullOrWhiteSpace(username) ? email : username;
+                    }
                 }
             }
 
