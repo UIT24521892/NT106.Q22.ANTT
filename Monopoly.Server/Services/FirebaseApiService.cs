@@ -51,9 +51,35 @@ namespace Monopoly.Server.Services
                     bool dbSuccess = await CreateUserInDatabase(uid, username, email, jwtToken);
                     if (!dbSuccess)
                         return "FAIL|Tạo tài khoản thành công nhưng lỗi khi khởi tạo dữ liệu Database.";
+                    return $"SUCCESS|{uid}|{jwtToken}|{username}|avatar_1|0";
+                }
+                else
+                {
+                    // Lấy thông tin user từ DB khi login
+                    try
+                    {
+                        string dbUrl = $"{DB_URL_BASE}/USERS/{uid}.json?auth={jwtToken}";
+                        var userResponse = await _http.GetAsync(dbUrl);
+                        if (userResponse.IsSuccessStatusCode)
+                        {
+                            string userBody = await userResponse.Content.ReadAsStringAsync();
+                            if (!string.IsNullOrWhiteSpace(userBody) && userBody != "null")
+                            {
+                                JObject userObj = JObject.Parse(userBody);
+                                string fetchedUsername = userObj["Username"]?.ToString() ?? email;
+                                string fetchedAvatar = userObj["AvatarId"]?.ToString() ?? "avatar_1";
+                                string fetchedPoint = userObj["Point"]?.ToString() ?? "0";
+                                return $"SUCCESS|{uid}|{jwtToken}|{fetchedUsername}|{fetchedAvatar}|{fetchedPoint}";
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AUTH ERROR] Get user data failed: {ex.Message}");
+                    }
                 }
 
-                return $"SUCCESS|{uid}|{jwtToken}";
+                return $"SUCCESS|{uid}|{jwtToken}|{email}|avatar_1|0";
             }
             else
             {

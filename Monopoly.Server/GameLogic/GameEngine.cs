@@ -1,4 +1,4 @@
-﻿using Monopoly.Server.Models;
+using Monopoly.Server.Models;
 using Monopoly.Server.Models.Events;
 using Monopoly.Server.Models.State;
 using Monopoly.Shared.Models.Configs.Models;
@@ -42,7 +42,7 @@ namespace Monopoly.Server.GameLogic
                 case "Tax":
                     const long taxAmount = 100000;
                     player.Money -= taxAmount;
-                    actionMessages.Add($"{player.Username} vào ô Thu? và n?p {taxAmount:N0}.");
+                    actionMessages.Add($"{player.Username} vào ô Thuế và nộp {taxAmount:N0}.");
                     break;
 
                 case "Chance":
@@ -51,7 +51,7 @@ namespace Monopoly.Server.GameLogic
 
                 case "LostIsland":
                     SendPlayerToIslandUnsafe(player);
-                    actionMessages.Add($"{player.Username} vào Ð?o Hoang và có 3 lu?t d? l?c dôi thoát ra.");
+                    actionMessages.Add($"{player.Username} vào Đảo Hoang và có 3 lượt để lấc đôi thoát ra.");
                     break;
 
                 case "WorldChampionship":
@@ -62,7 +62,7 @@ namespace Monopoly.Server.GameLogic
                 case "WorldTour":
                     player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
                     player.SkipReason = "WORLD_TOUR";
-                    actionMessages.Add($"{player.Username} d?n Du L?ch Th? Gi?i và s? b? lu?t k? ti?p.");
+                    actionMessages.Add($"{player.Username} đến Du Lịch Thế Giới và sẽ bị lượt kế tiếp.");
                     break;
             }
 
@@ -86,7 +86,7 @@ namespace Monopoly.Server.GameLogic
             int diceLandingPosition = rawPosition % boardSize;
 
             actionMessages.Add(
-                $"{player.Username} di t? ô {oldPosition} d?n ô {diceLandingPosition}."
+                $"{player.Username} đi từ ô {oldPosition} đến ô {diceLandingPosition}."
             );
 
             player.Position = diceLandingPosition;
@@ -95,7 +95,7 @@ namespace Monopoly.Server.GameLogic
             {
                 const long startBonus = 300000;
                 player.Money += startBonus;
-                actionMessages.Add($"{player.Username} di qua B?t Ð?u và nh?n {startBonus:N0}.");
+                actionMessages.Add($"{player.Username} đi qua Bắt Đầu và nhận {startBonus:N0}.");
             }
 
             ApplyRentOnLandingUnsafe(gameState, player, diceLandingPosition, actionMessages);
@@ -140,14 +140,14 @@ namespace Monopoly.Server.GameLogic
 
             if (landedProperty.PowerOutageTurn >= gameState.TurnNumber)
             {
-                actionMessages.Add($"{landedProperty.Name} dang m?t di?n, mi?n ti?n thuê lu?t này.");
+                actionMessages.Add($"{landedProperty.Name} đang mất điện, miễn tiền thuê lượt này.");
                 return;
             }
 
             if (player.HasFreeRentCard)
             {
                 player.HasFreeRentCard = false;
-                actionMessages.Add($"{player.Username} dùng Khiên Mi?n Tr?, không ph?i tr? ti?n thuê {landedProperty.Name}.");
+                actionMessages.Add($"{player.Username} dùng Khiên Miễn Trừ, không phải trả tiền thuê {landedProperty.Name}.");
                 return;
             }
 
@@ -157,7 +157,7 @@ namespace Monopoly.Server.GameLogic
             owner.Money += paidAmount;
 
             actionMessages.Add(
-                $"{player.Username} tr? {paidAmount:N0}/{rent:N0} ti?n thuê {landedProperty.Name} cho {owner.Username}."
+                $"{player.Username} trả {paidAmount:N0}/{rent:N0} tiền thuê {landedProperty.Name} cho {owner.Username}."
             );
 
             Console.WriteLine(
@@ -203,11 +203,11 @@ namespace Monopoly.Server.GameLogic
 
             if (totalCollected > 0)
             {
-                actionMessages.Add($"{winner.Username} th?ng Gi?i Vô Ð?ch và thu {totalCollected:N0} t? các d?i th?.");
+                actionMessages.Add($"{winner.Username} thắng Giải Vô Địch và thu {totalCollected:N0} từ các đối thủ.");
             }
             else
             {
-                actionMessages.Add($"{winner.Username} d?n Gi?i Vô Ð?ch nhung không thu du?c ti?n.");
+                actionMessages.Add($"{winner.Username} đến Giải Vô Địch nhưng không thu được tiền.");
             }
         }
         public static void ApplyChanceEffectUnsafe(
@@ -220,7 +220,7 @@ namespace Monopoly.Server.GameLogic
 
             if (card == null)
             {
-                actionMessages.Add($"{player.Username} rút th? Co H?i nhung không có d? li?u th?.");
+                actionMessages.Add($"{player.Username} rút thẻ Cơ Hội nhưng không có dữ liệu thẻ.");
                 return;
             }
 
@@ -234,38 +234,38 @@ namespace Monopoly.Server.GameLogic
                 DetailEffect = card.DetailEffect
             });
 
-            actionMessages.Add($"{player.Username} rút th? Co H?i: {card.Name}.");
+            actionMessages.Add($"{player.Username} rút thẻ Cơ Hội: {card.Name}.");
 
             switch (card.EffectCode)
             {
                 case "FINE":
                     const long fine = 100000;
                     player.Money -= fine;
-                    actionMessages.Add($"B? ph?t {fine:N0}.");
+                    actionMessages.Add($"Bị phạt {fine:N0}.");
                     break;
 
                 case "JACKPOT":
                     const long jackpot = 500000;
                     player.Money += jackpot;
-                    actionMessages.Add($"Nh?n thu?ng {jackpot:N0}.");
+                    actionMessages.Add($"Nhận thưởng {jackpot:N0}.");
                     break;
 
                 case "GO_TO_JAIL":
                     player.Position = 24;
                     SendPlayerToIslandUnsafe(player);
-                    actionMessages.Add("Ði t?i Ð?o Hoang.");
+                    actionMessages.Add("Đi tới Đảo Hoang.");
                     break;
 
                 case "SKIP_TURN":
                     player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
                     player.SkipReason = "CARD_SKIP";
-                    actionMessages.Add("B? dóng bang giao d?ch, b? lu?t k? ti?p.");
+                    actionMessages.Add("Bị đóng băng giao dịch, bỏ lượt kế tiếp.");
                     break;
 
                 case "TAX_PENALTY":
                     long penalty = (player.Money / 10 / 1000) * 1000;
                     player.Money -= penalty;
-                    actionMessages.Add($"N?p ph?t thu? {penalty:N0}.");
+                    actionMessages.Add($"Nộp phạt thuế {penalty:N0}.");
                     break;
 
                 case "CHARITY_PAY":
@@ -276,32 +276,32 @@ namespace Monopoly.Server.GameLogic
                     player.Position = 8;
                     player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
                     player.SkipReason = "WORLD_TOUR";
-                    actionMessages.Add("Bay d?n Du L?ch Th? Gi?i và ch? c?t cánh lu?t sau.");
+                    actionMessages.Add("Bay đến Du Lịch Thế Giới và chờ cất cánh lượt sau.");
                     break;
 
                 case "FREE_RENT":
                     player.HasFreeRentCard = true;
-                    actionMessages.Add("Nh?n Khiên Mi?n Tr?, t? d?ng dùng khi ph?i tr? ti?n thuê.");
+                    actionMessages.Add("Nh?n Khiên Mi?n Tr?, t? d?ng dùng khi ph?i trả ti?n thuê.");
                     break;
 
                 case "FLIGHT":
                     player.HasFlightCard = true;
-                    actionMessages.Add("Nh?n th? Bay, có th? dùng ? lu?t sau.");
+                    actionMessages.Add("Nhận thẻ Bay, có thể dùng ở lượt sau.");
                     break;
 
                 case "ESCAPE_ISLAND":
                     player.HasEscapeIslandCard = true;
-                    actionMessages.Add("Nh?n th? thoát Ð?o Hoang.");
+                    actionMessages.Add("Nhận thẻ thoát Đảo Hoang.");
                     break;
 
                 case "FREE_UPGRADE":
                     player.HasFreeUpgradeCard = true;
-                    actionMessages.Add("Nh?n th? nâng c?p mi?n phí.");
+                    actionMessages.Add("Nhận thẻ nâng cấp miễn phí.");
                     break;
 
                 case "FORCE_DOUBLE":
                     player.HasForceDoubleCard = true;
-                    actionMessages.Add("Nh?n th? Xúc X?c Ma Thu?t.");
+                    actionMessages.Add("Nhận thẻ Xúc Xắc Ma Thuật.");
                     break;
 
                 case "EARTHQUAKE":
@@ -317,7 +317,7 @@ namespace Monopoly.Server.GameLogic
                     break;
 
                 default:
-                    actionMessages.Add($"Hi?u ?ng {card.EffectCode} chua du?c h? tr?.");
+                    actionMessages.Add($"Hiệu ứng {card.EffectCode} chưa được hỗ trợ.");
                     break;
             }
         }
@@ -344,7 +344,7 @@ namespace Monopoly.Server.GameLogic
                 totalPaid += amount;
             }
 
-            actionMessages.Add($"{player.Username} t? thi?n {totalPaid:N0} cho các d?i th?.");
+            actionMessages.Add($"{player.Username} từ thiện {totalPaid:N0} cho các đối thủ.");
         }
         public static void ApplyEarthquakeAutoTargetUnsafe(
                 GameState gameState,
@@ -361,7 +361,7 @@ namespace Monopoly.Server.GameLogic
 
             if (target == null)
             {
-                actionMessages.Add("Không có thành ph? d?i th? d? di?u ki?n d? Ð?ng Ð?t phá h?y.");
+                actionMessages.Add("Không có thành phố đối thủ đủ điều kiện để Động Đất phá hủy.");
                 return;
             }
 
@@ -375,7 +375,7 @@ namespace Monopoly.Server.GameLogic
                 target.HouseCount = Math.Max(0, target.HouseCount - 1);
             }
 
-            actionMessages.Add($"Ð?ng Ð?t làm {target.Name} gi?m 1 c?p.");
+            actionMessages.Add($"Động Đất làm {target.Name} giảm 1 cấp.");
         }
         public static void ApplyPowerOutageAutoTargetUnsafe(
                 GameState gameState,
@@ -391,12 +391,12 @@ namespace Monopoly.Server.GameLogic
 
             if (target == null)
             {
-                actionMessages.Add("Không có d?t d?i th? d? di?u ki?n d? cúp di?n.");
+                actionMessages.Add("Không có đất đối thủ đủ điều kiện để cúp điện.");
                 return;
             }
 
             target.PowerOutageTurn = gameState.TurnNumber + 2;
-            actionMessages.Add($"{target.Name} b? cúp di?n trong 2 lu?t.");
+            actionMessages.Add($"{target.Name} bị cúp điện trong 2 lượt.");
         }
         public static void ApplyMoveChampionshipAutoTargetUnsafe(
                 GameState gameState,
@@ -410,12 +410,12 @@ namespace Monopoly.Server.GameLogic
 
             if (target == null)
             {
-                actionMessages.Add("Không có thành ph? thu?c s? h?u d? d?i Gi?i Vô Ð?ch.");
+                actionMessages.Add("Không có thành phố thuộc sở hữu để dời Giải Vô Địch.");
                 return;
             }
 
             gameState.WorldChampionshipPosition = target.PositionIndex;
-            actionMessages.Add($"D?i Gi?i Vô Ð?ch v? {target.Name}.");
+            actionMessages.Add($"Dời Giải Vô Địch về {target.Name}.");
         }
         public static void AddGameLogUnsafe(GameState gameState, string message)
         {
@@ -457,12 +457,12 @@ namespace Monopoly.Server.GameLogic
         {
             if (property == null)
             {
-                return "không xác d?nh";
+                return "không xác định";
             }
 
             if (property.HasHotel)
             {
-                return "khách s?n";
+                return "khách sạn";
             }
 
             if (property.HouseCount > 0)
@@ -470,7 +470,7 @@ namespace Monopoly.Server.GameLogic
                 return $"{property.HouseCount} nhà";
             }
 
-            return "d?t tr?ng";
+            return "đất trống";
         }
         public static void ResolveBankruptcyAndWinnerUnsafe(
                 GameState gameState,
@@ -485,19 +485,33 @@ namespace Monopoly.Server.GameLogic
                 }
             }
 
-            List<GamePlayerState> activeHumanPlayers = gameState.Players
-                .Where(p => !p.IsBankrupt && !p.IsBot && p.IsConnected)
+            List<GamePlayerState> activePlayers = gameState.Players
+                .Where(p => !p.IsBankrupt && p.IsConnected)
                 .OrderBy(p => p.PlayerIndex)
                 .ToList();
 
-            if (activeHumanPlayers.Count == 1)
+            List<GamePlayerState> activeHumanPlayers = activePlayers
+                .Where(p => !p.IsBot)
+                .ToList();
+
+            if (activePlayers.Count <= 1 || activeHumanPlayers.Count == 0)
             {
                 gameState.IsFinished = true;
-                gameState.WinnerUsername = activeHumanPlayers[0].Username;
+
+                if (activePlayers.Count > 0)
+                {
+                    var winner = activePlayers.OrderByDescending(p => p.Money).First();
+                    gameState.WinnerUsername = winner.Username;
+                }
+                else
+                {
+                    gameState.WinnerUsername = "Không có ai";
+                }
+
                 gameState.HasRolledThisTurn = true;
                 gameState.TurnEndsAtUtcTicks = 0;
-                actionMessages.Add($"{gameState.WinnerUsername} th?ng tr?n.");
-                actionMessages.Add($"X?p h?ng: {BuildRankingSummaryUnsafe(gameState)}");
+                actionMessages.Add($"{gameState.WinnerUsername} thắng trận.");
+                actionMessages.Add($"Xếp hạng: {BuildRankingSummaryUnsafe(gameState)}");
 
                 Console.WriteLine($"[GAME_OVER] Winner={gameState.WinnerUsername}");
                 return;
@@ -513,7 +527,7 @@ namespace Monopoly.Server.GameLogic
                 gameState.HasRolledThisTurn = false;
                 ResetTurnTimerUnsafe(gameState);
 
-                actionMessages.Add($"Ð?n lu?t {nextPlayer.Username}.");
+                actionMessages.Add($"Đến lượt {nextPlayer.Username}.");
 
                 Console.WriteLine(
                     $"[AUTO_END_TURN] Bankrupt={currentPlayer.Username}, " +
@@ -540,7 +554,7 @@ namespace Monopoly.Server.GameLogic
             player.SkipReason = "";
 
             int releasedProperties = ReleasePlayerPropertiesUnsafe(gameState, player.PlayerIndex);
-            actionMessages.Add($"{player.Username} dã phá s?n và m?t {releasedProperties} ô d?t.");
+            actionMessages.Add($"{player.Username} đã phá sản và mất {releasedProperties} ô đất.");
 
             Console.WriteLine(
                 $"[BANKRUPT] Player={player.Username}, Order={player.BankruptcyOrder}, ReleasedProperties={releasedProperties}"
@@ -629,17 +643,9 @@ namespace Monopoly.Server.GameLogic
         public static GamePlayerState GetNextTurnPlayerUnsafe(GameState gameState)
         {
             List<GamePlayerState> activePlayers = gameState.Players
-                .Where(p => !p.IsBankrupt && !p.IsBot && p.IsConnected)
+                .Where(p => !p.IsBankrupt && p.IsConnected)
                 .OrderBy(p => p.PlayerIndex)
                 .ToList();
-
-            if (activePlayers.Count == 0)
-            {
-                activePlayers = gameState.Players
-                    .Where(p => !p.IsBankrupt && p.IsConnected)
-                    .OrderBy(p => p.PlayerIndex)
-                    .ToList();
-            }
 
             if (activePlayers.Count == 0)
             {
@@ -702,7 +708,7 @@ namespace Monopoly.Server.GameLogic
                     Money = 2000000,
                     IsBankrupt = false,
                     BankruptcyOrder = 0,
-                    IsConnected = !player.IsBot,
+                    IsConnected = true,
                     ConsecutiveDoubles = 0,
                     JailTurnsLeft = 0,
                     HasFreeRentCard = false,
