@@ -13,6 +13,7 @@ public class BoardTileInfoUI : MonoBehaviour
 
     private readonly Dictionary<int, Button> buttonsByPosition = new Dictionary<int, Button>();
     private RectTransform popupRoot;
+    private RectTransform popupCardRoot;
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI bodyText;
     private Image deedHeaderImage;
@@ -75,46 +76,74 @@ public class BoardTileInfoUI : MonoBehaviour
             return;
         }
 
-        RectTransform canvasRect = canvas.transform as RectTransform;
-
         GameObject rootObject = new GameObject("Panel_BoardTileInfoPopup", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         popupRoot = rootObject.GetComponent<RectTransform>();
-        popupRoot.SetParent(canvasRect, false);
-        popupRoot.anchorMin = new Vector2(0.5f, 0.5f);
-        popupRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        popupRoot.SetParent(canvas.transform, false);
+        popupRoot.anchorMin = Vector2.zero;
+        popupRoot.anchorMax = Vector2.one;
         popupRoot.pivot = new Vector2(0.5f, 0.5f);
         popupRoot.anchoredPosition = Vector2.zero;
-        popupRoot.sizeDelta = new Vector2(360f, 520f);
+        popupRoot.sizeDelta = Vector2.zero;
+        popupRoot.offsetMin = Vector2.zero;
+        popupRoot.offsetMax = Vector2.zero;
 
-        Image rootImage = rootObject.GetComponent<Image>();
-        ApplyCardBackground(rootImage);
-        rootImage.raycastTarget = true;
+        Image overlayImage = rootObject.GetComponent<Image>();
+        overlayImage.sprite = null;
+        overlayImage.color = new Color(0f, 0f, 0f, 0.48f);
+        overlayImage.raycastTarget = true;
 
-        titleText = CreateText("Txt_TileTitle", popupRoot, "", 24f, FontStyles.Bold);
-        titleText.alignment = TextAlignmentOptions.TopLeft;
-        titleText.color = new Color(1f, 0.86f, 0.42f, 1f);
-        SetRect(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(20f, -18f), new Vector2(-74f, 54f));
+        GameObject cardObject = new GameObject("Panel_TileInfoModalCard", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        popupCardRoot = cardObject.GetComponent<RectTransform>();
+        popupCardRoot.SetParent(popupRoot, false);
+        popupCardRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        popupCardRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        popupCardRoot.pivot = new Vector2(0.5f, 0.5f);
+        popupCardRoot.anchoredPosition = Vector2.zero;
+        popupCardRoot.sizeDelta = new Vector2(980f, 620f);
 
-        bodyText = CreateText("Txt_TileBody", popupRoot, "", 15f, FontStyles.Normal);
-        bodyText.alignment = TextAlignmentOptions.TopLeft;
-        bodyText.enableWordWrapping = true;
-        bodyText.overflowMode = TextOverflowModes.Ellipsis;
-        bodyText.lineSpacing = 2f;
-        SetRect(bodyText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        SetOffsets(bodyText.rectTransform, 20f, 130f, 20f, 76f);
+        Image cardImage = cardObject.GetComponent<Image>();
+        ApplyCardBackground(cardImage);
+        cardImage.raycastTarget = true;
+
         BuildTitleDeedUi();
 
-        closeButton = CreateButton("Btn_CloseTilePopup", popupRoot, "X", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(44f, 38f));
+        titleText = CreateText("Txt_TileTitle", popupCardRoot, "", 34f, FontStyles.Bold);
+        titleText.alignment = TextAlignmentOptions.Center;
+        titleText.color = Color.white;
+        titleText.enableAutoSizing = true;
+        titleText.fontSizeMin = 22f;
+        titleText.fontSizeMax = 36f;
+        SetRect(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-20f, -35f), new Vector2(-190f, 70f));
+
+        bodyText = CreateText("Txt_TileBody", popupCardRoot, "", 24f, FontStyles.Normal);
+        bodyText.alignment = TextAlignmentOptions.TopLeft;
+        bodyText.enableWordWrapping = true;
+        bodyText.overflowMode = TextOverflowModes.Overflow;
+        bodyText.lineSpacing = 8f;
+        bodyText.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+        SetRect(bodyText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        SetOffsets(bodyText.rectTransform, 72f, 142f, 72f, 122f);
+
+        closeButton = CreateButton("Btn_CloseTilePopup", popupCardRoot, "X", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-32f, -22f), new Vector2(64f, 54f));
         closeButton.onClick.AddListener(HidePopup);
+        TextMeshProUGUI closeText = closeButton.GetComponentInChildren<TextMeshProUGUI>();
 
-        actionHintText = CreateText("Txt_TileActionHint", popupRoot, "", 14f, FontStyles.Normal);
+        if (closeText != null)
+            closeText.fontSize = 34f;
+
+        actionHintText = CreateText("Txt_TileActionHint", popupCardRoot, "", 20f, FontStyles.Normal);
         actionHintText.alignment = TextAlignmentOptions.MidlineLeft;
-        actionHintText.color = new Color(0.82f, 0.9f, 1f, 1f);
-        SetRect(actionHintText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-72f, 18f), new Vector2(-176f, 28f));
+        actionHintText.color = new Color(0.26f, 0.26f, 0.26f, 1f);
+        actionHintText.enableWordWrapping = true;
+        SetRect(actionHintText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-160f, 28f), new Vector2(-430f, 58f));
 
-        buildButton = CreateButton("Btn_BuildProperty", popupRoot, "Upgrade", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-20f, 14f), new Vector2(126f, 40f));
+        buildButton = CreateButton("Btn_BuildProperty", popupCardRoot, "Nâng cấp", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-52f, 26f), new Vector2(250f, 54f));
         buildButton.onClick.AddListener(SendBuildRequest);
-        SetButtonColor(buildButton, new Color(0.18f, 0.62f, 0.25f, 0.98f));
+        SetButtonColor(buildButton, new Color(0.1f, 0.56f, 0.86f, 0.98f));
+        TextMeshProUGUI buildText = buildButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        if (buildText != null)
+            buildText.fontSize = 22f;
 
         popupRoot.gameObject.SetActive(false);
     }
@@ -126,10 +155,10 @@ public class BoardTileInfoUI : MonoBehaviour
 
         Sprite cardSprite = Resources.Load<Sprite>(TileInfoCardSpritePath);
 
-        if (cardSprite == null)
+        if (cardSprite == null || cardSprite.border.sqrMagnitude <= 0f)
         {
             rootImage.sprite = null;
-            rootImage.color = new Color(0.07f, 0.08f, 0.09f, 0.94f);
+            rootImage.color = new Color(0.96f, 0.92f, 0.84f, 0.99f);
             rootImage.type = Image.Type.Simple;
             return;
         }
@@ -144,76 +173,78 @@ public class BoardTileInfoUI : MonoBehaviour
 
     private void BuildTitleDeedUi()
     {
-        deedHeaderImage = CreatePanelImage("Img_DeedHeader", popupRoot, new Color(0.62f, 0.86f, 0.96f, 1f));
-        SetRect(deedHeaderImage.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(-52f, 104f));
+        Transform parent = popupCardRoot != null ? popupCardRoot : popupRoot;
 
-        deedLabelText = CreateText("Txt_DeedLabel", popupRoot, "TITLE DEED", 15f, FontStyles.Bold);
+        deedHeaderImage = CreatePanelImage("Img_DeedHeader", parent, new Color(0.86f, 0.02f, 0.32f, 1f));
+        SetRect(deedHeaderImage.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(-86f, 88f));
+
+        deedLabelText = CreateText("Txt_DeedLabel", parent, "THẺ SỞ HỮU", 17f, FontStyles.Bold);
         deedLabelText.alignment = TextAlignmentOptions.Center;
-        deedLabelText.color = Color.black;
-        SetRect(deedLabelText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -38f), new Vector2(-68f, 24f));
+        deedLabelText.color = Color.white;
+        SetRect(deedLabelText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-16f, -20f), new Vector2(-210f, 24f));
 
-        deedPropertyNameText = CreateText("Txt_DeedPropertyName", popupRoot, "", 26f, FontStyles.Bold);
+        deedPropertyNameText = CreateText("Txt_DeedPropertyName", parent, "", 36f, FontStyles.Bold);
         deedPropertyNameText.alignment = TextAlignmentOptions.Center;
-        deedPropertyNameText.color = Color.black;
+        deedPropertyNameText.color = Color.white;
         deedPropertyNameText.enableAutoSizing = true;
-        deedPropertyNameText.fontSizeMin = 16f;
-        deedPropertyNameText.fontSizeMax = 26f;
-        SetRect(deedPropertyNameText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -72f), new Vector2(-68f, 40f));
+        deedPropertyNameText.fontSizeMin = 24f;
+        deedPropertyNameText.fontSizeMax = 36f;
+        SetRect(deedPropertyNameText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-16f, -48f), new Vector2(-210f, 46f));
 
-        deedMetaText = CreateText("Txt_DeedMeta", popupRoot, "", 12f, FontStyles.Normal);
+        deedMetaText = CreateText("Txt_DeedMeta", parent, "", 22f, FontStyles.Normal);
         deedMetaText.alignment = TextAlignmentOptions.Center;
         deedMetaText.color = new Color(0.12f, 0.12f, 0.12f, 1f);
         deedMetaText.enableWordWrapping = false;
         deedMetaText.overflowMode = TextOverflowModes.Ellipsis;
-        SetRect(deedMetaText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(34f, -132f), new Vector2(-68f, 22f));
+        SetRect(deedMetaText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(68f, -116f), new Vector2(-136f, 34f));
 
         string[] labels =
         {
-            "Rent",
-            "Rent with 1 house",
-            "Rent with 2 houses",
-            "Rent with 3 houses",
-            "Rent with hotel"
+            "Tiền thuê đất trống",
+            "Tiền thuê với 1 nhà",
+            "Tiền thuê với 2 nhà",
+            "Tiền thuê với 3 nhà",
+            "Tiền thuê với khách sạn"
         };
 
         for (int i = 0; i < labels.Length; i++)
         {
-            float y = -174f - i * 38f;
-            TextMeshProUGUI label = CreateText($"Txt_DeedRentLabel_{i}", popupRoot, labels[i], 18f, FontStyles.Bold);
+            float y = -182f - i * 48f;
+            TextMeshProUGUI label = CreateText($"Txt_DeedRentLabel_{i}", parent, labels[i], 24f, FontStyles.Normal);
             label.alignment = TextAlignmentOptions.MidlineLeft;
-            label.color = Color.black;
-            SetRect(label.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(36f, y), new Vector2(-126f, 28f));
+            label.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+            SetRect(label.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(120f, y), new Vector2(-360f, 36f));
             deedRentLabels.Add(label);
 
-            TextMeshProUGUI value = CreateText($"Txt_DeedRentValue_{i}", popupRoot, "", 18f, FontStyles.Bold);
+            TextMeshProUGUI value = CreateText($"Txt_DeedRentValue_{i}", parent, "", 24f, FontStyles.Bold);
             value.alignment = TextAlignmentOptions.MidlineRight;
-            value.color = Color.black;
-            SetRect(value.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, y), new Vector2(92f, 28f));
+            value.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+            SetRect(value.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-112f, y), new Vector2(250f, 36f));
             deedRentValues.Add(value);
         }
 
-        deedDividerImage = CreatePanelImage("Img_DeedDivider", popupRoot, new Color(0.18f, 0.18f, 0.18f, 0.85f));
-        SetRect(deedDividerImage.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 128f), new Vector2(-72f, 2f));
+        deedDividerImage = CreatePanelImage("Img_DeedDivider", parent, new Color(0.18f, 0.18f, 0.18f, 0.55f));
+        SetRect(deedDividerImage.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(-150f, 2f));
 
-        deedHouseCostLabel = CreateText("Txt_DeedHouseCostLabel", popupRoot, "Houses cost", 18f, FontStyles.Bold);
+        deedHouseCostLabel = CreateText("Txt_DeedHouseCostLabel", parent, "Chi phí nhà", 22f, FontStyles.Bold);
         deedHouseCostLabel.alignment = TextAlignmentOptions.MidlineLeft;
-        deedHouseCostLabel.color = Color.black;
-        SetRect(deedHouseCostLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(36f, 86f), new Vector2(-146f, 28f));
+        deedHouseCostLabel.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+        SetRect(deedHouseCostLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(120f, 104f), new Vector2(-360f, 34f));
 
-        deedHouseCostValue = CreateText("Txt_DeedHouseCostValue", popupRoot, "", 18f, FontStyles.Bold);
+        deedHouseCostValue = CreateText("Txt_DeedHouseCostValue", parent, "", 22f, FontStyles.Bold);
         deedHouseCostValue.alignment = TextAlignmentOptions.MidlineRight;
-        deedHouseCostValue.color = Color.black;
-        SetRect(deedHouseCostValue.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-36f, 86f), new Vector2(116f, 28f));
+        deedHouseCostValue.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+        SetRect(deedHouseCostValue.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-112f, 104f), new Vector2(250f, 34f));
 
-        deedHotelCostLabel = CreateText("Txt_DeedHotelCostLabel", popupRoot, "Hotels cost", 18f, FontStyles.Bold);
+        deedHotelCostLabel = CreateText("Txt_DeedHotelCostLabel", parent, "Chi phí khách sạn", 22f, FontStyles.Bold);
         deedHotelCostLabel.alignment = TextAlignmentOptions.MidlineLeft;
-        deedHotelCostLabel.color = Color.black;
-        SetRect(deedHotelCostLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(36f, 54f), new Vector2(-146f, 28f));
+        deedHotelCostLabel.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+        SetRect(deedHotelCostLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(120f, 64f), new Vector2(-360f, 34f));
 
-        deedHotelCostValue = CreateText("Txt_DeedHotelCostValue", popupRoot, "", 18f, FontStyles.Bold);
+        deedHotelCostValue = CreateText("Txt_DeedHotelCostValue", parent, "", 22f, FontStyles.Bold);
         deedHotelCostValue.alignment = TextAlignmentOptions.MidlineRight;
-        deedHotelCostValue.color = Color.black;
-        SetRect(deedHotelCostValue.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-36f, 54f), new Vector2(116f, 28f));
+        deedHotelCostValue.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+        SetRect(deedHotelCostValue.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-112f, 64f), new Vector2(250f, 34f));
     }
 
     private void RegisterBoardButtons()
@@ -532,9 +563,19 @@ public class BoardTileInfoUI : MonoBehaviour
         SetTitleDeedVisible(false);
         titleText.richText = false;
         bodyText.richText = false;
-        titleText.color = Color.black;
-        bodyText.color = Color.black;
-        actionHintText.color = Color.black;
+        Color headerColor = GetPopupHeaderColor(property);
+
+        if (deedHeaderImage != null)
+        {
+            deedHeaderImage.gameObject.SetActive(true);
+            deedHeaderImage.color = headerColor;
+        }
+
+        titleText.text = property.Name.ToUpperInvariant();
+        titleText.color = GetReadableHeaderTextColor(headerColor);
+        bodyText.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+        bodyText.alignment = TextAlignmentOptions.TopLeft;
+        actionHintText.color = new Color(0.26f, 0.26f, 0.26f, 1f);
         bodyText.text = BuildTileDescription(property, state);
         RefreshBuildButton(property, state);
     }
@@ -549,18 +590,25 @@ public class BoardTileInfoUI : MonoBehaviour
         if (bodyText != null)
             bodyText.gameObject.SetActive(false);
 
-        Color propertyColor = GetPopupTextColor(property);
+        Color propertyColor = GetPopupHeaderColor(property);
+        Color headerTextColor = GetReadableHeaderTextColor(propertyColor);
 
         if (deedHeaderImage != null)
             deedHeaderImage.color = propertyColor;
 
+        if (deedLabelText != null)
+            deedLabelText.color = headerTextColor;
+
         if (deedPropertyNameText != null)
+        {
             deedPropertyNameText.text = property.Name.ToUpperInvariant();
+            deedPropertyNameText.color = headerTextColor;
+        }
 
         if (deedMetaText != null)
         {
             string owner = GetOwnerName(property.OwnerPlayerIndex, state);
-            deedMetaText.text = $"Price: {FormatMoney(property.BuyPrice)}  |  Owner: {owner}  |  Level: {DescribeUpgradeLevel(property)}";
+            deedMetaText.text = $"Vị trí: Ô {property.PositionIndex}  |  Giá mua: {FormatMoney(property.BuyPrice)}  |  Chủ: {owner}  |  Cấp: {DescribeUpgradeLevel(property)}";
         }
 
         if (actionHintText != null)
@@ -583,7 +631,7 @@ public class BoardTileInfoUI : MonoBehaviour
         }
 
         long buildCost = GetBuildCost(property);
-        string costText = buildCost > 0 ? $"{FormatMoney(buildCost)} each" : "Max";
+        string costText = buildCost > 0 ? $"{FormatMoney(buildCost)} mỗi lần" : "Tối đa";
         bool showBuildCosts = property.Type == "City";
 
         if (deedHouseCostLabel != null)
@@ -653,17 +701,17 @@ public class BoardTileInfoUI : MonoBehaviour
         {
             return new[]
             {
-                "Rent"
+                "Tiền thuê"
             };
         }
 
         return new[]
         {
-            "Rent",
-            "Rent with 1 house",
-            "Rent with 2 houses",
-            "Rent with 3 houses",
-            "Rent with hotel"
+            "Tiền thuê đất trống",
+            "Tiền thuê với 1 nhà",
+            "Tiền thuê với 2 nhà",
+            "Tiền thuê với 3 nhà",
+            "Tiền thuê với khách sạn"
         };
     }
 
@@ -716,6 +764,40 @@ public class BoardTileInfoUI : MonoBehaviour
         }
 
         return new Color(1f, 0.86f, 0.42f, 1f);
+    }
+
+    private Color GetPopupHeaderColor(GamePropertyStateData property)
+    {
+        if (property != null &&
+            (property.Type == "City" || property.Type == "Resort") &&
+            TryGetMonopolyColor(property.ColorSet, out Color monopolyColor))
+        {
+            return monopolyColor;
+        }
+
+        switch (property?.Type)
+        {
+            case "Start":
+                return new Color(0.18f, 0.66f, 0.34f, 1f);
+            case "Tax":
+                return new Color(0.58f, 0.25f, 0.78f, 1f);
+            case "Chance":
+                return new Color(0.04f, 0.54f, 0.78f, 1f);
+            case "LostIsland":
+                return new Color(0.22f, 0.34f, 0.44f, 1f);
+            case "WorldChampionship":
+                return new Color(0.84f, 0.1f, 0.2f, 1f);
+            case "WorldTour":
+                return new Color(0.96f, 0.5f, 0.12f, 1f);
+            default:
+                return new Color(0.86f, 0.02f, 0.32f, 1f);
+        }
+    }
+
+    private Color GetReadableHeaderTextColor(Color background)
+    {
+        float luminance = background.r * 0.299f + background.g * 0.587f + background.b * 0.114f;
+        return luminance > 0.62f ? new Color(0.06f, 0.06f, 0.06f, 1f) : Color.white;
     }
 
     private string BuildTileDescription(GamePropertyStateData property, GameStateData state)
@@ -808,14 +890,22 @@ public class BoardTileInfoUI : MonoBehaviour
         if (buildButton == null || actionHintText == null)
             return;
 
+        bool showBuildButton = property != null && property.Type == "City";
+        buildButton.gameObject.SetActive(showBuildButton);
+
+        if (!showBuildButton)
+        {
+            actionHintText.text = "";
+            return;
+        }
+
         bool canBuild = CanBuildProperty(property, state, out string reason, out long buildCost);
-        buildButton.gameObject.SetActive(property != null && property.Type == "City");
         buildButton.interactable = canBuild;
 
         TextMeshProUGUI buttonText = buildButton.GetComponentInChildren<TextMeshProUGUI>();
 
         if (buttonText != null)
-            buttonText.text = "Upgrade";
+            buttonText.text = "Nâng cấp";
 
         actionHintText.text = reason;
     }
@@ -975,8 +1065,18 @@ public class BoardTileInfoUI : MonoBehaviour
     private void ShowFallback(string title, string body)
     {
         SetTitleDeedVisible(false);
+        Color fallbackHeaderColor = new Color(0.22f, 0.34f, 0.44f, 1f);
+
+        if (deedHeaderImage != null)
+        {
+            deedHeaderImage.gameObject.SetActive(true);
+            deedHeaderImage.color = fallbackHeaderColor;
+        }
+
         titleText.text = title;
+        titleText.color = GetReadableHeaderTextColor(fallbackHeaderColor);
         bodyText.text = body;
+        bodyText.color = new Color(0.08f, 0.08f, 0.08f, 1f);
         currentPopupPosition = -1;
 
         if (buildButton != null)

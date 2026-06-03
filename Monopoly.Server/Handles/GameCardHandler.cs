@@ -69,6 +69,10 @@ namespace Monopoly.Server.Handles
                     {
                         failMessage = "Dang co the khac cho chon muc tieu.";
                     }
+                    else if (room.GameState.IsWaitingForPropertySale)
+                    {
+                        failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
+                    }
                     else if (!GameEngine.PlayerHasHeldCardUnsafe(player, effectCode))
                     {
                         failMessage = "Ban khong so huu the nay hoac the da duoc dung.";

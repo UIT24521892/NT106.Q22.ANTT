@@ -51,6 +51,10 @@ namespace Monopoly.Server.Handles
                 {
                     failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
                 }
+                else if (room.GameState.IsWaitingForPropertySale)
+                {
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
+                }
                 else
                 {
                     List<string> actionMessages = new List<string>();
@@ -201,6 +205,10 @@ namespace Monopoly.Server.Handles
                 {
                     failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
                 }
+                else if (room.GameState.IsWaitingForPropertySale)
+                {
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
+                }
                 else
                 {
                     GamePlayerState player = room.GameState.Players.FirstOrDefault(
@@ -282,6 +290,10 @@ namespace Monopoly.Server.Handles
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
                     failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
+                }
+                else if (room.GameState.IsWaitingForPropertySale)
+                {
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {
@@ -382,6 +394,10 @@ namespace Monopoly.Server.Handles
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
                     failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
+                }
+                else if (room.GameState.IsWaitingForPropertySale)
+                {
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {

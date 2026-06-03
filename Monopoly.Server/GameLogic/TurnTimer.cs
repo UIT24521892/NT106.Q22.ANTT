@@ -36,6 +36,11 @@ namespace Monopoly.Server.GameLogic
                                 p => p.PlayerIndex == room.GameState.CurrentTurnPlayerIndex
                             );
 
+                            if (room.GameState.IsWaitingForPropertySale || room.GameState.IsWaitingForCardChoice)
+                            {
+                                continue;
+                            }
+
                             // Bắt sự kiện BOT
                             if (currentPlayer != null && currentPlayer.IsBot && !room.GameState.IsBotPlaying)
                             {

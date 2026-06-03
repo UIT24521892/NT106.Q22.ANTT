@@ -203,6 +203,7 @@ public class PlayerHandUI : MonoBehaviour
             localPlayer != null &&
             !state.IsFinished &&
             !state.IsWaitingForCardChoice &&
+            !state.IsWaitingForPropertySale &&
             localPlayer.IsConnected &&
             !localPlayer.IsBankrupt &&
             localPlayer.PlayerIndex == state.CurrentTurnPlayerIndex;

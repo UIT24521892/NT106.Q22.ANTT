@@ -39,6 +39,13 @@ public class GameStateData
     public string PendingCardPlayerUsername;
     public List<int> PendingCardTargetPositions;
     public bool ForceDoubleThisTurn;
+    public bool IsWaitingForPropertySale;
+    public int PendingSalePlayerIndex;
+    public string PendingSalePlayerUsername;
+    public long PendingDebtAmount;
+    public int PendingDebtCreditorPlayerIndex;
+    public string PendingDebtReason;
+    public List<int> PendingSalePropertyPositions;
     public List<string> ActionLog;
 
     public List<GamePlayerStateData> Players;

@@ -35,6 +35,13 @@ namespace Monopoly.Server.Models.State
         public string PendingCardPlayerUsername { get; set; } = "";
         public List<int> PendingCardTargetPositions { get; set; } = new List<int>();
         public bool ForceDoubleThisTurn { get; set; }
+        public bool IsWaitingForPropertySale { get; set; }
+        public int PendingSalePlayerIndex { get; set; } = -1;
+        public string PendingSalePlayerUsername { get; set; } = "";
+        public long PendingDebtAmount { get; set; }
+        public int PendingDebtCreditorPlayerIndex { get; set; } = -1;
+        public string PendingDebtReason { get; set; } = "";
+        public List<int> PendingSalePropertyPositions { get; set; } = new List<int>();
         public bool IsBotPlaying { get; set; }
         public List<string> ActionLog { get; set; } = new List<string>();
 

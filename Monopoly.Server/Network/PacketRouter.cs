@@ -79,6 +79,10 @@ namespace Monopoly.Server.Network
                         await GameHandler.HandleBuildPropertyAsync(packet, connection);
                         break;
 
+                    case "SELL_PROPERTY_FOR_DEBT":
+                        await GameHandler.HandleSellPropertyForDebtAsync(packet, connection);
+                        break;
+
                     case "USE_CARD":
                     case "UseCard":
                         await GameHandler.HandleUseCardAsync(packet, connection);

@@ -348,11 +348,20 @@ public class NetworkManager : MonoBehaviour
 
         GameStateData state = GameSession.CurrentState;
         GamePlayerStateData localPlayer = GetLocalPlayer(state);
-        bool isMyTurn = state != null &&
-            localPlayer != null &&
-            !state.IsFinished &&
+
+        if (state == null || localPlayer == null)
+        {
+            rollButton.interactable = false;
+            buyButton.interactable = false;
+            endTurnButton.interactable = false;
+            return;
+        }
+
+        bool isMyTurn = !state.IsFinished &&
             localPlayer.IsConnected &&
             !localPlayer.IsBankrupt &&
+            !state.IsWaitingForCardChoice &&
+            !state.IsWaitingForPropertySale &&
             localPlayer.PlayerIndex == state.CurrentTurnPlayerIndex;
 
         rollButton.interactable = isMyTurn && !state.HasRolledThisTurn;
@@ -703,6 +712,23 @@ public class NetworkManager : MonoBehaviour
         SendPacket(packet);
     }
 
+    public void SendSellPropertyForDebtRequest(int positionIndex)
+    {
+        var packet = new
+        {
+            Type = "SELL_PROPERTY_FOR_DEBT",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username,
+                PositionIndex = positionIndex
+            }
+        };
+
+        SendPacket(packet);
+        Debug.Log($"[NetworkManager] Sent SELL_PROPERTY_FOR_DEBT Position={positionIndex}.");
+    }
+
     private void AddGameChatMessage(ChatMessageData chatMessage)
     {
         if (chatMessage == null || string.IsNullOrWhiteSpace(chatMessage.Message))
@@ -925,6 +951,8 @@ public class NetworkManager : MonoBehaviour
 
                         PlayerHandUI.EnsureExists().Refresh(gameState);
                         BoardTileInfoUI.EnsureExists().SyncCardChoiceState(gameState);
+                        GameEventPopupUI.EnsureExists().ProcessGameStateUpdate(gameState, message);
+                        PropertySaleUI.EnsureExists().Refresh(gameState);
 
                         Debug.Log(
                             $"[NetworkManager] GAME_STATE_UPDATE Room={gameState?.RoomId ?? "N/A"}, " +
@@ -973,6 +1001,8 @@ public class NetworkManager : MonoBehaviour
 
                         ChanceCardUI.EnsureExists()
                             .ShowCard(drawnByUsername, cardId, cardName, cardType, detailEffect);
+                        GameEventPopupUI.EnsureExists()
+                            .ShowCardDrawn(drawnByUsername, cardId, cardName, cardType, detailEffect);
 
                         Debug.Log(
                             $"[NetworkManager] CARD_DRAWN By={drawnByUsername}, " +
@@ -986,6 +1016,7 @@ public class NetworkManager : MonoBehaviour
                         GameOverData gameOver = data["Payload"]?.ToObject<GameOverData>();
                         GameOverReceived?.Invoke(gameOver);
                         GameOverUI.EnsureExists().Show(gameOver);
+                        GameEventPopupUI.EnsureExists().ShowGameOver(gameOver);
                         Debug.Log($"[NetworkManager] GAME_OVER MatchId={gameOver?.MatchId ?? "N/A"}");
                         break;
                     }
@@ -1006,6 +1037,7 @@ public class NetworkManager : MonoBehaviour
                         lastClientActionStatus = "";
                         UpdateGameStateOverlayText();
                         UpdateGameplayButtons();
+                        GameEventPopupUI.EnsureExists().ShowActionFailed(message);
                         Debug.LogWarning($"[NetworkManager] GAME_ACTION_FAILED: {message}");
                         break;
                     }

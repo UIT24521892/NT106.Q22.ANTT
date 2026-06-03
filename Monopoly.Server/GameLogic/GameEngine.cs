@@ -41,8 +41,13 @@ namespace Monopoly.Server.GameLogic
             {
                 case "Tax":
                     const long taxAmount = 100000;
-                    player.Money -= taxAmount;
-                    actionMessages.Add($"{player.Username} vào ô Thu? và n?p {taxAmount:N0}.");
+                    ChargePlayerForDebtUnsafe(
+                        gameState,
+                        player,
+                        taxAmount,
+                        -1,
+                        "thuế",
+                        actionMessages);
                     break;
 
                 case "Chance":
@@ -152,19 +157,288 @@ namespace Monopoly.Server.GameLogic
             }
 
             long rent = GetCurrentRentUnsafe(landedProperty);
-            long paidAmount = Math.Min(rent, Math.Max(0, player.Money));
-            player.Money -= rent;
-            owner.Money += paidAmount;
-
-            actionMessages.Add(
-                $"{player.Username} tr? {paidAmount:N0}/{rent:N0} ti?n thuê {landedProperty.Name} cho {owner.Username}."
-            );
+            ChargePlayerForDebtUnsafe(
+                gameState,
+                player,
+                rent,
+                owner.PlayerIndex,
+                $"tiền thuê {landedProperty.Name} cho {owner.Username}",
+                actionMessages);
 
             Console.WriteLine(
                 $"[RENT] Room={gameState.RoomId}, From={player.Username}, To={owner.Username}, " +
-                $"Property={landedProperty.Name}, Rent={rent}, Paid={paidAmount}, " +
+                $"Property={landedProperty.Name}, Rent={rent}, " +
                 $"PayerMoney={player.Money}, OwnerMoney={owner.Money}"
             );
+        }
+        public static void ChargePlayerForDebtUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                long amount,
+                int creditorPlayerIndex,
+                string debtReason,
+                List<string> actionMessages)
+        {
+            if (gameState == null || player == null || amount <= 0 || player.IsBankrupt)
+                return;
+
+            long cashAvailable = Math.Max(0, player.Money);
+
+            if (cashAvailable >= amount)
+            {
+                player.Money -= amount;
+                PayDebtRecipientUnsafe(gameState, creditorPlayerIndex, amount);
+                actionMessages.Add($"{player.Username} trả {amount:N0} {debtReason}.");
+                return;
+            }
+
+            long paidByCash = cashAvailable;
+
+            if (paidByCash > 0)
+            {
+                player.Money -= paidByCash;
+                PayDebtRecipientUnsafe(gameState, creditorPlayerIndex, paidByCash);
+            }
+
+            long remainingDebt = amount - paidByCash;
+            long totalSaleValue = GetTotalPropertySaleValueUnsafe(gameState, player.PlayerIndex);
+
+            if (totalSaleValue < remainingDebt)
+            {
+                actionMessages.Add(
+                    $"{player.Username} chỉ trả được {paidByCash:N0}/{amount:N0} {debtReason}; tổng giá trị thanh lý tài sản {totalSaleValue:N0} không đủ trả nợ."
+                );
+                HandleBankruptcyUnsafe(gameState, player, actionMessages);
+                return;
+            }
+
+            if (player.IsBot)
+            {
+                SellBotPropertiesForDebtUnsafe(gameState, player, remainingDebt, creditorPlayerIndex, debtReason, actionMessages);
+                return;
+            }
+
+            gameState.IsWaitingForPropertySale = true;
+            gameState.PendingSalePlayerIndex = player.PlayerIndex;
+            gameState.PendingSalePlayerUsername = player.Username;
+            gameState.PendingDebtAmount = remainingDebt;
+            gameState.PendingDebtCreditorPlayerIndex = creditorPlayerIndex;
+            gameState.PendingDebtReason = debtReason;
+            RefreshPendingSalePositionsUnsafe(gameState);
+            gameState.TurnEndsAtUtcTicks = 0;
+            gameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
+
+            actionMessages.Add(
+                $"{player.Username} trả trước {paidByCash:N0}/{amount:N0} {debtReason} và cần bán tài sản để trả còn thiếu {remainingDebt:N0}."
+            );
+        }
+
+        public static bool TrySellPropertyForDebtUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int positionIndex,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (gameState == null || player == null)
+            {
+                failMessage = "Không tìm thấy trạng thái nợ.";
+                return false;
+            }
+
+            if (!gameState.IsWaitingForPropertySale)
+            {
+                failMessage = "Không có khoản nợ nào đang chờ bán tài sản.";
+                return false;
+            }
+
+            if (gameState.PendingSalePlayerIndex != player.PlayerIndex)
+            {
+                failMessage = "Không phải lượt bán tài sản của bạn.";
+                return false;
+            }
+
+            if (!gameState.Properties.TryGetValue(positionIndex, out GamePropertyState property) ||
+                property.OwnerPlayerIndex != player.PlayerIndex ||
+                !gameState.PendingSalePropertyPositions.Contains(positionIndex))
+            {
+                failMessage = "Tài sản này không hợp lệ để bán trả nợ.";
+                return false;
+            }
+
+            long saleValue = GetPropertySaleValueUnsafe(property);
+
+            if (saleValue <= 0)
+            {
+                failMessage = "Tài sản này không có giá trị thanh lý hợp lệ.";
+                return false;
+            }
+
+            string propertyName = property.Name;
+            ReleasePropertyUnsafe(property);
+
+            long paidToDebt = Math.Min(saleValue, gameState.PendingDebtAmount);
+            gameState.PendingDebtAmount -= paidToDebt;
+            PayDebtRecipientUnsafe(gameState, gameState.PendingDebtCreditorPlayerIndex, paidToDebt);
+
+            long surplus = saleValue - paidToDebt;
+
+            if (surplus > 0)
+                player.Money += surplus;
+
+            actionMessages.Add(
+                $"{player.Username} bán {propertyName} thu {saleValue:N0}, trả nợ {paidToDebt:N0}" +
+                (surplus > 0 ? $", còn dư {surplus:N0}." : ".")
+            );
+
+            if (gameState.PendingDebtAmount <= 0)
+            {
+                string reason = gameState.PendingDebtReason;
+                ClearPendingPropertySaleUnsafe(gameState);
+                ResetTurnTimerUnsafe(gameState);
+                actionMessages.Add($"{player.Username} đã trả xong khoản {reason}.");
+                return true;
+            }
+
+            RefreshPendingSalePositionsUnsafe(gameState);
+
+            if (gameState.PendingSalePropertyPositions.Count == 0)
+            {
+                actionMessages.Add($"{player.Username} không còn tài sản để bán nhưng vẫn nợ {gameState.PendingDebtAmount:N0}.");
+                ClearPendingPropertySaleUnsafe(gameState);
+                HandleBankruptcyUnsafe(gameState, player, actionMessages);
+            }
+            else
+            {
+                actionMessages.Add($"{player.Username} còn nợ {gameState.PendingDebtAmount:N0}, cần bán thêm tài sản.");
+            }
+
+            return true;
+        }
+
+        public static long GetPropertySaleValueUnsafe(GamePropertyState property)
+        {
+            if (property == null || property.BuyPrice <= 0 || (property.Type != "City" && property.Type != "Resort"))
+                return 0;
+
+            long saleValue = Math.Max(1, property.BuyPrice / 2);
+
+            if (property.Type == "City")
+            {
+                long houseBuildCost = Math.Max(1, property.BuyPrice / 2);
+                saleValue += property.HouseCount * Math.Max(1, houseBuildCost / 2);
+
+                if (property.HasHotel)
+                    saleValue += Math.Max(1, property.BuyPrice / 2);
+            }
+
+            return saleValue;
+        }
+
+        public static long GetTotalPropertySaleValueUnsafe(GameState gameState, int ownerPlayerIndex)
+        {
+            if (gameState == null || gameState.Properties == null)
+                return 0;
+
+            long total = 0;
+
+            foreach (GamePropertyState property in gameState.Properties.Values)
+            {
+                if (property.OwnerPlayerIndex == ownerPlayerIndex)
+                    total += GetPropertySaleValueUnsafe(property);
+            }
+
+            return total;
+        }
+
+        public static void ClearPendingPropertySaleUnsafe(GameState gameState)
+        {
+            if (gameState == null)
+                return;
+
+            gameState.IsWaitingForPropertySale = false;
+            gameState.PendingSalePlayerIndex = -1;
+            gameState.PendingSalePlayerUsername = "";
+            gameState.PendingDebtAmount = 0;
+            gameState.PendingDebtCreditorPlayerIndex = -1;
+            gameState.PendingDebtReason = "";
+            gameState.PendingSalePropertyPositions.Clear();
+        }
+
+        private static void RefreshPendingSalePositionsUnsafe(GameState gameState)
+        {
+            gameState.PendingSalePropertyPositions.Clear();
+
+            foreach (GamePropertyState property in gameState.Properties.Values
+                         .Where(p => p.OwnerPlayerIndex == gameState.PendingSalePlayerIndex)
+                         .OrderBy(p => p.PositionIndex))
+            {
+                if (GetPropertySaleValueUnsafe(property) > 0)
+                    gameState.PendingSalePropertyPositions.Add(property.PositionIndex);
+            }
+        }
+
+        private static void SellBotPropertiesForDebtUnsafe(
+                GameState gameState,
+                GamePlayerState bot,
+                long remainingDebt,
+                int creditorPlayerIndex,
+                string debtReason,
+                List<string> actionMessages)
+        {
+            List<GamePropertyState> botProperties = gameState.Properties.Values
+                .Where(p => p.OwnerPlayerIndex == bot.PlayerIndex)
+                .OrderBy(GetPropertySaleValueUnsafe)
+                .ToList();
+
+            foreach (GamePropertyState property in botProperties)
+            {
+                if (remainingDebt <= 0)
+                    break;
+
+                long saleValue = GetPropertySaleValueUnsafe(property);
+                string propertyName = property.Name;
+                ReleasePropertyUnsafe(property);
+
+                long paidToDebt = Math.Min(saleValue, remainingDebt);
+                remainingDebt -= paidToDebt;
+                PayDebtRecipientUnsafe(gameState, creditorPlayerIndex, paidToDebt);
+
+                long surplus = saleValue - paidToDebt;
+
+                if (surplus > 0)
+                    bot.Money += surplus;
+
+                actionMessages.Add($"{bot.Username} tự bán {propertyName} thu {saleValue:N0} để trả {debtReason}.");
+            }
+
+            if (remainingDebt > 0)
+            {
+                actionMessages.Add($"{bot.Username} vẫn còn nợ {remainingDebt:N0} sau khi thanh lý tài sản.");
+                HandleBankruptcyUnsafe(gameState, bot, actionMessages);
+            }
+        }
+
+        private static void PayDebtRecipientUnsafe(GameState gameState, int creditorPlayerIndex, long amount)
+        {
+            if (amount <= 0 || creditorPlayerIndex < 0)
+                return;
+
+            GamePlayerState creditor = gameState.Players.FirstOrDefault(p => p.PlayerIndex == creditorPlayerIndex);
+
+            if (creditor != null && !creditor.IsBankrupt)
+                creditor.Money += amount;
+        }
+
+        private static void ReleasePropertyUnsafe(GamePropertyState property)
+        {
+            property.OwnerPlayerIndex = -1;
+            property.HouseCount = 0;
+            property.HasHotel = false;
+            property.Multiplier = 1;
+            property.PowerOutageTurn = 0;
         }
         public static void SendPlayerToIslandUnsafe(GamePlayerState player)
         {
@@ -240,8 +514,13 @@ namespace Monopoly.Server.GameLogic
             {
                 case "FINE":
                     const long fine = 100000;
-                    player.Money -= fine;
-                    actionMessages.Add($"B? ph?t {fine:N0}.");
+                    ChargePlayerForDebtUnsafe(
+                        gameState,
+                        player,
+                        fine,
+                        -1,
+                        "tiền phạt thẻ Cơ Hội",
+                        actionMessages);
                     break;
 
                 case "JACKPOT":
@@ -264,8 +543,13 @@ namespace Monopoly.Server.GameLogic
 
                 case "TAX_PENALTY":
                     long penalty = (player.Money / 10 / 1000) * 1000;
-                    player.Money -= penalty;
-                    actionMessages.Add($"N?p ph?t thu? {penalty:N0}.");
+                    ChargePlayerForDebtUnsafe(
+                        gameState,
+                        player,
+                        penalty,
+                        -1,
+                        "phạt thuế thẻ Cơ Hội",
+                        actionMessages);
                     break;
 
                 case "CHARITY_PAY":
@@ -924,6 +1208,9 @@ namespace Monopoly.Server.GameLogic
             player.SkipTurnsLeft = 0;
             player.SkipReason = "";
 
+            if (gameState.IsWaitingForPropertySale && gameState.PendingSalePlayerIndex == player.PlayerIndex)
+                ClearPendingPropertySaleUnsafe(gameState);
+
             int releasedProperties = ReleasePlayerPropertiesUnsafe(gameState, player.PlayerIndex);
             actionMessages.Add($"{player.Username} dã phá s?n và m?t {releasedProperties} ô d?t.");
 
@@ -1072,7 +1359,14 @@ namespace Monopoly.Server.GameLogic
                 PendingCardEffectCode = "",
                 PendingCardPlayerUsername = "",
                 PendingCardTargetPositions = new List<int>(),
-                ForceDoubleThisTurn = false
+                ForceDoubleThisTurn = false,
+                IsWaitingForPropertySale = false,
+                PendingSalePlayerIndex = -1,
+                PendingSalePlayerUsername = "",
+                PendingDebtAmount = 0,
+                PendingDebtCreditorPlayerIndex = -1,
+                PendingDebtReason = "",
+                PendingSalePropertyPositions = new List<int>()
             };
 
             ResetTurnTimerUnsafe(gameState);
