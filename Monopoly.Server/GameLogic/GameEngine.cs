@@ -41,8 +41,13 @@ namespace Monopoly.Server.GameLogic
             {
                 case "Tax":
                     const long taxAmount = 100000;
-                    player.Money -= taxAmount;
-                    actionMessages.Add($"{player.Username} vào ô Thuế và nộp {taxAmount:N0}.");
+                    ChargePlayerForDebtUnsafe(
+                        gameState,
+                        player,
+                        taxAmount,
+                        -1,
+                        "thuế",
+                        actionMessages);
                     break;
 
                 case "Chance":
@@ -144,27 +149,296 @@ namespace Monopoly.Server.GameLogic
                 return;
             }
 
-            if (player.HasFreeRentCard)
+            if (player.IsFreeRentShieldActive)
             {
-                player.HasFreeRentCard = false;
+                player.IsFreeRentShieldActive = false;
                 actionMessages.Add($"{player.Username} dùng Khiên Miễn Trừ, không phải trả tiền thuê {landedProperty.Name}.");
                 return;
             }
 
             long rent = GetCurrentRentUnsafe(landedProperty);
-            long paidAmount = Math.Min(rent, Math.Max(0, player.Money));
-            player.Money -= rent;
-            owner.Money += paidAmount;
-
-            actionMessages.Add(
-                $"{player.Username} trả {paidAmount:N0}/{rent:N0} tiền thuê {landedProperty.Name} cho {owner.Username}."
-            );
+            ChargePlayerForDebtUnsafe(
+                gameState,
+                player,
+                rent,
+                owner.PlayerIndex,
+                $"tiền thuê {landedProperty.Name} cho {owner.Username}",
+                actionMessages);
 
             Console.WriteLine(
                 $"[RENT] Room={gameState.RoomId}, From={player.Username}, To={owner.Username}, " +
-                $"Property={landedProperty.Name}, Rent={rent}, Paid={paidAmount}, " +
+                $"Property={landedProperty.Name}, Rent={rent}, " +
                 $"PayerMoney={player.Money}, OwnerMoney={owner.Money}"
             );
+        }
+        public static void ChargePlayerForDebtUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                long amount,
+                int creditorPlayerIndex,
+                string debtReason,
+                List<string> actionMessages)
+        {
+            if (gameState == null || player == null || amount <= 0 || player.IsBankrupt)
+                return;
+
+            long cashAvailable = Math.Max(0, player.Money);
+
+            if (cashAvailable >= amount)
+            {
+                player.Money -= amount;
+                PayDebtRecipientUnsafe(gameState, creditorPlayerIndex, amount);
+                actionMessages.Add($"{player.Username} trả {amount:N0} {debtReason}.");
+                return;
+            }
+
+            long paidByCash = cashAvailable;
+
+            if (paidByCash > 0)
+            {
+                player.Money -= paidByCash;
+                PayDebtRecipientUnsafe(gameState, creditorPlayerIndex, paidByCash);
+            }
+
+            long remainingDebt = amount - paidByCash;
+            long totalSaleValue = GetTotalPropertySaleValueUnsafe(gameState, player.PlayerIndex);
+
+            if (totalSaleValue < remainingDebt)
+            {
+                actionMessages.Add(
+                    $"{player.Username} chỉ trả được {paidByCash:N0}/{amount:N0} {debtReason}; tổng giá trị thanh lý tài sản {totalSaleValue:N0} không đủ trả nợ."
+                );
+                HandleBankruptcyUnsafe(gameState, player, actionMessages);
+                return;
+            }
+
+            if (player.IsBot)
+            {
+                SellBotPropertiesForDebtUnsafe(gameState, player, remainingDebt, creditorPlayerIndex, debtReason, actionMessages);
+                return;
+            }
+
+            gameState.IsWaitingForPropertySale = true;
+            gameState.PendingSalePlayerIndex = player.PlayerIndex;
+            gameState.PendingSalePlayerUsername = player.Username;
+            gameState.PendingDebtAmount = remainingDebt;
+            gameState.PendingDebtCreditorPlayerIndex = creditorPlayerIndex;
+            gameState.PendingDebtReason = debtReason;
+            RefreshPendingSalePositionsUnsafe(gameState);
+            gameState.TurnEndsAtUtcTicks = 0;
+            gameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
+
+            actionMessages.Add(
+                $"{player.Username} trả trước {paidByCash:N0}/{amount:N0} {debtReason} và cần bán tài sản để trả còn thiếu {remainingDebt:N0}."
+            );
+        }
+
+        public static bool TrySellPropertyForDebtUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int positionIndex,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (gameState == null || player == null)
+            {
+                failMessage = "Không tìm thấy trạng thái nợ.";
+                return false;
+            }
+
+            if (!gameState.IsWaitingForPropertySale)
+            {
+                failMessage = "Không có khoản nợ nào đang chờ bán tài sản.";
+                return false;
+            }
+
+            if (gameState.PendingSalePlayerIndex != player.PlayerIndex)
+            {
+                failMessage = "Không phải lượt bán tài sản của bạn.";
+                return false;
+            }
+
+            if (!gameState.Properties.TryGetValue(positionIndex, out GamePropertyState property) ||
+                property.OwnerPlayerIndex != player.PlayerIndex ||
+                !gameState.PendingSalePropertyPositions.Contains(positionIndex))
+            {
+                failMessage = "Tài sản này không hợp lệ để bán trả nợ.";
+                return false;
+            }
+
+            long saleValue = GetPropertySaleValueUnsafe(property);
+
+            if (saleValue <= 0)
+            {
+                failMessage = "Tài sản này không có giá trị thanh lý hợp lệ.";
+                return false;
+            }
+
+            string propertyName = property.Name;
+            ReleasePropertyUnsafe(property);
+
+            long paidToDebt = Math.Min(saleValue, gameState.PendingDebtAmount);
+            gameState.PendingDebtAmount -= paidToDebt;
+            PayDebtRecipientUnsafe(gameState, gameState.PendingDebtCreditorPlayerIndex, paidToDebt);
+
+            long surplus = saleValue - paidToDebt;
+
+            if (surplus > 0)
+                player.Money += surplus;
+
+            actionMessages.Add(
+                $"{player.Username} bán {propertyName} thu {saleValue:N0}, trả nợ {paidToDebt:N0}" +
+                (surplus > 0 ? $", còn dư {surplus:N0}." : ".")
+            );
+
+            if (gameState.PendingDebtAmount <= 0)
+            {
+                string reason = gameState.PendingDebtReason;
+                ClearPendingPropertySaleUnsafe(gameState);
+                ResetTurnTimerUnsafe(gameState);
+                actionMessages.Add($"{player.Username} đã trả xong khoản {reason}.");
+                return true;
+            }
+
+            RefreshPendingSalePositionsUnsafe(gameState);
+
+            if (gameState.PendingSalePropertyPositions.Count == 0)
+            {
+                actionMessages.Add($"{player.Username} không còn tài sản để bán nhưng vẫn nợ {gameState.PendingDebtAmount:N0}.");
+                ClearPendingPropertySaleUnsafe(gameState);
+                HandleBankruptcyUnsafe(gameState, player, actionMessages);
+            }
+            else
+            {
+                actionMessages.Add($"{player.Username} còn nợ {gameState.PendingDebtAmount:N0}, cần bán thêm tài sản.");
+            }
+
+            return true;
+        }
+
+        public static long GetPropertySaleValueUnsafe(GamePropertyState property)
+        {
+            if (property == null || property.BuyPrice <= 0 || (property.Type != "City" && property.Type != "Resort"))
+                return 0;
+
+            long saleValue = Math.Max(1, property.BuyPrice / 2);
+
+            if (property.Type == "City")
+            {
+                long houseBuildCost = Math.Max(1, property.BuyPrice / 2);
+                saleValue += property.HouseCount * Math.Max(1, houseBuildCost / 2);
+
+                if (property.HasHotel)
+                    saleValue += Math.Max(1, property.BuyPrice / 2);
+            }
+
+            return saleValue;
+        }
+
+        public static long GetTotalPropertySaleValueUnsafe(GameState gameState, int ownerPlayerIndex)
+        {
+            if (gameState == null || gameState.Properties == null)
+                return 0;
+
+            long total = 0;
+
+            foreach (GamePropertyState property in gameState.Properties.Values)
+            {
+                if (property.OwnerPlayerIndex == ownerPlayerIndex)
+                    total += GetPropertySaleValueUnsafe(property);
+            }
+
+            return total;
+        }
+
+        public static void ClearPendingPropertySaleUnsafe(GameState gameState)
+        {
+            if (gameState == null)
+                return;
+
+            gameState.IsWaitingForPropertySale = false;
+            gameState.PendingSalePlayerIndex = -1;
+            gameState.PendingSalePlayerUsername = "";
+            gameState.PendingDebtAmount = 0;
+            gameState.PendingDebtCreditorPlayerIndex = -1;
+            gameState.PendingDebtReason = "";
+            gameState.PendingSalePropertyPositions.Clear();
+        }
+
+        private static void RefreshPendingSalePositionsUnsafe(GameState gameState)
+        {
+            gameState.PendingSalePropertyPositions.Clear();
+
+            foreach (GamePropertyState property in gameState.Properties.Values
+                         .Where(p => p.OwnerPlayerIndex == gameState.PendingSalePlayerIndex)
+                         .OrderBy(p => p.PositionIndex))
+            {
+                if (GetPropertySaleValueUnsafe(property) > 0)
+                    gameState.PendingSalePropertyPositions.Add(property.PositionIndex);
+            }
+        }
+
+        private static void SellBotPropertiesForDebtUnsafe(
+                GameState gameState,
+                GamePlayerState bot,
+                long remainingDebt,
+                int creditorPlayerIndex,
+                string debtReason,
+                List<string> actionMessages)
+        {
+            List<GamePropertyState> botProperties = gameState.Properties.Values
+                .Where(p => p.OwnerPlayerIndex == bot.PlayerIndex)
+                .OrderBy(GetPropertySaleValueUnsafe)
+                .ToList();
+
+            foreach (GamePropertyState property in botProperties)
+            {
+                if (remainingDebt <= 0)
+                    break;
+
+                long saleValue = GetPropertySaleValueUnsafe(property);
+                string propertyName = property.Name;
+                ReleasePropertyUnsafe(property);
+
+                long paidToDebt = Math.Min(saleValue, remainingDebt);
+                remainingDebt -= paidToDebt;
+                PayDebtRecipientUnsafe(gameState, creditorPlayerIndex, paidToDebt);
+
+                long surplus = saleValue - paidToDebt;
+
+                if (surplus > 0)
+                    bot.Money += surplus;
+
+                actionMessages.Add($"{bot.Username} tự bán {propertyName} thu {saleValue:N0} để trả {debtReason}.");
+            }
+
+            if (remainingDebt > 0)
+            {
+                actionMessages.Add($"{bot.Username} vẫn còn nợ {remainingDebt:N0} sau khi thanh lý tài sản.");
+                HandleBankruptcyUnsafe(gameState, bot, actionMessages);
+            }
+        }
+
+        private static void PayDebtRecipientUnsafe(GameState gameState, int creditorPlayerIndex, long amount)
+        {
+            if (amount <= 0 || creditorPlayerIndex < 0)
+                return;
+
+            GamePlayerState creditor = gameState.Players.FirstOrDefault(p => p.PlayerIndex == creditorPlayerIndex);
+
+            if (creditor != null && !creditor.IsBankrupt)
+                creditor.Money += amount;
+        }
+
+        private static void ReleasePropertyUnsafe(GamePropertyState property)
+        {
+            property.OwnerPlayerIndex = -1;
+            property.HouseCount = 0;
+            property.HasHotel = false;
+            property.Multiplier = 1;
+            property.PowerOutageTurn = 0;
         }
         public static void SendPlayerToIslandUnsafe(GamePlayerState player)
         {
@@ -240,8 +514,13 @@ namespace Monopoly.Server.GameLogic
             {
                 case "FINE":
                     const long fine = 100000;
-                    player.Money -= fine;
-                    actionMessages.Add($"Bị phạt {fine:N0}.");
+                    ChargePlayerForDebtUnsafe(
+                        gameState,
+                        player,
+                        fine,
+                        -1,
+                        "tiền phạt thẻ Cơ Hội",
+                        actionMessages);
                     break;
 
                 case "JACKPOT":
@@ -264,8 +543,13 @@ namespace Monopoly.Server.GameLogic
 
                 case "TAX_PENALTY":
                     long penalty = (player.Money / 10 / 1000) * 1000;
-                    player.Money -= penalty;
-                    actionMessages.Add($"Nộp phạt thuế {penalty:N0}.");
+                    ChargePlayerForDebtUnsafe(
+                        gameState,
+                        player,
+                        penalty,
+                        -1,
+                        "phạt thuế thẻ Cơ Hội",
+                        actionMessages);
                     break;
 
                 case "CHARITY_PAY":
@@ -281,7 +565,7 @@ namespace Monopoly.Server.GameLogic
 
                 case "FREE_RENT":
                     player.HasFreeRentCard = true;
-                    actionMessages.Add("Nh?n Khiên Mi?n Tr?, t? d?ng dùng khi ph?i trả ti?n thuê.");
+                    actionMessages.Add("Nhận Khiên Miễn Trừ. Dùng thẻ để kích hoạt miễn tiền thuê lần sau.");
                     break;
 
                 case "FLIGHT":
@@ -305,15 +589,18 @@ namespace Monopoly.Server.GameLogic
                     break;
 
                 case "EARTHQUAKE":
-                    ApplyEarthquakeAutoTargetUnsafe(gameState, player, actionMessages);
+                    player.HasEarthquakeCard = true;
+                    actionMessages.Add("Nh?n th? Ð?ng Ð?t. Dùng th? d? ch?n thành ph? d?i th? c?n phá h?y.");
                     break;
 
                 case "POWER_OUTAGE":
-                    ApplyPowerOutageAutoTargetUnsafe(gameState, player, actionMessages);
+                    player.HasPowerOutageCard = true;
+                    actionMessages.Add("Nh?n th? Cúp Ði?n. Dùng th? d? ch?n d?t d?i th? b? vô hi?u rent.");
                     break;
 
                 case "MOVE_CHAMPIONSHIP":
-                    ApplyMoveChampionshipAutoTargetUnsafe(gameState, player, actionMessages);
+                    player.HasMoveChampionshipCard = true;
+                    actionMessages.Add("Nh?n th? Ðang Cai Gi?i Ð?u. Dùng th? d? ch?n thành ph? c?a b?n.");
                     break;
 
                 default:
@@ -416,6 +703,384 @@ namespace Monopoly.Server.GameLogic
 
             gameState.WorldChampionshipPosition = target.PositionIndex;
             actionMessages.Add($"Dời Giải Vô Địch về {target.Name}.");
+        }
+        public static string NormalizeCardEffectCode(string cardIdOrEffectCode)
+        {
+            if (string.IsNullOrWhiteSpace(cardIdOrEffectCode))
+                return "";
+
+            string value = cardIdOrEffectCode.Trim();
+
+            if (CardDatabase.Cards.TryGetValue(value, out ChanceCardConfig card))
+                return card.EffectCode ?? "";
+
+            return value.ToUpperInvariant();
+        }
+        public static bool RequiresCardTarget(string effectCode)
+        {
+            switch (NormalizeCardEffectCode(effectCode))
+            {
+                case "FLIGHT":
+                case "FREE_UPGRADE":
+                case "EARTHQUAKE":
+                case "POWER_OUTAGE":
+                case "MOVE_CHAMPIONSHIP":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        public static bool PlayerHasHeldCardUnsafe(GamePlayerState player, string effectCode)
+        {
+            if (player == null)
+                return false;
+
+            switch (NormalizeCardEffectCode(effectCode))
+            {
+                case "FREE_RENT":
+                    return player.HasFreeRentCard;
+                case "ESCAPE_ISLAND":
+                    return player.HasEscapeIslandCard;
+                case "FLIGHT":
+                    return player.HasFlightCard;
+                case "FREE_UPGRADE":
+                    return player.HasFreeUpgradeCard;
+                case "FORCE_DOUBLE":
+                    return player.HasForceDoubleCard;
+                case "EARTHQUAKE":
+                    return player.HasEarthquakeCard;
+                case "POWER_OUTAGE":
+                    return player.HasPowerOutageCard;
+                case "MOVE_CHAMPIONSHIP":
+                    return player.HasMoveChampionshipCard;
+                default:
+                    return false;
+            }
+        }
+        public static List<int> BuildCardTargetPositionsUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                string effectCode)
+        {
+            List<int> targets = new List<int>();
+
+            if (gameState == null || player == null)
+                return targets;
+
+            switch (NormalizeCardEffectCode(effectCode))
+            {
+                case "FLIGHT":
+                    targets.AddRange(BoardDatabase.Squares.Keys.OrderBy(p => p));
+                    break;
+
+                case "FREE_UPGRADE":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.Type == "City" &&
+                                    p.OwnerPlayerIndex == player.PlayerIndex &&
+                                    !p.HasHotel)
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+
+                case "EARTHQUAKE":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.Type == "City" &&
+                                    p.OwnerPlayerIndex >= 0 &&
+                                    p.OwnerPlayerIndex != player.PlayerIndex &&
+                                    (p.HasHotel || p.HouseCount > 0))
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+
+                case "POWER_OUTAGE":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.OwnerPlayerIndex >= 0 &&
+                                    p.OwnerPlayerIndex != player.PlayerIndex &&
+                                    (p.Type == "City" || p.Type == "Resort"))
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+
+                case "MOVE_CHAMPIONSHIP":
+                    targets.AddRange(gameState.Properties.Values
+                        .Where(p => p.Type == "City" &&
+                                    p.OwnerPlayerIndex == player.PlayerIndex)
+                        .OrderBy(p => p.PositionIndex)
+                        .Select(p => p.PositionIndex));
+                    break;
+            }
+
+            return targets;
+        }
+        public static bool TryApplyHeldCardEffectUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                string effectCode,
+                int? targetPosition,
+                List<string> actionMessages,
+                List<CardDrawEvent> cardDrawEvents,
+                out string failMessage)
+        {
+            failMessage = "";
+            effectCode = NormalizeCardEffectCode(effectCode);
+
+            if (gameState == null || player == null)
+            {
+                failMessage = "Khong tim thay trang thai game hoac nguoi choi.";
+                return false;
+            }
+
+            if (!PlayerHasHeldCardUnsafe(player, effectCode))
+            {
+                failMessage = "Ban khong so huu the nay hoac the da duoc dung.";
+                return false;
+            }
+
+            if (RequiresCardTarget(effectCode))
+            {
+                if (!targetPosition.HasValue)
+                {
+                    failMessage = "The nay can chon muc tieu.";
+                    return false;
+                }
+
+                List<int> validTargets = BuildCardTargetPositionsUnsafe(gameState, player, effectCode);
+
+                if (!validTargets.Contains(targetPosition.Value))
+                {
+                    failMessage = "Muc tieu khong hop le cho the nay.";
+                    return false;
+                }
+            }
+
+            switch (effectCode)
+            {
+                case "FREE_RENT":
+                    player.HasFreeRentCard = false;
+                    player.IsFreeRentShieldActive = true;
+                    actionMessages.Add($"{player.Username} kich hoat Khien Mien Tru cho lan tra tien thue tiep theo.");
+                    return true;
+
+                case "ESCAPE_ISLAND":
+                    if (!player.IsOnIsland && player.JailTurnsLeft <= 0)
+                    {
+                        failMessage = "Chi co the dung the thoat Dao Hoang khi dang o Dao Hoang.";
+                        return false;
+                    }
+
+                    player.HasEscapeIslandCard = false;
+                    player.IsOnIsland = false;
+                    player.JailTurnsLeft = 0;
+                    player.SkipTurnsLeft = 0;
+                    player.SkipReason = "";
+                    actionMessages.Add($"{player.Username} dung Truc Thang Cuu Ho va thoat Dao Hoang.");
+                    return true;
+
+                case "FORCE_DOUBLE":
+                    if (gameState.HasRolledThisTurn)
+                    {
+                        failMessage = "Chi co the dung Xuc Xac Ma Thuat truoc khi do xuc xac.";
+                        return false;
+                    }
+
+                    if (!player.IsOnIsland && player.SkipTurnsLeft > 0)
+                    {
+                        failMessage = "Khong the dung Xuc Xac Ma Thuat khi dang bi mat luot.";
+                        return false;
+                    }
+
+                    player.HasForceDoubleCard = false;
+                    gameState.ForceDoubleThisTurn = true;
+                    actionMessages.Add($"{player.Username} kich hoat Xuc Xac Ma Thuat cho lan roll nay.");
+                    return true;
+
+                case "FLIGHT":
+                    return ApplyFlightCardUnsafe(gameState, player, targetPosition.Value, actionMessages, cardDrawEvents, out failMessage);
+
+                case "FREE_UPGRADE":
+                    return ApplyFreeUpgradeCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                case "EARTHQUAKE":
+                    return ApplyEarthquakeCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                case "POWER_OUTAGE":
+                    return ApplyPowerOutageCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                case "MOVE_CHAMPIONSHIP":
+                    return ApplyMoveChampionshipCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
+
+                default:
+                    failMessage = $"The {effectCode} chua duoc ho tro trong hand.";
+                    return false;
+            }
+        }
+        private static bool ApplyFlightCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                List<CardDrawEvent> cardDrawEvents,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!BoardDatabase.Squares.ContainsKey(targetPosition))
+            {
+                failMessage = "O dich khong hop le.";
+                return false;
+            }
+
+            int oldPosition = player.Position;
+            int boardSize = BoardDatabase.Squares.Count;
+            player.HasFlightCard = false;
+            player.Position = targetPosition;
+
+            if (targetPosition < oldPosition)
+            {
+                const long startBonus = 300000;
+                player.Money += startBonus;
+                actionMessages.Add($"{player.Username} bay qua Bat Dau va nhan {startBonus:N0}.");
+            }
+
+            actionMessages.Add($"{player.Username} dung Ve May Bay tu o {oldPosition} den o {targetPosition}.");
+            ApplyRentOnLandingUnsafe(gameState, player, targetPosition, actionMessages);
+            ApplySpecialSquareEffectUnsafe(gameState, player, targetPosition, actionMessages, cardDrawEvents);
+
+            gameState.LastDice1 = 0;
+            gameState.LastDice2 = 0;
+            gameState.LastDiceTotal = 0;
+            gameState.LastMovedPlayerIndex = player.PlayerIndex;
+            gameState.LastMoveFromPosition = oldPosition;
+            gameState.LastMoveToPosition = targetPosition;
+            gameState.LastFinalPosition = player.Position;
+            return true;
+        }
+        private static bool ApplyFreeUpgradeCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property))
+            {
+                failMessage = "Khong tim thay o dat can nang cap.";
+                return false;
+            }
+
+            if (property.Type != "City" ||
+                property.OwnerPlayerIndex != player.PlayerIndex ||
+                property.HasHotel)
+            {
+                failMessage = "O dat nay khong the nang cap mien phi.";
+                return false;
+            }
+
+            player.HasFreeUpgradeCard = false;
+
+            if (property.HouseCount >= 3)
+            {
+                property.HouseCount = 3;
+                property.HasHotel = true;
+            }
+            else
+            {
+                property.HouseCount++;
+            }
+
+            actionMessages.Add($"{player.Username} dung Giay Phep Xay Dung nang cap {property.Name} len {DescribePropertyLevelUnsafe(property)} mien phi.");
+            return true;
+        }
+        private static bool ApplyEarthquakeCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property) ||
+                property.Type != "City" ||
+                property.OwnerPlayerIndex < 0 ||
+                property.OwnerPlayerIndex == player.PlayerIndex ||
+                (!property.HasHotel && property.HouseCount <= 0))
+            {
+                failMessage = "Muc tieu Dong Dat khong hop le.";
+                return false;
+            }
+
+            player.HasEarthquakeCard = false;
+
+            if (property.HasHotel)
+            {
+                property.HasHotel = false;
+                property.HouseCount = 3;
+            }
+            else
+            {
+                property.HouseCount = Math.Max(0, property.HouseCount - 1);
+            }
+
+            actionMessages.Add($"{player.Username} dung Dong Dat lam {property.Name} giam 1 cap.");
+            return true;
+        }
+        private static bool ApplyPowerOutageCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property) ||
+                property.OwnerPlayerIndex < 0 ||
+                property.OwnerPlayerIndex == player.PlayerIndex ||
+                (property.Type != "City" && property.Type != "Resort"))
+            {
+                failMessage = "Muc tieu Cup Dien khong hop le.";
+                return false;
+            }
+
+            player.HasPowerOutageCard = false;
+            property.PowerOutageTurn = gameState.TurnNumber + 2;
+            actionMessages.Add($"{player.Username} dung Cup Dien lam {property.Name} mat dien trong 2 luot.");
+            return true;
+        }
+        private static bool ApplyMoveChampionshipCardUnsafe(
+                GameState gameState,
+                GamePlayerState player,
+                int targetPosition,
+                List<string> actionMessages,
+                out string failMessage)
+        {
+            failMessage = "";
+
+            if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property) ||
+                property.Type != "City" ||
+                property.OwnerPlayerIndex != player.PlayerIndex)
+            {
+                failMessage = "Muc tieu dang cai giai dau khong hop le.";
+                return false;
+            }
+
+            player.HasMoveChampionshipCard = false;
+            gameState.WorldChampionshipPosition = targetPosition;
+            actionMessages.Add($"{player.Username} doi Giai Vo Dich ve {property.Name}.");
+            return true;
+        }
+        public static void ClearPendingCardChoiceUnsafe(GameState gameState)
+        {
+            if (gameState == null)
+                return;
+
+            gameState.IsWaitingForCardChoice = false;
+            gameState.PendingCardEffectCode = "";
+            gameState.PendingCardPlayerUsername = "";
+            gameState.PendingCardTargetPositions.Clear();
         }
         public static void AddGameLogUnsafe(GameState gameState, string message)
         {
@@ -544,14 +1209,21 @@ namespace Monopoly.Server.GameLogic
             player.BankruptcyOrder = GetNextBankruptcyOrderUnsafe(gameState);
             player.Money = 0;
             player.HasFreeRentCard = false;
+            player.IsFreeRentShieldActive = false;
             player.HasEscapeIslandCard = false;
             player.HasFlightCard = false;
             player.HasFreeUpgradeCard = false;
             player.HasForceDoubleCard = false;
+            player.HasEarthquakeCard = false;
+            player.HasPowerOutageCard = false;
+            player.HasMoveChampionshipCard = false;
             player.IsOnIsland = false;
             player.JailTurnsLeft = 0;
             player.SkipTurnsLeft = 0;
             player.SkipReason = "";
+
+            if (gameState.IsWaitingForPropertySale && gameState.PendingSalePlayerIndex == player.PlayerIndex)
+                ClearPendingPropertySaleUnsafe(gameState);
 
             int releasedProperties = ReleasePlayerPropertiesUnsafe(gameState, player.PlayerIndex);
             actionMessages.Add($"{player.Username} đã phá sản và mất {releasedProperties} ô đất.");
@@ -692,7 +1364,15 @@ namespace Monopoly.Server.GameLogic
                 IsWaitingForCardChoice = false,
                 PendingCardEffectCode = "",
                 PendingCardPlayerUsername = "",
-                ForceDoubleThisTurn = false
+                PendingCardTargetPositions = new List<int>(),
+                ForceDoubleThisTurn = false,
+                IsWaitingForPropertySale = false,
+                PendingSalePlayerIndex = -1,
+                PendingSalePlayerUsername = "",
+                PendingDebtAmount = 0,
+                PendingDebtCreditorPlayerIndex = -1,
+                PendingDebtReason = "",
+                PendingSalePropertyPositions = new List<int>()
             };
 
             ResetTurnTimerUnsafe(gameState);
@@ -712,10 +1392,14 @@ namespace Monopoly.Server.GameLogic
                     ConsecutiveDoubles = 0,
                     JailTurnsLeft = 0,
                     HasFreeRentCard = false,
+                    IsFreeRentShieldActive = false,
                     HasEscapeIslandCard = false,
                     HasFlightCard = false,
                     HasFreeUpgradeCard = false,
                     HasForceDoubleCard = false,
+                    HasEarthquakeCard = false,
+                    HasPowerOutageCard = false,
+                    HasMoveChampionshipCard = false,
                     IsOnIsland = false,
                     SkipTurnsLeft = 0,
                     SkipReason = "",

@@ -36,6 +36,8 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private TMP_Text txtPlayerUsername;    // Tên người chơi
     [SerializeField] private TMP_Text txtPlayerBalance;     // Số dư tiền tệ
     [SerializeField] private Image imgPlayerAvatar;         // Ảnh đại diện
+    [SerializeField] private Button btnResumeGame;
+    [SerializeField] private TMP_Text txtResumeStatus;
 
     [Header("=== PROFILE PANEL UI ===")]
     [SerializeField] private TMP_InputField inpNewUsername;
@@ -102,7 +104,6 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Instance != null)
         {
             NetworkManager.Instance.StartListeningToServer();
-            NetworkManager.Instance.SendResumeGameRequest();
         }
         // Khởi tạo slider với giá trị hợp lệ
         InitSliders();
@@ -112,6 +113,12 @@ public class LobbyManager : MonoBehaviour
 
         // Hiển thị thông tin người chơi từ session đăng nhập
         LoadPlayerInfo();
+
+        if (btnResumeGame != null)
+        {
+            btnResumeGame.onClick.RemoveAllListeners();
+            btnResumeGame.onClick.AddListener(OnBtnResumeGameClicked);
+        }
 
         // Bắt đầu ở Panel Main Menu
         ShowPanel(panelMainMenu);
@@ -311,6 +318,29 @@ public class LobbyManager : MonoBehaviour
 
         // Tải lại Scene Login (đảm bảo "LoginScene" đúng tên trong Build Settings)
         UnityEngine.SceneManagement.SceneManager.LoadScene("SampleScene");
+    }
+
+    public void OnBtnResumeGameClicked()
+    {
+        if (txtResumeStatus != null)
+        {
+            txtResumeStatus.color = Color.white;
+            txtResumeStatus.text = "Dang kiem tra tran dang do...";
+        }
+
+        if (NetworkManager.Instance != null)
+            NetworkManager.Instance.SendResumeGameRequest();
+    }
+
+    public void OnResumeGameNone(string message)
+    {
+        if (txtResumeStatus != null)
+        {
+            txtResumeStatus.color = new Color(0.95f, 0.75f, 0.25f, 1f);
+            txtResumeStatus.text = string.IsNullOrWhiteSpace(message)
+                ? "Khong co tran dang do."
+                : message;
+        }
     }
 
     // ──────────────────────────────────────────────────────────

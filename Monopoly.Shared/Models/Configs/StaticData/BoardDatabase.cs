@@ -34,8 +34,8 @@ namespace Monopoly.Shared.Models.Configs.StaticData
                 BuyPrice = 100000, RentPrices = new List<long> { 6000, 30000, 90000, 270000, 550000 }
             }},
             { 6, new BoardSquareConfig {
-                PositionIndex = 6, Name = "Lyon", Type = "City", ColorSet = "Yellow", LineIndex = "1",
-                BuyPrice = 120000, RentPrices = new List<long> { 8000, 40000, 100000, 300000, 600000 }
+                PositionIndex = 6, Name = "Hawaii", Type = "Resort", LineIndex = "1",
+                BuyPrice = 200000, RentPrices = new List<long> { 50000 }
             }},
             { 7, new BoardSquareConfig {
                 PositionIndex = 7, Name = "Nice", Type = "Resort", LineIndex = "1",
@@ -123,15 +123,14 @@ namespace Monopoly.Shared.Models.Configs.StaticData
                 BuyPrice = 200000, RentPrices = new List<long> { 50000 }
             }},
             { 29, new BoardSquareConfig {
-                PositionIndex = 29, Name = "Madrid", Type = "City", ColorSet = "Cyan", LineIndex = "4",
+                PositionIndex = 29, Name = "Hà Nội", Type = "City", ColorSet = "Cyan", LineIndex = "4",
                 BuyPrice = 350000, RentPrices = new List<long> { 35000, 175000, 500000, 1100000, 1500000 }
             }},
             { 30, new BoardSquareConfig {
-                PositionIndex = 30, Name = "Seville", Type = "City", ColorSet = "Cyan", LineIndex = "4",
-                BuyPrice = 350000, RentPrices = new List<long> { 35000, 175000, 500000, 1100000, 1500000 }
+                PositionIndex = 30, Name = "Cơ quan Thuế", Type = "Tax", LineIndex = "4"
             }},
             { 31, new BoardSquareConfig {
-                PositionIndex = 31, Name = "Granada", Type = "City", ColorSet = "Cyan", LineIndex = "4",
+                PositionIndex = 31, Name = "Sài Gòn", Type = "City", ColorSet = "Cyan", LineIndex = "4",
                 BuyPrice = 400000, RentPrices = new List<long> { 50000, 200000, 600000, 1400000, 2000000 }
             }}
         };

@@ -19,10 +19,14 @@ namespace Monopoly.Server.Models.State
         public int ConsecutiveDoubles { get; set; }
         public int JailTurnsLeft { get; set; }
         public bool HasFreeRentCard { get; set; }
+        public bool IsFreeRentShieldActive { get; set; }
         public bool HasEscapeIslandCard { get; set; }
         public bool HasFlightCard { get; set; }
         public bool HasFreeUpgradeCard { get; set; }
         public bool HasForceDoubleCard { get; set; }
+        public bool HasEarthquakeCard { get; set; }
+        public bool HasPowerOutageCard { get; set; }
+        public bool HasMoveChampionshipCard { get; set; }
         public bool IsOnIsland { get; set; }
         public int SkipTurnsLeft { get; set; }
         public string SkipReason { get; set; } = "";

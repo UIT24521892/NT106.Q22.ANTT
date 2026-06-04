@@ -13,6 +13,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
 
     private RectTransform root;
     private float nextRefreshTime;
+    private bool usingScenePanels;
 
     public static PlayerInfoLayerUI EnsureExists()
     {
@@ -57,7 +58,6 @@ public class PlayerInfoLayerUI : MonoBehaviour
         {
             existingLayer.SetActive(true);
             parent = existingLayer.transform;
-            HideExistingChildren(parent);
 
             Image layerImage = existingLayer.GetComponent<Image>();
 
@@ -68,6 +68,15 @@ public class PlayerInfoLayerUI : MonoBehaviour
                 layerImage.color = color;
                 layerImage.raycastTarget = false;
             }
+
+            if (TryBindScenePlayerPanels(parent))
+            {
+                root = existingLayer.transform as RectTransform;
+                usingScenePanels = true;
+                return;
+            }
+
+            HideExistingChildren(parent);
         }
 
         GameObject rootObject = new GameObject("Runtime_PlayerInfoCorners", typeof(RectTransform), typeof(CanvasRenderer));
@@ -77,6 +86,107 @@ public class PlayerInfoLayerUI : MonoBehaviour
         root.anchorMax = Vector2.one;
         root.offsetMin = Vector2.zero;
         root.offsetMax = Vector2.zero;
+    }
+
+    private bool TryBindScenePlayerPanels(Transform layer)
+    {
+        cardsByPlayerIndex.Clear();
+
+        for (int i = 0; i < 4; i++)
+        {
+            Transform panel = FindChildRecursive(layer, $"Player{i + 1}_Panel");
+
+            if (panel == null)
+                return false;
+
+            panel.gameObject.SetActive(false);
+            cardsByPlayerIndex[i] = BindScenePlayerCard(panel.gameObject, i);
+        }
+
+        return true;
+    }
+
+    private PlayerCard BindScenePlayerCard(GameObject panelObject, int playerIndex)
+    {
+        RectTransform rect = panelObject.transform as RectTransform;
+        Image background = panelObject.GetComponent<Image>();
+
+        TextMeshProUGUI[] texts = panelObject.GetComponentsInChildren<TextMeshProUGUI>(true);
+        TextMeshProUGUI nameText = GetOrCreatePanelText(panelObject.transform, texts, 0, "Txt_Name", 16f, FontStyles.Bold);
+        TextMeshProUGUI detailText = GetOrCreatePanelText(panelObject.transform, texts, 1, "Txt_Detail", 13f, FontStyles.Normal);
+        TextMeshProUGUI badgeText = GetOrCreatePanelText(panelObject.transform, texts, 2, "Txt_Badge", 13f, FontStyles.Bold);
+
+        for (int i = 3; texts != null && i < texts.Length; i++)
+            texts[i].gameObject.SetActive(false);
+
+        nameText.alignment = TextAlignmentOptions.MidlineLeft;
+        detailText.alignment = TextAlignmentOptions.MidlineLeft;
+        badgeText.alignment = TextAlignmentOptions.MidlineRight;
+
+        nameText.fontSize = 15f;
+        detailText.fontSize = 11f;
+        badgeText.fontSize = 12f;
+        detailText.enableAutoSizing = true;
+        detailText.fontSizeMin = 8f;
+        detailText.fontSizeMax = 11f;
+
+        SetStretch(nameText.rectTransform, 76f, 4f, 4f, 62f);
+        SetStretch(detailText.rectTransform, 76f, 34f, 4f, 34f);
+        SetStretch(badgeText.rectTransform, 76f, 68f, 4f, 4f);
+
+        return new PlayerCard(panelObject, rect, background, nameText, detailText, badgeText, keepSceneLayout: true);
+    }
+
+    private TextMeshProUGUI GetOrCreatePanelText(
+        Transform parent,
+        TextMeshProUGUI[] existingTexts,
+        int index,
+        string name,
+        float fontSize,
+        FontStyles style)
+    {
+        if (existingTexts != null && index >= 0 && index < existingTexts.Length && existingTexts[index] != null)
+        {
+            existingTexts[index].gameObject.name = name;
+            existingTexts[index].fontSize = fontSize;
+            existingTexts[index].fontStyle = style;
+            existingTexts[index].enableWordWrapping = false;
+            existingTexts[index].overflowMode = TextOverflowModes.Ellipsis;
+            existingTexts[index].raycastTarget = false;
+            return existingTexts[index];
+        }
+
+        TextMeshProUGUI text = CreateText(name, parent, fontSize, style);
+
+        if (index == 0)
+            SetStretch(text.rectTransform, 10f, 6f, 72f, 44f);
+        else if (index == 1)
+            SetStretch(text.rectTransform, 10f, 32f, 10f, 8f);
+        else
+            SetAnchored(text.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-8f, -8f), new Vector2(62f, 24f));
+
+        return text;
+    }
+
+    private Transform FindChildRecursive(Transform parent, string childName)
+    {
+        if (parent == null)
+            return null;
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+
+            if (child.name == childName)
+                return child;
+
+            Transform nested = FindChildRecursive(child, childName);
+
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
     }
 
     private void HideExistingChildren(Transform parent)
@@ -89,7 +199,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
 
     private void Refresh()
     {
-        if (root == null)
+        if (root == null && !usingScenePanels)
             return;
 
         GameStateData state = GameSession.CurrentState;
@@ -163,7 +273,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
             new Vector2(62f, 24f)
         );
 
-        PlayerCard card = new PlayerCard(cardObject, cardRect, background, nameText, detailText, badgeText);
+        PlayerCard card = new PlayerCard(cardObject, cardRect, background, nameText, detailText, badgeText, keepSceneLayout: false);
         cardsByPlayerIndex[playerIndex] = card;
         return card;
     }
@@ -314,6 +424,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
         private readonly TextMeshProUGUI nameText;
         private readonly TextMeshProUGUI detailText;
         private readonly TextMeshProUGUI badgeText;
+        private readonly bool keepSceneLayout;
 
         public PlayerCard(
             GameObject root,
@@ -321,7 +432,8 @@ public class PlayerInfoLayerUI : MonoBehaviour
             Image background,
             TextMeshProUGUI nameText,
             TextMeshProUGUI detailText,
-            TextMeshProUGUI badgeText)
+            TextMeshProUGUI badgeText,
+            bool keepSceneLayout)
         {
             Root = root;
             this.rect = rect;
@@ -329,10 +441,14 @@ public class PlayerInfoLayerUI : MonoBehaviour
             this.nameText = nameText;
             this.detailText = detailText;
             this.badgeText = badgeText;
+            this.keepSceneLayout = keepSceneLayout;
         }
 
         public void SetCorner(CornerLayout layout)
         {
+            if (keepSceneLayout || rect == null)
+                return;
+
             rect.anchorMin = layout.AnchorMin;
             rect.anchorMax = layout.AnchorMax;
             rect.pivot = layout.Pivot;
@@ -346,27 +462,33 @@ public class PlayerInfoLayerUI : MonoBehaviour
             string badge = isCurrentTurn ? "TURN" : status;
 
             nameText.text = $"{(isLocal ? "You - " : "")}P{player.PlayerIndex + 1} {ShortName(player.Username)}";
-            detailText.text = $"{FormatMoney(player.Money)} | Pos {player.Position} | Lands {ownedCount}";
+            detailText.text = $"{FormatMoney(player.Money)} | Pos {player.Position} | Land {ownedCount}";
             badgeText.text = badge;
+            nameText.color = new Color(1f, 0.15f, 0.18f, 1f);
+            detailText.color = new Color(1f, 0.15f, 0.18f, 1f);
 
             if (player.IsBankrupt)
             {
-                background.color = new Color(0.38f, 0.04f, 0.04f, 0.68f);
+                if (background != null)
+                    background.color = new Color(0.38f, 0.04f, 0.04f, 0.68f);
                 badgeText.color = new Color(1f, 0.55f, 0.55f, 1f);
             }
             else if (!player.IsConnected)
             {
-                background.color = new Color(0.12f, 0.12f, 0.12f, 0.54f);
+                if (background != null)
+                    background.color = new Color(0.12f, 0.12f, 0.12f, 0.54f);
                 badgeText.color = new Color(0.72f, 0.72f, 0.72f, 1f);
             }
             else if (isCurrentTurn)
             {
-                background.color = new Color(0.95f, 0.62f, 0.08f, 0.38f);
+                if (background != null)
+                    background.color = new Color(0.95f, 0.62f, 0.08f, 0.38f);
                 badgeText.color = new Color(1f, 0.88f, 0.25f, 1f);
             }
             else
             {
-                background.color = new Color(0f, 0f, 0f, 0.46f);
+                if (background != null)
+                    background.color = new Color(0f, 0f, 0f, 0.46f);
                 badgeText.color = new Color(0.62f, 0.9f, 1f, 1f);
             }
         }
