@@ -10,6 +10,7 @@ public class BoardTileInfoUI : MonoBehaviour
 {
     private const int BoardSquareCount = 32;
     private const string TileInfoCardSpritePath = "UI/TileInfoCard";
+    private const string TileImageResourcePath = "TileImages";
 
     private readonly Dictionary<int, Button> buttonsByPosition = new Dictionary<int, Button>();
     private RectTransform popupRoot;
@@ -17,6 +18,8 @@ public class BoardTileInfoUI : MonoBehaviour
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI bodyText;
     private Image deedHeaderImage;
+    private Image deedPreviewFrameImage;
+    private Image deedPreviewImage;
     private TextMeshProUGUI deedLabelText;
     private TextMeshProUGUI deedPropertyNameText;
     private TextMeshProUGUI deedMetaText;
@@ -198,6 +201,14 @@ public class BoardTileInfoUI : MonoBehaviour
         deedMetaText.overflowMode = TextOverflowModes.Ellipsis;
         SetRect(deedMetaText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(68f, -116f), new Vector2(-136f, 34f));
 
+        deedPreviewFrameImage = CreatePanelImage("Img_DeedPreviewFrame", parent, new Color(1f, 1f, 1f, 0.96f));
+        deedPreviewFrameImage.raycastTarget = false;
+        SetRect(deedPreviewFrameImage.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(78f, -174f), new Vector2(270f, 270f));
+
+        deedPreviewImage = CreatePanelImage("Img_DeedPreview", deedPreviewFrameImage.transform, new Color(0.88f, 0.93f, 0.94f, 1f));
+        deedPreviewImage.preserveAspect = true;
+        SetOffsets(deedPreviewImage.rectTransform, 12f, 12f, 12f, 12f);
+
         string[] labels =
         {
             "Tiền thuê đất trống",
@@ -213,38 +224,38 @@ public class BoardTileInfoUI : MonoBehaviour
             TextMeshProUGUI label = CreateText($"Txt_DeedRentLabel_{i}", parent, labels[i], 24f, FontStyles.Normal);
             label.alignment = TextAlignmentOptions.MidlineLeft;
             label.color = new Color(0.08f, 0.08f, 0.08f, 1f);
-            SetRect(label.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(120f, y), new Vector2(-360f, 36f));
+            SetRect(label.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(430f, y), new Vector2(330f, 36f));
             deedRentLabels.Add(label);
 
             TextMeshProUGUI value = CreateText($"Txt_DeedRentValue_{i}", parent, "", 24f, FontStyles.Bold);
             value.alignment = TextAlignmentOptions.MidlineRight;
             value.color = new Color(0.08f, 0.08f, 0.08f, 1f);
-            SetRect(value.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-112f, y), new Vector2(250f, 36f));
+            SetRect(value.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-86f, y), new Vector2(250f, 36f));
             deedRentValues.Add(value);
         }
 
         deedDividerImage = CreatePanelImage("Img_DeedDivider", parent, new Color(0.18f, 0.18f, 0.18f, 0.55f));
-        SetRect(deedDividerImage.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(-150f, 2f));
+        SetRect(deedDividerImage.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(430f, -438f), new Vector2(500f, 2f));
 
         deedHouseCostLabel = CreateText("Txt_DeedHouseCostLabel", parent, "Chi phí nhà", 22f, FontStyles.Bold);
         deedHouseCostLabel.alignment = TextAlignmentOptions.MidlineLeft;
         deedHouseCostLabel.color = new Color(0.08f, 0.08f, 0.08f, 1f);
-        SetRect(deedHouseCostLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(120f, 104f), new Vector2(-360f, 34f));
+        SetRect(deedHouseCostLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(430f, -462f), new Vector2(330f, 34f));
 
         deedHouseCostValue = CreateText("Txt_DeedHouseCostValue", parent, "", 22f, FontStyles.Bold);
         deedHouseCostValue.alignment = TextAlignmentOptions.MidlineRight;
         deedHouseCostValue.color = new Color(0.08f, 0.08f, 0.08f, 1f);
-        SetRect(deedHouseCostValue.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-112f, 104f), new Vector2(250f, 34f));
+        SetRect(deedHouseCostValue.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-86f, -462f), new Vector2(250f, 34f));
 
         deedHotelCostLabel = CreateText("Txt_DeedHotelCostLabel", parent, "Chi phí khách sạn", 22f, FontStyles.Bold);
         deedHotelCostLabel.alignment = TextAlignmentOptions.MidlineLeft;
         deedHotelCostLabel.color = new Color(0.08f, 0.08f, 0.08f, 1f);
-        SetRect(deedHotelCostLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(120f, 64f), new Vector2(-360f, 34f));
+        SetRect(deedHotelCostLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(430f, -502f), new Vector2(330f, 34f));
 
         deedHotelCostValue = CreateText("Txt_DeedHotelCostValue", parent, "", 22f, FontStyles.Bold);
         deedHotelCostValue.alignment = TextAlignmentOptions.MidlineRight;
         deedHotelCostValue.color = new Color(0.08f, 0.08f, 0.08f, 1f);
-        SetRect(deedHotelCostValue.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-112f, 64f), new Vector2(250f, 34f));
+        SetRect(deedHotelCostValue.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-86f, -502f), new Vector2(250f, 34f));
     }
 
     private void RegisterBoardButtons()
@@ -596,6 +607,8 @@ public class BoardTileInfoUI : MonoBehaviour
         if (deedHeaderImage != null)
             deedHeaderImage.color = propertyColor;
 
+        UpdateTilePreview(property);
+
         if (deedLabelText != null)
             deedLabelText.color = headerTextColor;
 
@@ -634,6 +647,9 @@ public class BoardTileInfoUI : MonoBehaviour
         string costText = buildCost > 0 ? $"{FormatMoney(buildCost)} mỗi lần" : "Tối đa";
         bool showBuildCosts = property.Type == "City";
 
+        if (deedDividerImage != null)
+            deedDividerImage.gameObject.SetActive(showBuildCosts);
+
         if (deedHouseCostLabel != null)
             deedHouseCostLabel.gameObject.SetActive(showBuildCosts);
 
@@ -669,6 +685,12 @@ public class BoardTileInfoUI : MonoBehaviour
 
         if (deedPropertyNameText != null)
             deedPropertyNameText.gameObject.SetActive(visible);
+
+        if (deedPreviewFrameImage != null)
+            deedPreviewFrameImage.gameObject.SetActive(visible);
+
+        if (deedPreviewImage != null)
+            deedPreviewImage.gameObject.SetActive(visible);
 
         if (deedMetaText != null)
             deedMetaText.gameObject.SetActive(visible);
@@ -713,6 +735,44 @@ public class BoardTileInfoUI : MonoBehaviour
             "Tiền thuê với 3 nhà",
             "Tiền thuê với khách sạn"
         };
+    }
+
+    private void UpdateTilePreview(GamePropertyStateData property)
+    {
+        if (deedPreviewImage == null)
+            return;
+
+        Sprite sprite = LoadTilePreviewSprite(property);
+        deedPreviewImage.sprite = sprite;
+        deedPreviewImage.color = sprite != null
+            ? Color.white
+            : new Color(0.86f, 0.92f, 0.94f, 1f);
+    }
+
+    private Sprite LoadTilePreviewSprite(GamePropertyStateData property)
+    {
+        if (property == null)
+            return null;
+
+        string[] resourceNames =
+        {
+            $"tile-{property.PositionIndex:00}",
+            property.Name,
+            (property.Name ?? "").Replace(" ", "_")
+        };
+
+        foreach (string resourceName in resourceNames)
+        {
+            if (string.IsNullOrWhiteSpace(resourceName))
+                continue;
+
+            Sprite sprite = Resources.Load<Sprite>($"{TileImageResourcePath}/{resourceName}");
+
+            if (sprite != null)
+                return sprite;
+        }
+
+        return null;
     }
 
     private string[] BuildDeedRentValues(GamePropertyStateData property)
