@@ -182,7 +182,7 @@ public class LobbyManager : MonoBehaviour
             txtPlayerUsername.text = PlayerSession.Instance?.Username ?? "Player";
 
         if (txtPlayerBalance != null)
-            txtPlayerBalance.text = FormatCurrency(PlayerSession.Instance?.Balance ?? 2000000);
+            txtPlayerBalance.text = $"Tổng điểm: {PlayerSession.Instance?.Point ?? 0}";
     }
 
     // ──────────────────────────────────────────────────────────
@@ -307,14 +307,14 @@ public class LobbyManager : MonoBehaviour
         SendPacketToServer(packet);
 
         // --- BẮT ĐẦU SỬA ĐỔI ---
-        // 1. Comment hoặc xóa dòng ngắt kết nối này đi:
-        // NetworkManager.Instance?.Disconnect();
+        if (NetworkManager.Instance != null)
+        {
+            Destroy(NetworkManager.Instance.gameObject);
+        }
 
         // 2. Xóa dữ liệu phiên đăng nhập cũ để account khác có thể login sạch sẽ
         PlayerSession.Clear();
         // --- KẾT THÚC SỬA ĐỔI ---
-
-        // Tải lại Scene Login
 
         // Tải lại Scene Login (đảm bảo "LoginScene" đúng tên trong Build Settings)
         UnityEngine.SceneManagement.SceneManager.LoadScene("SampleScene");
@@ -839,7 +839,7 @@ public class LobbyManager : MonoBehaviour
             txtPlayerUsername.text = PlayerSession.Instance?.Username ?? "Player";
 
         if (txtPlayerBalance != null)
-            txtPlayerBalance.text = FormatCurrency(PlayerSession.Instance?.Balance ?? 0);
+            txtPlayerBalance.text = $"Tổng điểm: {PlayerSession.Instance?.Point ?? 0}";
 
         if (imgPlayerAvatar != null && avatarSprites != null)
         {
@@ -1039,18 +1039,18 @@ public class PlayerSession
     public string Uid { get; private set; }
     public string IdToken { get; private set; }
     public string Username { get; private set; }
-    public long Balance { get; private set; }
+    public long Point { get; private set; }
     public string AvatarId { get; private set; }
 
     public static void Initialize(string uid, string idToken, string username,
-                                  long balance, string avatarId = "avatar_1")
+                                  long point, string avatarId = "avatar_1")
     {
         Instance = new PlayerSession
         {
             Uid = uid,
             IdToken = idToken,
             Username = username,
-            Balance = balance,
+            Point = point,
             AvatarId = avatarId
         };
     }
