@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -754,12 +755,20 @@ public class BoardTileInfoUI : MonoBehaviour
         if (property == null)
             return null;
 
-        string[] resourceNames =
+        List<string> resourceNames = new List<string>
         {
             $"tile-{property.PositionIndex:00}",
-            property.Name,
-            (property.Name ?? "").Replace(" ", "_")
+            property.Name
         };
+
+        string normalizedName = NormalizeTileResourceName(property.Name);
+
+        if (!string.IsNullOrWhiteSpace(normalizedName))
+        {
+            resourceNames.Add(normalizedName);
+            resourceNames.Add(normalizedName.Replace(" ", "_"));
+            resourceNames.Add(normalizedName.Replace(" ", ""));
+        }
 
         foreach (string resourceName in resourceNames)
         {
@@ -773,6 +782,37 @@ public class BoardTileInfoUI : MonoBehaviour
         }
 
         return null;
+    }
+
+    private string NormalizeTileResourceName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "";
+
+        string normalized = value.Normalize(NormalizationForm.FormD);
+        StringBuilder builder = new StringBuilder(normalized.Length);
+
+        foreach (char c in normalized)
+        {
+            UnicodeCategory category = CharUnicodeInfo.GetUnicodeCategory(c);
+
+            if (category == UnicodeCategory.NonSpacingMark)
+                continue;
+
+            if (c == '_' || c == '-')
+            {
+                builder.Append(' ');
+                continue;
+            }
+
+            builder.Append(c);
+        }
+
+        string collapsed = builder.ToString().Normalize(NormalizationForm.FormC);
+        while (collapsed.Contains("  "))
+            collapsed = collapsed.Replace("  ", " ");
+
+        return collapsed.Trim().ToUpperInvariant();
     }
 
     private string[] BuildDeedRentValues(GamePropertyStateData property)
