@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Monopoly.Server.Handles;
 using Monopoly.Server.Models;
+using Monopoly.Server.Models.State;
 using Monopoly.Server.Network;
 
 namespace Monopoly.Server.Network
@@ -18,6 +19,12 @@ namespace Monopoly.Server.Network
             {
                 JObject packet = JObject.Parse(jsonPacket);
                 string packetType = packet["Type"]?.ToString() ?? "";
+
+                if (IsBlockedWhilePaused(packetType, connection))
+                {
+                    await NetworkSender.SendGameActionFailedAsync(connection, "Trận đấu đang tạm dừng.");
+                    return;
+                }
 
                 switch (packetType)
                 {
@@ -96,6 +103,22 @@ namespace Monopoly.Server.Network
                         await GameHandler.HandleResumeGameAsync(packet, connection);
                         break;
 
+                    case "REQUEST_PAUSE":
+                        await GameControlHandler.HandleRequestPauseAsync(connection);
+                        break;
+
+                    case "PAUSE_VOTE":
+                        await GameControlHandler.HandlePauseVoteAsync(packet, connection);
+                        break;
+
+                    case "RESUME_GAMEPLAY":
+                        await GameControlHandler.HandleResumeGameplayAsync(connection);
+                        break;
+
+                    case "SURRENDER_GAME":
+                        await GameControlHandler.HandleSurrenderAsync(connection);
+                        break;
+
                     case "GAME_CHAT":
                     case "CHAT_MESSAGE":
                         await RoomHandler.HandleGameChatAsync(packet, connection);
@@ -143,6 +166,33 @@ namespace Monopoly.Server.Network
             }
 
             return JObject.FromObject(payloadToken);
+        }
+
+        private static bool IsBlockedWhilePaused(string packetType, ClientConnection connection)
+        {
+            if (connection == null || string.IsNullOrWhiteSpace(connection.CurrentRoomId))
+                return false;
+
+            string[] blockedPacketTypes =
+            {
+                "DiceRoll", "ROLL_DICE",
+                "EndTurn", "END_TURN",
+                "BUY_PROPERTY", "BuyProperty",
+                "BUILD_PROPERTY", "BuildProperty",
+                "SELL_PROPERTY_FOR_DEBT",
+                "USE_CARD", "UseCard",
+                "CARD_CHOICE_MADE"
+            };
+
+            if (!blockedPacketTypes.Contains(packetType))
+                return false;
+
+            lock (ServerState.Lock)
+            {
+                return ServerState.Rooms.TryGetValue(connection.CurrentRoomId, out Room room) &&
+                    room.GameState != null &&
+                    room.GameState.IsPaused;
+            }
         }
     }
 }

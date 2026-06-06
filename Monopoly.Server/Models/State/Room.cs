@@ -13,6 +13,7 @@ namespace Monopoly.Server.Models.State
         public int MaxPlayers { get; set; }
         public int BotCount { get; set; }
         public string MapName { get; set; }
+        public int MatchDurationMinutes { get; set; } = 20;
         public bool IsStarted { get; set; }
 
         public List<RoomPlayer> Players { get; set; } = new List<RoomPlayer>();

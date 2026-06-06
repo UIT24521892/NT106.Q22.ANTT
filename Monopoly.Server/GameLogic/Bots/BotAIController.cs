@@ -21,7 +21,7 @@ namespace Monopoly.Server.GameLogic.Bots
             lock (ServerState.Lock)
             {
                 // Kiểm tra lại trạng thái game xem còn hợp lệ không
-                if (!room.IsStarted || room.GameState.IsFinished || room.GameState.CurrentTurnPlayerIndex != bot.PlayerIndex)
+                if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
                 // Giai đoạn 1 & 2: Xử lý Đảo Hoang (Jail)
@@ -57,7 +57,7 @@ namespace Monopoly.Server.GameLogic.Bots
 
             lock (ServerState.Lock)
             {
-                if (!room.IsStarted || room.GameState.IsFinished || room.GameState.CurrentTurnPlayerIndex != bot.PlayerIndex)
+                if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
                 // Đổ xúc xắc
@@ -110,7 +110,7 @@ namespace Monopoly.Server.GameLogic.Bots
             // Giai đoạn mua/xây nhà và phá sản
             lock (ServerState.Lock)
             {
-                if (!room.IsStarted || room.GameState.IsFinished || room.GameState.CurrentTurnPlayerIndex != bot.PlayerIndex)
+                if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
                 // Xử lý nợ nần nếu tiền âm (Bankruptcy / Sell properties)
@@ -180,7 +180,7 @@ namespace Monopoly.Server.GameLogic.Bots
             // Chuyển lượt
             lock (ServerState.Lock)
             {
-                if (!room.IsStarted || room.GameState.IsFinished || room.GameState.CurrentTurnPlayerIndex != bot.PlayerIndex)
+                if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
                 if (!bot.IsBankrupt && hasRolledDouble && bot.ConsecutiveDoubles < 3 && bot.JailTurnsLeft <= 0)
@@ -212,6 +212,16 @@ namespace Monopoly.Server.GameLogic.Bots
             }
 
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
+        }
+
+        private static bool CanContinueTurnUnsafe(Room room, GamePlayerState bot)
+        {
+            return room != null &&
+                room.IsStarted &&
+                room.GameState != null &&
+                !room.GameState.IsFinished &&
+                !room.GameState.IsPaused &&
+                room.GameState.CurrentTurnPlayerIndex == bot.PlayerIndex;
         }
 
         private static bool CompletesColorSet(GameState gameState, GamePlayerState bot, GamePropertyState targetProp)

@@ -23,6 +23,7 @@ namespace Monopoly.Server.Handles
             int maxPlayers = payload["MaxPlayers"]?.Value<int>() ?? 4;
             int botCount = payload["BotCount"]?.Value<int>() ?? 0;
             string mapName = payload["MapName"]?.ToString() ?? "Classic";
+            int matchDurationMinutes = payload["MatchDurationMinutes"]?.Value<int>() ?? 20;
 
             if (string.IsNullOrWhiteSpace(hostUsername))
             {
@@ -58,6 +59,9 @@ namespace Monopoly.Server.Handles
 
             if (botCount < 0) botCount = 0;
             if (botCount > maxPlayers - 1) botCount = maxPlayers - 1;
+            int[] allowedDurations = { 10, 20, 30, 60 };
+            if (!allowedDurations.Contains(matchDurationMinutes))
+                matchDurationMinutes = 20;
 
             string roomId;
             Room room;
@@ -76,6 +80,7 @@ namespace Monopoly.Server.Handles
                     MaxPlayers = maxPlayers,
                     BotCount = botCount,
                     MapName = mapName,
+                    MatchDurationMinutes = matchDurationMinutes,
                     IsStarted = false
                 };
 
@@ -103,7 +108,7 @@ namespace Monopoly.Server.Handles
                 ServerState.Rooms[roomId] = room;
             }
 
-            Console.WriteLine($"[ROOM] Tạo phòng {roomId} bởi {hostUsername}. Max={maxPlayers}, Bot={botCount}, Map={mapName}");
+            Console.WriteLine($"[ROOM] Tạo phòng {roomId} bởi {hostUsername}. Max={maxPlayers}, Bot={botCount}, Map={mapName}, Duration={matchDurationMinutes}m");
 
             await NetworkSender.SendJsonPacketAsync(connection.Stream, new
             {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -13,6 +14,9 @@ public class BoardTileInfoUI : MonoBehaviour
     private const string TileImageResourcePath = "TileImages";
 
     private readonly Dictionary<int, Button> buttonsByPosition = new Dictionary<int, Button>();
+    private readonly Dictionary<string, Sprite> tilePreviewSprites =
+        new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+    private bool tilePreviewSpritesLoaded;
     private RectTransform popupRoot;
     private RectTransform popupCardRoot;
     private TextMeshProUGUI titleText;
@@ -207,6 +211,9 @@ public class BoardTileInfoUI : MonoBehaviour
 
         deedPreviewImage = CreatePanelImage("Img_DeedPreview", deedPreviewFrameImage.transform, new Color(0.88f, 0.93f, 0.94f, 1f));
         deedPreviewImage.preserveAspect = true;
+        deedPreviewImage.rectTransform.anchorMin = Vector2.zero;
+        deedPreviewImage.rectTransform.anchorMax = Vector2.one;
+        deedPreviewImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
         SetOffsets(deedPreviewImage.rectTransform, 12f, 12f, 12f, 12f);
 
         string[] labels =
@@ -754,25 +761,119 @@ public class BoardTileInfoUI : MonoBehaviour
         if (property == null)
             return null;
 
-        string[] resourceNames =
+        EnsureTilePreviewSpritesLoaded();
+
+        List<string> resourceNames = new List<string>
         {
             $"tile-{property.PositionIndex:00}",
-            property.Name,
-            (property.Name ?? "").Replace(" ", "_")
+            property.Name
         };
+
+        string normalizedName = NormalizeTileResourceName(property.Name);
+
+        if (!string.IsNullOrWhiteSpace(normalizedName))
+        {
+            resourceNames.Add(normalizedName);
+            resourceNames.Add(normalizedName.Replace(" ", "_"));
+            resourceNames.Add(normalizedName.Replace(" ", ""));
+        }
 
         foreach (string resourceName in resourceNames)
         {
             if (string.IsNullOrWhiteSpace(resourceName))
                 continue;
 
-            Sprite sprite = Resources.Load<Sprite>($"{TileImageResourcePath}/{resourceName}");
+            string lookupKey = NormalizeTileResourceName(resourceName);
+            if (tilePreviewSprites.TryGetValue(lookupKey, out Sprite sprite))
+                return sprite;
 
+            string resourcePath = $"{TileImageResourcePath}/{resourceName}";
+            sprite = Resources.Load<Sprite>(resourcePath);
             if (sprite != null)
                 return sprite;
+
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture != null)
+            {
+                return Sprite.Create(
+                    texture,
+                    new Rect(0f, 0f, texture.width, texture.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f);
+            }
         }
 
+        Debug.LogWarning(
+            $"[BoardTileInfoUI] Tile preview not found for '{property.Name}' " +
+            $"at position {property.PositionIndex}. Tried: {string.Join(", ", resourceNames)}");
         return null;
+    }
+
+    private void EnsureTilePreviewSpritesLoaded()
+    {
+        if (tilePreviewSpritesLoaded)
+            return;
+
+        tilePreviewSpritesLoaded = true;
+        tilePreviewSprites.Clear();
+
+        UnityEngine.Object[] assets = Resources.LoadAll(TileImageResourcePath);
+        foreach (UnityEngine.Object asset in assets)
+        {
+            if (asset == null)
+                continue;
+
+            Sprite sprite = asset as Sprite;
+            if (sprite == null && asset is Texture2D texture)
+            {
+                sprite = Sprite.Create(
+                    texture,
+                    new Rect(0f, 0f, texture.width, texture.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f);
+                sprite.name = asset.name;
+            }
+
+            if (sprite == null)
+                continue;
+
+            string key = NormalizeTileResourceName(asset.name);
+            if (!string.IsNullOrWhiteSpace(key))
+                tilePreviewSprites[key] = sprite;
+        }
+
+        Debug.Log($"[BoardTileInfoUI] Loaded {tilePreviewSprites.Count} tile preview sprites.");
+    }
+
+    private string NormalizeTileResourceName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "";
+
+        string normalized = value.Normalize(NormalizationForm.FormD);
+        StringBuilder builder = new StringBuilder(normalized.Length);
+
+        foreach (char c in normalized)
+        {
+            UnicodeCategory category = CharUnicodeInfo.GetUnicodeCategory(c);
+
+            if (category == UnicodeCategory.NonSpacingMark)
+                continue;
+
+            if (c == '_' || c == '-')
+            {
+                builder.Append(' ');
+                continue;
+            }
+
+            builder.Append(c);
+        }
+
+        string collapsed = builder.ToString().Normalize(NormalizationForm.FormC);
+        while (collapsed.Contains("  "))
+            collapsed = collapsed.Replace("  ", " ");
+
+        return collapsed.Trim().ToUpperInvariant();
     }
 
     private string[] BuildDeedRentValues(GamePropertyStateData property)
