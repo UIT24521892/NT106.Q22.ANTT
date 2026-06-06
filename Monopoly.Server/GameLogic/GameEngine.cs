@@ -19,6 +19,9 @@ namespace Monopoly.Server.GameLogic
     {
         public static void ResetTurnTimerUnsafe(GameState gameState)
         {
+            if (gameState.IsPaused)
+                return;
+
             gameState.TurnDurationSeconds = 45;
             gameState.TurnEndsAtUtcTicks = DateTime.UtcNow.AddSeconds(45).Ticks;
             gameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
@@ -1265,12 +1268,7 @@ namespace Monopoly.Server.GameLogic
         }
         public static string BuildRankingSummaryUnsafe(GameState gameState)
         {
-            List<GamePlayerState> rankedPlayers = gameState.Players
-                .Where(p => !p.IsBot)
-                .OrderBy(p => p.IsBankrupt ? 1 : 0)
-                .ThenByDescending(p => p.IsBankrupt ? p.BankruptcyOrder : int.MaxValue)
-                .ThenBy(p => p.PlayerIndex)
-                .ToList();
+            List<GamePlayerState> rankedPlayers = GetRankedHumanPlayersUnsafe(gameState);
 
             List<string> parts = new List<string>();
 
@@ -1283,12 +1281,7 @@ namespace Monopoly.Server.GameLogic
         }
         public static List<GameOverRankingResult> BuildGameOverRankingsUnsafe(GameState gameState)
         {
-            List<GamePlayerState> rankedPlayers = gameState.Players
-                .Where(p => !p.IsBot)
-                .OrderBy(p => p.IsBankrupt ? 1 : 0)
-                .ThenByDescending(p => p.IsBankrupt ? p.BankruptcyOrder : int.MaxValue)
-                .ThenBy(p => p.PlayerIndex)
-                .ToList();
+            List<GamePlayerState> rankedPlayers = GetRankedHumanPlayersUnsafe(gameState);
 
             List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
 
@@ -1311,6 +1304,27 @@ namespace Monopoly.Server.GameLogic
             }
 
             return rankings;
+        }
+
+        private static List<GamePlayerState> GetRankedHumanPlayersUnsafe(GameState gameState)
+        {
+            IEnumerable<GamePlayerState> players = gameState.Players.Where(p => !p.IsBot);
+
+            if (gameState.EndReason == "TIMEOUT")
+            {
+                return players
+                    .OrderByDescending(p => GetPlayerNetWorthUnsafe(gameState, p))
+                    .ThenByDescending(p => p.Money)
+                    .ThenBy(p => p.IsBankrupt ? 1 : 0)
+                    .ThenBy(p => p.PlayerIndex)
+                    .ToList();
+            }
+
+            return players
+                .OrderBy(p => p.IsBankrupt ? 1 : 0)
+                .ThenByDescending(p => p.IsBankrupt ? p.BankruptcyOrder : int.MaxValue)
+                .ThenBy(p => p.PlayerIndex)
+                .ToList();
         }
         public static GamePlayerState GetNextTurnPlayerUnsafe(GameState gameState)
         {
@@ -1343,6 +1357,8 @@ namespace Monopoly.Server.GameLogic
         }
         public static GameState CreateInitialGameState(Room room)
         {
+            long nowTicks = DateTime.UtcNow.Ticks;
+            int matchDurationSeconds = Math.Max(600, room.MatchDurationMinutes * 60);
             GameState gameState = new GameState
             {
                 RoomId = room.RoomId,
@@ -1360,6 +1376,14 @@ namespace Monopoly.Server.GameLogic
                 WinnerUsername = "",
                 MatchId = Guid.NewGuid().ToString("N"),
                 GameOverBroadcasted = false,
+                MatchDurationSeconds = matchDurationSeconds,
+                MatchStartedAtUtcTicks = nowTicks,
+                MatchEndsAtUtcTicks = DateTime.UtcNow.AddSeconds(matchDurationSeconds).Ticks,
+                EndReason = "",
+                IsPaused = false,
+                PauseRequestedBy = "",
+                PauseStartedAtUtcTicks = 0,
+                PauseVotes = new List<string>(),
                 WorldChampionshipPosition = 16,
                 IsWaitingForCardChoice = false,
                 PendingCardEffectCode = "",
@@ -1429,6 +1453,45 @@ namespace Monopoly.Server.GameLogic
             }
 
             return gameState;
+        }
+
+        public static long GetPlayerNetWorthUnsafe(GameState gameState, GamePlayerState player)
+        {
+            if (gameState == null || player == null)
+                return 0;
+
+            long netWorth = Math.Max(0, player.Money);
+            foreach (GamePropertyState property in gameState.Properties.Values)
+            {
+                if (property.OwnerPlayerIndex == player.PlayerIndex)
+                    netWorth += GetPropertySaleValueUnsafe(property);
+            }
+
+            return netWorth;
+        }
+
+        public static void FinishMatchByTimeUnsafe(GameState gameState, List<string> actionMessages)
+        {
+            if (gameState == null || gameState.IsFinished)
+                return;
+
+            List<GamePlayerState> ranked = gameState.Players
+                .Where(p => !p.IsBot)
+                .OrderByDescending(p => GetPlayerNetWorthUnsafe(gameState, p))
+                .ThenByDescending(p => p.Money)
+                .ThenBy(p => p.IsBankrupt ? 1 : 0)
+                .ThenBy(p => p.PlayerIndex)
+                .ToList();
+
+            gameState.IsFinished = true;
+            gameState.EndReason = "TIMEOUT";
+            gameState.WinnerUsername = ranked.Count > 0 ? ranked[0].Username : "Không có ai";
+            gameState.HasRolledThisTurn = true;
+            gameState.TurnEndsAtUtcTicks = 0;
+            gameState.MatchEndsAtUtcTicks = DateTime.UtcNow.Ticks;
+            gameState.IsBotPlaying = false;
+            actionMessages.Add($"Hết thời gian trận. {gameState.WinnerUsername} dẫn đầu theo tổng tài sản.");
+            actionMessages.Add($"Xếp hạng: {BuildRankingSummaryUnsafe(gameState)}");
         }
         public static int GetScoreForRank(int rank)
         {

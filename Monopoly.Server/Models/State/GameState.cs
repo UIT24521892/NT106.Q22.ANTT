@@ -29,6 +29,14 @@ namespace Monopoly.Server.Models.State
         public string WinnerUsername { get; set; } = "";
         public string MatchId { get; set; } = "";
         public bool GameOverBroadcasted { get; set; }
+        public int MatchDurationSeconds { get; set; } = 1200;
+        public long MatchStartedAtUtcTicks { get; set; }
+        public long MatchEndsAtUtcTicks { get; set; }
+        public string EndReason { get; set; } = "";
+        public bool IsPaused { get; set; }
+        public string PauseRequestedBy { get; set; } = "";
+        public long PauseStartedAtUtcTicks { get; set; }
+        public List<string> PauseVotes { get; set; } = new List<string>();
         public int WorldChampionshipPosition { get; set; } = 16;
         public bool IsWaitingForCardChoice { get; set; }
         public string PendingCardEffectCode { get; set; } = "";

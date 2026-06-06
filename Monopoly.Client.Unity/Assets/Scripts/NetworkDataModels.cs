@@ -33,6 +33,14 @@ public class GameStateData
     public long ServerUtcTicks;
     public bool IsFinished;
     public string WinnerUsername;
+    public int MatchDurationSeconds;
+    public long MatchStartedAtUtcTicks;
+    public long MatchEndsAtUtcTicks;
+    public string EndReason;
+    public bool IsPaused;
+    public string PauseRequestedBy;
+    public long PauseStartedAtUtcTicks;
+    public List<string> PauseVotes;
     public int WorldChampionshipPosition;
     public bool IsWaitingForCardChoice;
     public string PendingCardEffectCode;

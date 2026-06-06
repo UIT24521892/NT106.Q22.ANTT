@@ -52,6 +52,7 @@ public class NetworkManager : MonoBehaviour
     private void Awake()
     {
         Application.runInBackground = true;
+        AudioManager.EnsureExists();
 
         if (Instance != null)
         {
@@ -701,6 +702,42 @@ public class NetworkManager : MonoBehaviour
         SendPacket(packet);
     }
 
+    public void SendPauseRequest()
+    {
+        SendPacket(new
+        {
+            Type = "REQUEST_PAUSE",
+            Payload = new { RoomId = GameSession.RoomId }
+        });
+    }
+
+    public void SendPauseVote(bool accept)
+    {
+        SendPacket(new
+        {
+            Type = "PAUSE_VOTE",
+            Payload = new { RoomId = GameSession.RoomId, Accept = accept }
+        });
+    }
+
+    public void SendResumeGameplayRequest()
+    {
+        SendPacket(new
+        {
+            Type = "RESUME_GAMEPLAY",
+            Payload = new { RoomId = GameSession.RoomId }
+        });
+    }
+
+    public void SendSurrenderRequest()
+    {
+        SendPacket(new
+        {
+            Type = "SURRENDER_GAME",
+            Payload = new { RoomId = GameSession.RoomId }
+        });
+    }
+
     public void RequestLeaderboard()
     {
         var packet = new
@@ -953,6 +990,7 @@ public class NetworkManager : MonoBehaviour
                         BoardTileInfoUI.EnsureExists().SyncCardChoiceState(gameState);
                         GameEventPopupUI.EnsureExists().ProcessGameStateUpdate(gameState, message);
                         PropertySaleUI.EnsureExists().Refresh(gameState);
+                        GameSettingsUI.EnsureExists().Refresh(gameState);
 
                         Debug.Log(
                             $"[NetworkManager] GAME_STATE_UPDATE Room={gameState?.RoomId ?? "N/A"}, " +

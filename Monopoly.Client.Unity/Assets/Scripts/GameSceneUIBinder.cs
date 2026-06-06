@@ -27,6 +27,8 @@ public class GameSceneUIBinder : MonoBehaviour
         GameOverUI.EnsureExists();
         GameEventPopupUI.EnsureExists().ResetEvents();
         PropertySaleUI.EnsureExists().Refresh(GameSession.CurrentState);
+        AudioManager.EnsureExists();
+        GameSettingsUI.EnsureExists().Refresh(GameSession.CurrentState);
     }
 
     private void OnDestroy()

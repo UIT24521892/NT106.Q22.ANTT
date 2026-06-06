@@ -62,6 +62,7 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private Slider sliderBotCount;         // Slider chọn số bot
     [SerializeField] private TMP_Text txtBotCountValue;     // Hiển thị giá trị slider bot
     [SerializeField] private TMP_Dropdown dropdownMap;      // Dropdown chọn bản đồ
+    [SerializeField] private TMP_Dropdown dropdownMatchDuration;
     [SerializeField] private TMP_Text txtRoomSettingsError; // Text hiển thị lỗi validation
 
     // ──────────────────────────────────────────────────────────
@@ -110,6 +111,7 @@ public class LobbyManager : MonoBehaviour
 
         // Khởi tạo dropdown danh sách map
         InitMapDropdown();
+        InitMatchDurationDropdown();
 
         // Hiển thị thông tin người chơi từ session đăng nhập
         LoadPlayerInfo();
@@ -169,6 +171,23 @@ public class LobbyManager : MonoBehaviour
             "Châu Âu"
         };
         dropdownMap.AddOptions(mapOptions);
+    }
+
+    private void InitMatchDurationDropdown()
+    {
+        if (dropdownMatchDuration == null)
+            return;
+
+        dropdownMatchDuration.ClearOptions();
+        dropdownMatchDuration.AddOptions(new List<string>
+        {
+            "10 phút",
+            "20 phút",
+            "30 phút",
+            "60 phút"
+        });
+        dropdownMatchDuration.value = 1;
+        dropdownMatchDuration.RefreshShownValue();
     }
 
     /// <summary>
@@ -356,6 +375,9 @@ public class LobbyManager : MonoBehaviour
         int maxPlayers = (int)sliderMaxPlayers.value;
         int botCount = (int)sliderBotCount.value;
         string selectedMap = dropdownMap.options[dropdownMap.value].text;
+        int[] durationOptions = { 10, 20, 30, 60 };
+        int durationIndex = dropdownMatchDuration != null ? dropdownMatchDuration.value : 1;
+        int matchDurationMinutes = durationOptions[Mathf.Clamp(durationIndex, 0, durationOptions.Length - 1)];
 
         if (botCount >= maxPlayers)
         {
@@ -371,7 +393,8 @@ public class LobbyManager : MonoBehaviour
                 HostUsername = PlayerSession.Instance?.Username,
                 MaxPlayers = maxPlayers,
                 BotCount = botCount,
-                MapName = selectedMap
+                MapName = selectedMap,
+                MatchDurationMinutes = matchDurationMinutes
             }
         };
 

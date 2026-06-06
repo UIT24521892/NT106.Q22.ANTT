@@ -32,6 +32,23 @@ namespace Monopoly.Server.GameLogic
                                 continue;
                             }
 
+                            if (room.GameState.IsPaused)
+                            {
+                                continue;
+                            }
+
+                            if (room.GameState.MatchEndsAtUtcTicks > 0 &&
+                                nowTicks >= room.GameState.MatchEndsAtUtcTicks)
+                            {
+                                List<string> timeoutMessages = new List<string>();
+                                GameEngine.FinishMatchByTimeUnsafe(room.GameState, timeoutMessages);
+                                string timeoutMessage = string.Join(" ", timeoutMessages);
+                                room.GameState.LastActionMessage = timeoutMessage;
+                                GameEngine.AddGameLogUnsafe(room.GameState, timeoutMessage);
+                                expiredTurns.Add((room.RoomId, timeoutMessage));
+                                continue;
+                            }
+
                             GamePlayerState currentPlayer = room.GameState.Players.FirstOrDefault(
                                 p => p.PlayerIndex == room.GameState.CurrentTurnPlayerIndex
                             );
