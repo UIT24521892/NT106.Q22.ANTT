@@ -430,13 +430,25 @@ public class NetworkManager : MonoBehaviour
 
     private async Task ConnectToServerAsync()
     {
+        ServerConnectionConfigData endpoint = ServerConnectionConfig.Current;
+
         try
         {
             ClientSocket = new TcpClient();
+            ClientSocket.NoDelay = true;
 
-            // Test cùng máy thì dùng 127.0.0.1.
-            // Test LAN thì đổi thành IP máy chạy server, ví dụ: 192.168.1.10
-            await ClientSocket.ConnectAsync("127.0.0.1", 8080);
+            // Endpoint comes from StreamingAssets/server-config.json or command-line overrides.
+            if (txtStatus != null)
+                txtStatus.text = $"Dang ket noi {endpoint.Host}:{endpoint.Port}...";
+
+            Task connectTask = ClientSocket.ConnectAsync(endpoint.Host, endpoint.Port);
+            Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(endpoint.ConnectTimeoutSeconds));
+            Task completedTask = await Task.WhenAny(connectTask, timeoutTask);
+
+            if (completedTask != connectTask)
+                throw new TimeoutException($"Connection timeout after {endpoint.ConnectTimeoutSeconds}s.");
+
+            await connectTask;
 
             ServerStream = ClientSocket.GetStream();
 
@@ -465,13 +477,17 @@ public class NetworkManager : MonoBehaviour
         }
         catch (Exception ex)
         {
+            ServerStream = null;
+            ClientSocket?.Close();
+            ClientSocket = null;
+
             if (txtStatus != null)
             {
                 txtStatus.color = Color.red;
-                txtStatus.text = "Lỗi: Không tìm thấy Máy chủ!";
+                txtStatus.text = $"Không thể kết nối {endpoint.Host}:{endpoint.Port}";
             }
 
-            Debug.LogError($"[NetworkManager] TCP Error: {ex.Message}");
+            Debug.LogError($"[NetworkManager] TCP {endpoint.Host}:{endpoint.Port} error: {ex.Message}");
         }
     }
 
