@@ -533,7 +533,7 @@ public class BoardTokenManager : MonoBehaviour
 
         BoardTileInfoUI tileInfo = FindObjectOfType<BoardTileInfoUI>();
 
-        if (tileInfo != null)
+        if (tileInfo != null && !tileInfo.IsSelectingCardTarget)
             tileInfo.ShowTileInfo(finalPosition);
     }
 

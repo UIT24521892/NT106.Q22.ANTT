@@ -41,6 +41,7 @@ public class BoardTileInfoUI : MonoBehaviour
     private int currentPopupPosition = -1;
     private float nextPopupRefreshTime;
     private bool isSelectingCardTarget;
+    public bool IsSelectingCardTarget => isSelectingCardTarget;
     private string selectingCardEffectCode = "";
     private readonly HashSet<int> selectableCardTargets = new HashSet<int>();
 
@@ -467,7 +468,6 @@ public class BoardTileInfoUI : MonoBehaviour
 
         return mappedButtons;
     }
-
     public void ShowTileInfo(int position)
     {
         if (isSelectingCardTarget)
@@ -485,7 +485,7 @@ public class BoardTileInfoUI : MonoBehaviour
             RefreshCurrentPopup();
 
             if (actionHintText != null)
-                actionHintText.text = $"O {position} khong hop le cho the {selectingCardEffectCode}.";
+                actionHintText.text = $"O {position} khong hop le cho {GetFriendlyEffectName(selectingCardEffectCode)}.";
 
             popupRoot.SetAsLastSibling();
             popupRoot.gameObject.SetActive(true);
@@ -496,6 +496,21 @@ public class BoardTileInfoUI : MonoBehaviour
         RefreshCurrentPopup();
         popupRoot.SetAsLastSibling();
         popupRoot.gameObject.SetActive(true);
+    }
+
+    private string GetFriendlyEffectName(string effectCode)
+    {
+        switch (effectCode)
+        {
+            case "WORLD_TOUR": return "Du Lich The Gioi";
+            case "WORLD_CHAMPIONSHIP_HOST": return "Dang Cai Giai Vo Dich";
+            case "FLIGHT": return "Ve May Bay";
+            case "FREE_UPGRADE": return "Nang Cap Mien Phi";
+            case "EARTHQUAKE": return "Dong Dat";
+            case "POWER_OUTAGE": return "Cup Dien";
+            case "MOVE_CHAMPIONSHIP": return "Doi Giai Vo Dich";
+            default: return $"the {effectCode}";
+        }
     }
 
     public void BeginCardTargetSelection(string effectCode, List<int> validPositions)
@@ -512,6 +527,10 @@ public class BoardTileInfoUI : MonoBehaviour
 
         ApplyTargetHighlights();
         HidePopup();
+
+        // Bring click zones to the front so popups/overlays don't block them
+        if (isSelectingCardTarget && markerClickLayer != null)
+            markerClickLayer.SetAsLastSibling();
     }
 
     public void SyncCardChoiceState(GameStateData state)

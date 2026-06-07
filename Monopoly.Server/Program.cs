@@ -6,6 +6,15 @@ using System.Threading.Tasks;
 using Monopoly.Server.Network;
 using Monopoly.Server.GameLogic;
 
+using System;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading.Tasks;
+using Monopoly.Server.Network;
+using Monopoly.Server.GameLogic;
+
 namespace Monopoly.Server
 {
     class Program
@@ -16,6 +25,12 @@ namespace Monopoly.Server
         {
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
+
+            if (args.Contains("--run-tests"))
+            {
+                GameEngineTests.Run();
+                return;
+            }
 
             Console.Title = "Monopoly Game Server - Nhóm 4";
             Console.WriteLine("=====================================");
