@@ -742,6 +742,13 @@ Recommended production safeguards:
 ### Verification snapshot
 
 - `dotnet build MonopolyGame.sln`: **successful**, 0 errors.
-- Current build warnings: approximately **112**.
+- Current build warnings: approximately **114**.
 - Unity scenes and prefabs: inspected statically; no automated Unity build or PlayMode test suite was found.
-- Existing uncommitted Unity changes were not modified while producing this document.
+
+### Latest repository sync
+
+- Latest pushed branch: `feature/logic_game`.
+- Latest pushed commit: `0b828b6 add gameplay updates and project summary`.
+- Commit timestamp: June 7, 2026 23:19:05 +0700.
+- Remote target: `origin/feature/logic_game`.
+- This summary reflects the committed gameplay/UI/server updates, the added `GameEngineTests.cs`, and the project documentation snapshot included in that push.
