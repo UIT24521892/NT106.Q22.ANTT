@@ -466,6 +466,25 @@ public class BoardTokenManager : MonoBehaviour
         return token;
     }
 
+    public bool TryGetBoardCenterWorldPosition(out Vector3 worldPosition)
+    {
+        worldPosition = Vector3.zero;
+
+        Initialize();
+
+        if (boardPath.Count != BoardSquareCount || tokenLayer == null)
+            return false;
+
+        Vector2 sum = Vector2.zero;
+
+        foreach (Vector2 point in boardPath)
+            sum += point;
+
+        Vector2 centerLocal = sum / boardPath.Count;        // local trong tokenLayer (pivot center)
+        worldPosition = tokenLayer.TransformPoint(centerLocal); // -> world để caller tự convert
+        return true;
+    }
+
     public bool TryGetPlayerTokenWorldPosition(string username, out Vector3 worldPosition)
     {
         worldPosition = Vector3.zero;

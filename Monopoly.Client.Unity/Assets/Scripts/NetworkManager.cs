@@ -573,6 +573,7 @@ public class NetworkManager : MonoBehaviour
         };
 
         SendPacket(packet);
+        AudioManager.EnsureExists().PlaySfx("buy");
         lastClientActionStatus = "Sent: Buy";
         UpdateGameStateOverlayText();
         Debug.Log("[NetworkManager] Đã gửi yêu cầu BUY_PROPERTY bằng phím B.");
@@ -592,6 +593,7 @@ public class NetworkManager : MonoBehaviour
         };
 
         SendPacket(packet);
+        AudioManager.EnsureExists().PlaySfx("build");
         lastClientActionStatus = "Sent: Build";
         UpdateGameStateOverlayText();
         Debug.Log($"[NetworkManager] Sent BUILD_PROPERTY for position {positionIndex}.");
@@ -1007,6 +1009,7 @@ public class NetworkManager : MonoBehaviour
                         GameEventPopupUI.EnsureExists().ProcessGameStateUpdate(gameState, message);
                         PropertySaleUI.EnsureExists().Refresh(gameState);
                         GameSettingsUI.EnsureExists().Refresh(gameState);
+                        MoneyFlowUI.EnsureExists().NotifyStateUpdate(gameState);
 
                         Debug.Log(
                             $"[NetworkManager] GAME_STATE_UPDATE Room={gameState?.RoomId ?? "N/A"}, " +
@@ -1057,6 +1060,7 @@ public class NetworkManager : MonoBehaviour
                             .ShowCard(drawnByUsername, cardId, cardName, cardType, detailEffect);
                         GameEventPopupUI.EnsureExists()
                             .ShowCardDrawn(drawnByUsername, cardId, cardName, cardType, detailEffect);
+                        AudioManager.EnsureExists().PlaySfx("card");
 
                         Debug.Log(
                             $"[NetworkManager] CARD_DRAWN By={drawnByUsername}, " +
@@ -1071,6 +1075,7 @@ public class NetworkManager : MonoBehaviour
                         GameOverReceived?.Invoke(gameOver);
                         GameOverUI.EnsureExists().Show(gameOver);
                         GameEventPopupUI.EnsureExists().ShowGameOver(gameOver);
+                        AudioManager.EnsureExists().PlaySfx("gameover");
                         Debug.Log($"[NetworkManager] GAME_OVER MatchId={gameOver?.MatchId ?? "N/A"}");
                         break;
                     }

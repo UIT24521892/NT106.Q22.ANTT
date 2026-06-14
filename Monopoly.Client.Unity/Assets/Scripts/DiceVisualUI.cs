@@ -108,6 +108,7 @@ public class DiceVisualUI : MonoBehaviour
         if (rollRoutine != null)
             StopCoroutine(rollRoutine);
 
+        AudioManager.EnsureExists().PlaySfx("dice");
         rollRoutine = StartCoroutine(AnimateToServerDice(state.LastDice1, state.LastDice2, state.LastDiceTotal));
     }
 
