@@ -1355,10 +1355,14 @@ namespace Monopoly.Server.GameLogic
                 {
                     var winner = activePlayers.OrderByDescending(p => p.Money).First();
                     gameState.WinnerUsername = winner.Username;
+                    if (string.IsNullOrWhiteSpace(gameState.EndReason))
+                        gameState.EndReason = "Phá sản — người chơi cuối cùng trụ lại";
                 }
                 else
                 {
                     gameState.WinnerUsername = "Không có ai";
+                    if (string.IsNullOrWhiteSpace(gameState.EndReason))
+                        gameState.EndReason = "Tất cả người chơi đã rời/phá sản";
                 }
 
                 gameState.HasRolledThisTurn = true;
@@ -1774,10 +1778,11 @@ namespace Monopoly.Server.GameLogic
 
                 nextPlayer = candidate;
                 gameState.CurrentTurnUsername = nextPlayer.Username;
-                
+                nextPlayer.ConsecutiveDoubles = 0;
+
                 gameState.HasRolledThisTurn = false;
                 gameState.ForceDoubleThisTurn = false;
-                
+
                 return;
             }
 

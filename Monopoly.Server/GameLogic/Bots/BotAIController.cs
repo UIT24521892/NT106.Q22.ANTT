@@ -54,6 +54,7 @@ namespace Monopoly.Server.GameLogic.Bots
 
             List<CardDrawEvent> cardEvents = new List<CardDrawEvent>();
             bool hasRolledDouble = false;
+            bool wasInJail = false;
 
             lock (ServerState.Lock)
             {
@@ -68,13 +69,15 @@ namespace Monopoly.Server.GameLogic.Bots
                 // ...
                 
                 hasRolledDouble = (dice1 == dice2);
+                wasInJail = bot.JailTurnsLeft > 0;
                 room.GameState.HasRolledThisTurn = true;
 
-                if (bot.JailTurnsLeft > 0)
+                if (wasInJail)
                 {
                     if (hasRolledDouble)
                     {
                         bot.JailTurnsLeft = 0;
+                        bot.IsOnIsland = false;
                         GameEngine.AddGameLogUnsafe(room.GameState, $"{bot.Username} đã đổ được đôi ({dice1}-{dice2}) và thoát khỏi Đảo Hoang!");
                     }
                     else
@@ -87,10 +90,33 @@ namespace Monopoly.Server.GameLogic.Bots
                 if (bot.JailTurnsLeft <= 0)
                 {
                     List<string> actionMessages = new List<string>();
-                    GameEngine.MovePlayerByDiceUnsafe(room.GameState, bot, bot.Position, dice1, dice2, actionMessages, cardEvents);
-                    
-                    room.GameState.LastActionMessage = string.Join(" ", actionMessages);
-                    GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                    bool sentToIslandByDoubles = false;
+
+                    if (!wasInJail && hasRolledDouble)
+                    {
+                        bot.ConsecutiveDoubles++;
+                        if (bot.ConsecutiveDoubles >= 3)
+                        {
+                            bot.ConsecutiveDoubles = 0;
+                            GameEngine.SendPlayerToIslandUnsafe(bot);
+                            room.GameState.LastFinalPosition = bot.Position;
+                            sentToIslandByDoubles = true;
+                            room.GameState.LastActionMessage = $"{bot.Username} đổ đôi 3 lần liên tiếp và bị đưa thẳng vào Đảo Hoang!";
+                            GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                        }
+                    }
+                    else if (!wasInJail)
+                    {
+                        bot.ConsecutiveDoubles = 0;
+                    }
+
+                    if (!sentToIslandByDoubles)
+                    {
+                        GameEngine.MovePlayerByDiceUnsafe(room.GameState, bot, bot.Position, dice1, dice2, actionMessages, cardEvents);
+
+                        room.GameState.LastActionMessage = string.Join(" ", actionMessages);
+                        GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                    }
                 }
             }
 
@@ -183,7 +209,7 @@ namespace Monopoly.Server.GameLogic.Bots
                 if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
-                if (!bot.IsBankrupt && hasRolledDouble && bot.ConsecutiveDoubles < 3 && bot.JailTurnsLeft <= 0)
+                if (!bot.IsBankrupt && hasRolledDouble && !wasInJail && bot.ConsecutiveDoubles < 3 && bot.JailTurnsLeft <= 0)
                 {
                     // Được đổ tiếp
                     room.GameState.HasRolledThisTurn = false;
@@ -201,8 +227,8 @@ namespace Monopoly.Server.GameLogic.Bots
                     room.GameState.CurrentTurnPlayerIndex = nextPlayer.PlayerIndex;
                     room.GameState.CurrentTurnUsername = nextPlayer.Username;
                     room.GameState.HasRolledThisTurn = false;
-                    
-                    if (bot.ConsecutiveDoubles >= 3) bot.ConsecutiveDoubles = 0;
+
+                    bot.ConsecutiveDoubles = 0;
 
                     GameEngine.ResetTurnTimerUnsafe(room.GameState);
                     string msg = $"Lượt của {bot.Username} đã kết thúc. Tiếp theo là {nextPlayer.Username}.";

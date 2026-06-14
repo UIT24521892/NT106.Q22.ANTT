@@ -43,9 +43,9 @@ public class GameOverUI : MonoBehaviour
             BuildUi();
 
         titleText.text = "Kết thúc trận";
-        matchText.text = string.IsNullOrWhiteSpace(gameOver?.MatchId)
-            ? "Match: N/A"
-            : $"Match: {gameOver.MatchId}";
+        matchText.text = string.IsNullOrWhiteSpace(gameOver?.Reason)
+            ? (string.IsNullOrWhiteSpace(gameOver?.MatchId) ? "Trận đấu kết thúc" : $"Match: {gameOver.MatchId}")
+            : gameOver.Reason;
         contentText.text = BuildRankingText(gameOver?.Rankings);
         root.transform.SetAsLastSibling();
         root.SetActive(true);

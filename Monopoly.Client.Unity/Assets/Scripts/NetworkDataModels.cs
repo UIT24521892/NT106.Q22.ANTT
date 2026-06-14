@@ -73,6 +73,7 @@ public class ChatMessageData
 public class GameOverData
 {
     public string MatchId;
+    public string Reason;
     public List<RankingEntryData> Rankings;
 }
 

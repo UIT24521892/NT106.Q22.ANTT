@@ -58,6 +58,7 @@ namespace Monopoly.Server.Handles
                 else
                 {
                     List<string> actionMessages = new List<string>();
+                    bool grantExtraRoll = false;
                     GamePlayerState player = room.GameState.Players.FirstOrDefault(
                         p => p.Username == connection.Username && !p.IsBot && p.IsConnected
                     );
@@ -104,7 +105,7 @@ namespace Monopoly.Server.Handles
                         if (room.GameState.ForceDoubleThisTurn)
                         {
                             room.GameState.ForceDoubleThisTurn = false;
-                            actionMessages.Add("${player.Username} dung Xuc Xac Ma Thuat va roll doi ${dice1}.");
+                            actionMessages.Add($"{player.Username} dùng Xúc Xắc Ma Thuật và đổ đôi {dice1}.");
                         }
 
                         if (player.IsOnIsland || player.JailTurnsLeft > 0)
@@ -145,12 +146,40 @@ namespace Monopoly.Server.Handles
                         else
                         {
                             GameEngine.MovePlayerByDiceUnsafe(room.GameState, player, oldPosition, dice1, dice2, actionMessages, cardDrawEvents);
+
+                            bool isDouble = dice1 == dice2;
+
+                            if (room.GameState.IsWaitingForPropertySale)
+                            {
+                                // Đang chờ bán tài sản trả nợ: không xử lý đổ đôi, không cho tung lại.
+                                player.ConsecutiveDoubles = 0;
+                            }
+                            else if (isDouble && !player.IsOnIsland)
+                            {
+                                player.ConsecutiveDoubles++;
+                                if (player.ConsecutiveDoubles >= 3)
+                                {
+                                    player.ConsecutiveDoubles = 0;
+                                    GameEngine.SendPlayerToIslandUnsafe(player);
+                                    room.GameState.LastFinalPosition = player.Position;
+                                    actionMessages.Add($"{player.Username} đổ đôi 3 lần liên tiếp và bị đưa thẳng vào Đảo Hoang!");
+                                }
+                                else
+                                {
+                                    grantExtraRoll = true;
+                                    actionMessages.Add($"{player.Username} đổ đôi ({dice1}) — được tung thêm một lần.");
+                                }
+                            }
+                            else
+                            {
+                                player.ConsecutiveDoubles = 0;
+                            }
                         }
                     }
 
                     if (string.IsNullOrWhiteSpace(failMessage))
                     {
-                        room.GameState.HasRolledThisTurn = true;
+                        room.GameState.HasRolledThisTurn = !grantExtraRoll;
                         GameEngine.ResolveBankruptcyAndWinnerUnsafe(room.GameState, player, actionMessages);
                         room.GameState.LastActionMessage = string.Join(" ", actionMessages);
                         GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
@@ -602,6 +631,8 @@ namespace Monopoly.Server.Handles
                     {
                         room.GameState.IsFinished = true;
                         room.GameState.WinnerUsername = connectedHumans[0].Username;
+                        if (string.IsNullOrWhiteSpace(room.GameState.EndReason))
+                            room.GameState.EndReason = "Đối thủ ngắt kết nối";
                         room.GameState.HasRolledThisTurn = true;
                         room.GameState.TurnEndsAtUtcTicks = 0;
                         gameStateMessage += $" {connectedHumans[0].Username} th?ng tr?n.";

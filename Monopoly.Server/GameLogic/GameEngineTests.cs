@@ -21,6 +21,8 @@ namespace Monopoly.Server.GameLogic
                 TestTripleMonopolyVictory();
                 TestWorldTourChoice();
                 TestStartNextTurn();
+                TestEndReasonLastPlayerStanding();
+                TestSendPlayerToIsland();
 
                 Console.WriteLine("=== ALL TESTS PASSED SUCCESSFULLY! ===\n");
             }
@@ -188,6 +190,40 @@ namespace Monopoly.Server.GameLogic
             Assert(player.Money == 1300000, "Player should receive pass Start bonus");
 
             Console.WriteLine("World Tour Choice test passed.");
+        }
+
+        private static void TestEndReasonLastPlayerStanding()
+        {
+            Console.WriteLine("Testing EndReason for last player standing...");
+            GameState state = CreateMockGameState();
+
+            // PlayerB hết tiền (âm) -> phá sản -> chỉ còn PlayerA trụ lại.
+            state.Players[1].Money = -1;
+
+            List<string> messages = new List<string>();
+            GameEngine.ResolveBankruptcyAndWinnerUnsafe(state, state.Players[1], messages);
+
+            Assert(state.IsFinished, "Game should finish when only one active player remains");
+            Assert(state.WinnerUsername == "PlayerA", $"PlayerA should win, got {state.WinnerUsername}");
+            Assert(!string.IsNullOrWhiteSpace(state.EndReason), "EndReason should not be empty for last-player-standing");
+
+            Console.WriteLine($"EndReason last-player test passed (reason='{state.EndReason}').");
+        }
+
+        private static void TestSendPlayerToIsland()
+        {
+            Console.WriteLine("Testing SendPlayerToIsland (3-doubles jail target)...");
+            GameState state = CreateMockGameState();
+            GamePlayerState player = state.Players[0];
+            player.Position = 10;
+
+            GameEngine.SendPlayerToIslandUnsafe(player);
+
+            Assert(player.Position == 24, $"Player should be at island position 24, got {player.Position}");
+            Assert(player.IsOnIsland, "Player should be flagged on island");
+            Assert(player.JailTurnsLeft >= 3, $"Player should have >=3 jail turns, got {player.JailTurnsLeft}");
+
+            Console.WriteLine("SendPlayerToIsland test passed.");
         }
 
         private static void TestStartNextTurn()
