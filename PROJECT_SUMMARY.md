@@ -89,7 +89,7 @@ The active system has three main layers:
 | Build houses | ✅ Done | City properties support three houses. |
 | Build hotel | ✅ Done | Hotel follows three houses. |
 | Complete color-set rule | ❌ Not started | Current build validation does not require ownership of the complete color group. |
-| Property marker visualization | ⚠️ Partial | Runtime markers exist, but remain colored UI bars rather than final house/hotel artwork. |
+| Property marker visualization | ⚠️ Partial | Runtime markers now load `Resources/UI/house` and `Resources/UI/hotel` sprites (lightly tinted by owner) when present, and fall back to colored UI bars when the sprite assets are missing. |
 | Property detail popup | ⚠️ Partial | Large runtime title-deed popup, pricing, rent table, image slot, and upgrade action exist; design is still code-generated and resource-name dependent. |
 | Tile image loading | ⚠️ Partial | City images load from `Resources/TileImages`; resort and missing-name assets fall back to blank. |
 | Tax squares | ✅ Done | Fixed debt is charged through the common debt system. |
@@ -104,7 +104,7 @@ The active system has three main layers:
 | Card target selection | ✅ Done | Server requests a target; owning client highlights valid board squares and returns a choice. |
 | Card cancellation | ✅ Done | Optional target selection can be cancelled. |
 | Free rent | ✅ Done | Prevents the next applicable rent payment. |
-| Forced double | ⚠️ Partial | Held-card effect exists; human double-roll/triple-double rules are not consistently modeled. |
+| Forced double | ✅ Done | Held-card effect exists; rolling doubles now grants an extra roll and three consecutive doubles sends the player straight to Lost Island, for both humans and bots. |
 | Flight | ✅ Done | Allows movement to a selected board square. |
 | Free upgrade | ✅ Done | Upgrades a valid owned city. |
 | Earthquake | ✅ Done | Damages a selected developed opponent city. |
@@ -116,7 +116,7 @@ The active system has three main layers:
 | Pause request and voting | ✅ Done | Connected active humans vote; timers are shifted while paused. |
 | Resume paused game | ⚠️ Partial | Any active player can resume gameplay without a second vote. |
 | Surrender | ✅ Done | Surrender is handled as bankruptcy. |
-| Audio settings | ⚠️ Partial | Volume, music, effects, mute, PlayerPrefs, and audio manager scaffolding exist, but no complete clip/event binding was found. |
+| Audio settings | ✅ Done | Volume, music, effects, mute, and PlayerPrefs exist; SFX are now wired to dice roll, buy, build, card draw and game over, with background music on entering GameScene. Clips load by name from `Resources/Audio/` and no-op gracefully if a file is missing. |
 
 ### Debt, property sale, and bankruptcy
 
@@ -145,7 +145,7 @@ The active system has three main layers:
 | Score rewards | ✅ Done | Rank rewards are 100, 50, 20, then 5 points. |
 | Human-only persisted rankings | ✅ Done | Bots are excluded from Firebase match rewards. |
 | Game-over UI | ✅ Done | Runtime ranking, leaderboard, and return-to-lobby flow exist. |
-| End reason reporting | ⚠️ Partial | Timeout sets an explicit reason; some bankruptcy/disconnect paths can leave it incomplete. |
+| End reason reporting | ✅ Done | Timeout, monopoly victories, last-player-standing, "all players left/bankrupt", and opponent-disconnect paths all set an explicit `EndReason`, which is now included in the `GAME_OVER` packet and shown on the result screen (default "Trận đấu kết thúc" if still blank). |
 | Post-match cleanup | ⚠️ Partial | UI returns to lobby, but finished rooms are not consistently removed immediately from server memory. |
 
 ### Leaderboard
@@ -609,11 +609,11 @@ Do not reorder board entries or scene board points independently. Token movement
 3. Finished rooms can remain in server dictionaries longer than necessary.
 4. The card deck is global across every room, so concurrent rooms draw from the same 97-card deck.
 5. Building does not require a complete color set.
-6. Human double/triple-double behavior is less complete than bot behavior.
+6. ~~Human double/triple-double behavior is less complete than bot behavior.~~ **Resolved (2026-06-14):** both humans and bots now re-roll on doubles and go to Lost Island on the third consecutive double.
 7. Pause requires voting, but any active player can resume without a vote.
-8. Some non-timeout game-over paths do not provide a detailed `EndReason`.
+8. ~~Some non-timeout game-over paths do not provide a detailed `EndReason`.~~ **Resolved (2026-06-14):** last-player-standing and disconnect finishes now set `EndReason`, and the reason is sent in `GAME_OVER` and displayed.
 9. Bot AI includes duplicate or older debt/sale decisions separate from the central engine.
-10. A forced-double message contains a likely non-interpolated `${player.Username}` string.
+10. ~~A forced-double message contains a likely non-interpolated `${player.Username}` string.~~ **Fixed (2026-06-14):** now a proper C# interpolated string in `GameHandler.cs`.
 11. Some asynchronous bot tasks can continue briefly after client exit or room-state changes.
 12. Match result persistence depends on the connection still holding Firebase identity information.
 13. There is no server-state persistence, replay log, or crash recovery.
@@ -637,10 +637,10 @@ Do not reorder board entries or scene board points independently. Token movement
 6. Tile artwork is loaded by normalized resource name; missing or differently named files leave the image area blank.
 7. Current tracked tile images do not cover all resort squares.
 8. `TileImages/LYON` remains although Lyon is no longer in the current board database.
-9. Property build markers are still colored shapes rather than final house/hotel sprites and do not match all requested dimensions.
+9. Property build markers show the actual house count as 1–3 discrete house icons in a centered row (procedurally drawn body + roof, tinted by owner color); a hotel replaces them with a single wide red building (procedural trapezoid-roof sprite). `Resources/UI/house`/`hotel` sprites are used if supplied, else the code-drawn sprites are used (no asset required).
 10. No final `Resources/UI/GameSettingsPanel.prefab` was found, so settings commonly use runtime fallback.
 11. Fixed pixel positions and sizes can overlap at resolutions other than the primary 1920x1080 target.
-12. Audio controls exist, but no comprehensive gameplay sound clips and event hookups were found.
+12. Audio event hookups now exist (dice/buy/build/card/game-over SFX + GameScene background music), loading clips by name from `Resources/Audio/`; the actual clip files (`dice, card, gameover, buy, build, bgm`) still need to be added.
 13. Settings-launcher placement can conflict with player information depending on scene layout.
 14. Some UI scripts search objects by name, creating fragile scene coupling.
 15. Direct `StreamingAssets` file access is suitable for the current desktop target but is not portable to every Unity platform.
@@ -752,3 +752,30 @@ Recommended production safeguards:
 - Commit timestamp: June 7, 2026 23:19:05 +0700.
 - Remote target: `origin/feature/logic_game`.
 - This summary reflects the committed gameplay/UI/server updates, the added `GameEngineTests.cs`, and the project documentation snapshot included in that push.
+
+## 8. Change Log
+
+### 2026-06-14 — Money-flow corner boxes + house-block build markers (client)
+
+- **Per-player money boxes + payment animation (new `MoneyFlowUI.cs`):** A new runtime UI (`EnsureExists`, bootstrapped in `GameSceneUIBinder` and refreshed from `NetworkManager`'s `GAME_STATE_UPDATE`) draws a money box at each of the 4 corners showing each player's cash (formatted `366 000`). On every state update it diffs each player's `Money` against the previous snapshot and flies a code-drawn money chip from the payer's box **into the board center, then out to the receiver's box** (board center is a hub, so player↔player and player↔bank both work). First state / resume only seeds the snapshot (no spurious chips). Chip/box sprites are generated in code; animation reuses the `SmoothStep + Lerp + Sin`-arc coroutine pattern. `BoardTokenManager` gained `TryGetBoardCenterWorldPosition()` for the center point.
+- **Count-based build markers (`PropertyBuildMarkerUI.cs`):** Replaced the previous 3 colored bars with **1–3 discrete house icons** (procedurally drawn body + triangular roof via `CreateHouseSprite`, tinted by owner color) laid out in a centered horizontal row matching the actual house count; a **hotel** replaces the cluster with **one wide red building** (procedural trapezoid-roof `CreateHotelSprite`). Still prefers `Resources/UI/house`/`hotel` sprites when present, otherwise uses the code-drawn sprites (no asset needed). *(Note: an interim "single growing block" version was iterated to this count-based layout per design feedback.)*
+
+**Verification:** Unity recompiled with 0 errors (checked via MCP `read_console`). Visual behavior (corner box placement, fly animation, house block sizing) requires in-Editor / in-game verification.
+
+### 2026-06-14 — Core rules + audio/visual pass
+
+**Theme A — Core gameplay rules (server):**
+
+- **Doubles & triple-double jail (A1):** Rolling doubles now grants an extra roll for human players (mirroring existing bot behavior), and three consecutive doubles sends the player straight to Lost Island without applying the landed square. Tracked via the existing `GamePlayerState.ConsecutiveDoubles`, reset on turn change. Implemented in `Handles/GameHandler.cs` (`HandleDiceRollAsync`), `GameLogic/Bots/BotAIController.cs`, and `GameLogic/GameEngine.cs` (`StartNextTurnUnsafe` reset). The non-interpolated `${player.Username}` forced-double log string was fixed here too. Client needed no change — `rollButton.interactable = isMyTurn && !HasRolledThisTurn` already re-enables the roll and `End Turn` stays gated on `HasRolledThisTurn`.
+- **Complete `EndReason` (A2):** `EndReason` is now set for last-player-standing and "all players left/bankrupt" (`GameEngine.ResolveBankruptcyAndWinnerUnsafe`) and opponent-disconnect (`GameHandler` leave/disconnect). The `GAME_OVER` packet now carries a `Reason` field (`NetworkSender.BroadcastGameOverAsync`, defaulting to "Trận đấu kết thúc"); the client `GameOverData` gained `Reason` and `GameOverUI` displays it.
+
+**Theme B — Audio & visuals (client):**
+
+- **Audio event wiring (B1):** `AudioManager` gained `PlaySfx(string)` / `PlayMusic(string)` overloads that load by name from `Resources/Audio/` (cached, null-safe). SFX fire on dice roll (`DiceVisualUI`), buy/build (`NetworkManager`), card draw and game over (`NetworkManager`), plus background music on entering GameScene (`GameSceneUIBinder`). Missing clip files simply no-op.
+- **Build marker sprites (B2):** `PropertyBuildMarkerUI` loads `Resources/UI/house` and `Resources/UI/hotel` sprites when present (lightly tinted by owner color) and falls back to the previous colored bars when absent.
+
+**Assets still to add (code degrades gracefully without them):** `Assets/Resources/Audio/{dice,card,gameover,buy,build,bgm}` and `Assets/Resources/UI/{house,hotel}.png`.
+
+**Out of scope this pass (deliberately not changed):** building does not require owning the complete color group; bot held-card usage; per-room deck; finished-room cleanup; remaining mojibake log strings.
+
+**Verification:** `dotnet build MonopolyGame.sln` succeeds with 0 errors. `dotnet run --project Monopoly.Server -- --run-tests` passes all `GameEngineTests`, including the new `TestEndReasonLastPlayerStanding` and `TestSendPlayerToIsland`. Client (Unity) changes require Editor verification and are not covered by the .NET build. A1's per-turn doubles flow lives in the packet handler and is verified manually rather than by `GameEngineTests`.
