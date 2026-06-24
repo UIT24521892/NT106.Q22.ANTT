@@ -54,14 +54,14 @@ namespace Monopoly.Server.Network
                         {
                             continue;
                         }
-                        Console.WriteLine($"[NH?N T? {tcpClient.Client.RemoteEndPoint}] {jsonPacket}");
+                        Console.WriteLine($"[NHẬN TỪ {tcpClient.Client.RemoteEndPoint}] {jsonPacket}");
                         await PacketRouter.RoutePacketAsync(jsonPacket, connection);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[L?I] K?t n?i b? ng?t: {ex.Message}");
+                Console.WriteLine($"[LỖI] Kết nối bị ngắt: {ex.Message}");
             }
             finally
             {
@@ -70,7 +70,7 @@ namespace Monopoly.Server.Network
                     await HandleDisconnectAsync(connection);
                 }
                 tcpClient.Close();
-                Console.WriteLine("[DISCONNECT] M?t client dã r?i di.");
+                Console.WriteLine("[DISCONNECT] Một client đã rời đi.");
             }
         }
         public static async Task HandleDisconnectAsync(ClientConnection connection)

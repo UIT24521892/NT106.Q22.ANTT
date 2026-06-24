@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
@@ -58,7 +58,7 @@ namespace Monopoly.Client
             var payload = new { Email = txtEmail.Text, Password = txtPassword.Text };
             var packet = new
             {
-                Type = isLoginMode ? "Login" : "Register",
+                Type = isLoginMode ? "LOGIN" : "REGISTER",
                 Payload = JsonConvert.SerializeObject(payload)
             };
 

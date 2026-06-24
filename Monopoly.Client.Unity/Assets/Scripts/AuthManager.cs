@@ -139,7 +139,7 @@ public class AuthManager : MonoBehaviour
 
             // Gửi dữ liệu lên Server (giữ nguyên logic cũ)
             var payload = new { Username = username, Email = email, Password = password };
-            var packet = new { Type = isLoginMode ? "Login" : "Register", Payload = JsonConvert.SerializeObject(payload) };
+            var packet = new { Type = isLoginMode ? "LOGIN" : "REGISTER", Payload = JsonConvert.SerializeObject(payload) };
 
             string jsonToSend = JsonConvert.SerializeObject(packet) + "<EOF>";
             byte[] outStream = Encoding.UTF8.GetBytes(jsonToSend);
