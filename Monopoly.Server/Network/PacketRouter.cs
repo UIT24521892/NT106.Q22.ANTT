@@ -19,10 +19,10 @@ namespace Monopoly.Server.Network
             {
                 JObject packet = JObject.Parse(jsonPacket);
                 string packetType = packet["Type"]?.ToString() ?? "";
-
                 if (IsBlockedWhilePaused(packetType, connection))
                 {
-                    await NetworkSender.SendGameActionFailedAsync(connection, "Trận đấu đang tạm dừng.");
+                    await NetworkSender.SendGameActionFailedAsync(connection, 
+                        "Trận đấu đang tạm dừng.");
                     return;
                 }
 
@@ -65,7 +65,7 @@ namespace Monopoly.Server.Network
                         await TcpServer.HandleDisconnectAsync(connection);
                         connection.TcpClient?.Close();
                         break;
-
+                    // might need to check this, this is a problem of not synchronize case name
                     case "DiceRoll":
                     case "ROLL_DICE":
                         await GameHandler.HandleDiceRollAsync(connection);

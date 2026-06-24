@@ -35,10 +35,8 @@ namespace Monopoly.Server.Handles
                         Message = "Không xác định được tên người chơi."
                     }
                 });
-
                 return;
             }
-
             if (!string.IsNullOrWhiteSpace(connection.CurrentRoomId))
             {
                 await NetworkSender.SendJsonPacketAsync(connection.Stream, new
@@ -49,16 +47,15 @@ namespace Monopoly.Server.Handles
                         Message = "Bạn đang ở trong một phòng khác."
                     }
                 });
-
                 return;
             }
 
-            // Giới hạn an toàn theo UI hiện tại: 2-4 người.
             if (maxPlayers < 2) maxPlayers = 2;
             if (maxPlayers > 4) maxPlayers = 4;
 
             if (botCount < 0) botCount = 0;
             if (botCount > maxPlayers - 1) botCount = maxPlayers - 1;
+
             int[] allowedDurations = { 10, 20, 30, 60 };
             if (!allowedDurations.Contains(matchDurationMinutes))
                 matchDurationMinutes = 20;
@@ -134,12 +131,10 @@ namespace Monopoly.Server.Handles
                     {
                         continue;
                     }
-
                     if (room.Players.Count >= room.MaxPlayers)
                     {
                         continue;
                     }
-
                     roomList.Add(new
                     {
                         RoomId = room.RoomId,
@@ -180,7 +175,6 @@ namespace Monopoly.Server.Handles
                         Message = "Không xác định được tên người chơi."
                     }
                 });
-
                 return;
             }
 
@@ -194,7 +188,6 @@ namespace Monopoly.Server.Handles
                         Message = "Bạn đang ở trong một phòng khác."
                     }
                 });
-
                 return;
             }
 
@@ -213,7 +206,6 @@ namespace Monopoly.Server.Handles
                             Message = "Phòng không tồn tại."
                         }
                     });
-
                     return;
                 }
 
@@ -233,7 +225,6 @@ namespace Monopoly.Server.Handles
                                 Message = "Phòng đã bắt đầu."
                             }
                         });
-
                         return;
                     }
 
@@ -256,7 +247,6 @@ namespace Monopoly.Server.Handles
                             Message = "Phòng đã đầy."
                         }
                     });
-
                     return;
                 }
                 else if (room.Players.Any(p => p.Username == username))
@@ -269,7 +259,6 @@ namespace Monopoly.Server.Handles
                             Message = "Người chơi này đã ở trong phòng."
                         }
                     });
-
                     return;
                 }
                 else
@@ -350,9 +339,7 @@ namespace Monopoly.Server.Handles
                     player.IsReady = isReady;
                 }
             }
-
             Console.WriteLine($"[ROOM] {connection.Username} -> Ready={isReady}");
-
             await NetworkSender.BroadcastRoomUpdateAsync(roomId);
         }
         public static async Task HandleStartGameAsync(JObject packet, ClientConnection connection)
@@ -369,7 +356,6 @@ namespace Monopoly.Server.Handles
                         Message = "Bạn chưa ở trong phòng nào."
                     }
                 });
-
                 return;
             }
 
@@ -387,7 +373,6 @@ namespace Monopoly.Server.Handles
                             Message = "Phòng không tồn tại."
                         }
                     });
-
                     return;
                 }
 
@@ -401,7 +386,6 @@ namespace Monopoly.Server.Handles
                             Message = "Chỉ chủ phòng mới được bắt đầu."
                         }
                     });
-
                     return;
                 }
 
@@ -417,7 +401,6 @@ namespace Monopoly.Server.Handles
                             Message = "Vẫn còn người chơi chưa sẵn sàng."
                         }
                     });
-
                     return;
                 }
 
@@ -432,7 +415,6 @@ namespace Monopoly.Server.Handles
                             Message = "Cần ít nhất 2 người chơi hoặc bot để bắt đầu."
                         }
                     });
-
                     return;
                 }
 

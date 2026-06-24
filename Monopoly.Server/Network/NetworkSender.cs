@@ -8,7 +8,6 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
-using Monopoly.Server.Models.State;
 using Monopoly.Server.GameLogic;
 
 
@@ -28,20 +27,18 @@ namespace Monopoly.Server.Network
             }
             catch
             {
-                // Client dã dóng k?t n?i, b? qua.
+                // Client da dong ket noi, bo qua
             }
         }
         public static async Task BroadcastToRoomAsync(string roomId, object packet)
         {
             List<ClientConnection> targets;
-
             lock (ServerState.Lock)
             {
                 targets = ServerState.Clients.Values
                     .Where(c => c.CurrentRoomId == roomId)
                     .ToList();
             }
-
             foreach (ClientConnection target in targets)
             {
                 await SendJsonPacketAsync(target.Stream, packet);
@@ -50,17 +47,13 @@ namespace Monopoly.Server.Network
         public static async Task BroadcastRoomUpdateAsync(string roomId)
         {
             Room roomSnapshot;
-
             lock (ServerState.Lock)
             {
                 if (!ServerState.Rooms.TryGetValue(roomId, out Room room))
-                {
                     return;
-                }
-
                 roomSnapshot = room;
             }
-
+            // kind of confuse what does this mean
             await BroadcastToRoomAsync(roomId, new
             {
                 Type = "ROOM_UPDATE",
@@ -175,16 +168,13 @@ namespace Monopoly.Server.Network
                 }
             });
         }
-        public static async Task SendCardChoiceRequestAsync(
-            ClientConnection connection,
-            string effectCode,
-            List<int> validTargetPositions)
+        public static async Task SendCardChoiceRequestAsync(ClientConnection connection,
+                                                            string effectCode,
+                                                            List<int> validTargetPositions)
         {
             if (connection == null)
-            {
                 return;
-            }
-
+            
             await SendJsonPacketAsync(connection.Stream, new
             {
                 Type = "REQUEST_CARD_CHOICE",
@@ -195,7 +185,8 @@ namespace Monopoly.Server.Network
                 }
             });
         }
-        public static async Task SendGameActionFailedAsync(ClientConnection connection, string message)
+        public static async Task SendGameActionFailedAsync(ClientConnection connection, 
+                                                            string message)
         {
             await SendJsonPacketAsync(connection.Stream, new
             {
@@ -205,7 +196,6 @@ namespace Monopoly.Server.Network
                     Message = message
                 }
             });
-
             Console.WriteLine($"[GAME_ACTION_FAILED] User={connection.Username}, Message={message}");
         }
         public static async Task SendRawStringAsync(NetworkStream stream, string message)
@@ -220,7 +210,7 @@ namespace Monopoly.Server.Network
             }
             catch
             {
-                // Client dã dóng k?t n?i, b? qua.
+                // Client da dong ket noi, bo qua
             }
         }
     }

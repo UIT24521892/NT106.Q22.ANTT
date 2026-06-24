@@ -26,7 +26,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "Ban chua o trong tran nao.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận đấu nào.");
                 return;
             }
 
@@ -41,11 +41,11 @@ namespace Monopoly.Server.Handles
             {
                 if (!ServerState.Rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
                 {
-                    failMessage = "Tran dau khong ton tai hoac chua bat dau.";
+                    failMessage = "Trận đấu không tồn tại hoặc chưa bắt đầu.";
                 }
                 else if (room.GameState.IsFinished)
                 {
-                    failMessage = $"Tran dau da ket thuc. Nguoi thang: {room.GameState.WinnerUsername}.";
+                    failMessage = $"Trận đấu đã kết thúc. Người thắng: {room.GameState.WinnerUsername}.";
                 }
                 else
                 {
@@ -55,19 +55,19 @@ namespace Monopoly.Server.Handles
 
                     if (player == null)
                     {
-                        failMessage = "Khong tim thay nguoi choi trong tran.";
+                        failMessage = "Không tìm thấy người chơi trong trận.";
                     }
                     else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
                     {
-                        failMessage = $"Chua den luot cua ban. Hien tai la luot cua {room.GameState.CurrentTurnUsername}.";
+                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
                     }
                     else if (string.IsNullOrWhiteSpace(effectCode))
                     {
-                        failMessage = "CardId khong hop le.";
+                        failMessage = "CardId không hợp lệ.";
                     }
                     else if (room.GameState.IsWaitingForCardChoice)
                     {
-                        failMessage = "Dang co the khac cho chon muc tieu.";
+                        failMessage = "Đang có thẻ khác chờ chọn mục tiêu.";
                     }
                     else if (room.GameState.IsWaitingForPropertySale)
                     {
@@ -75,7 +75,7 @@ namespace Monopoly.Server.Handles
                     }
                     else if (!GameEngine.PlayerHasHeldCardUnsafe(player, effectCode))
                     {
-                        failMessage = "Ban khong so huu the nay hoac the da duoc dung.";
+                        failMessage = "Bạn không sở hữu thẻ này hoặc thẻ đã được dùng.";
                     }
                     else if (GameEngine.RequiresCardTarget(effectCode) && !targetPosition.HasValue)
                     {
@@ -83,7 +83,7 @@ namespace Monopoly.Server.Handles
 
                         if (validTargets.Count == 0)
                         {
-                            failMessage = "Khong co muc tieu hop le cho the nay.";
+                            failMessage = "Không có mục tiêu hợp lệ cho thẻ này.";
                         }
                         else
                         {
@@ -92,7 +92,7 @@ namespace Monopoly.Server.Handles
                             room.GameState.PendingCardPlayerUsername = player.Username;
                             room.GameState.PendingCardTargetPositions.Clear();
                             room.GameState.PendingCardTargetPositions.AddRange(validTargets);
-                            room.GameState.LastActionMessage = $"{player.Username} dang chon muc tieu cho the {effectCode}.";
+                            room.GameState.LastActionMessage = $"{player.Username} đang chọn mục tiêu cho thẻ {effectCode}.";
                             GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
                             broadcastMessage = room.GameState.LastActionMessage;
                             shouldBroadcast = true;
@@ -154,7 +154,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "Ban chua o trong tran nao.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận nào.");
                 return;
             }
 
@@ -167,15 +167,15 @@ namespace Monopoly.Server.Handles
             {
                 if (!ServerState.Rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
                 {
-                    failMessage = "Tran dau khong ton tai hoac chua bat dau.";
+                    failMessage = "Trận đấu không tồn tại hoặc chưa bắt đầu.";
                 }
                 else if (!room.GameState.IsWaitingForCardChoice)
                 {
-                    failMessage = "Khong co the nao dang cho chon muc tieu.";
+                    failMessage = "Không có thẻ nào đang chờ chọn mục tiêu.";
                 }
                 else if (!string.Equals(room.GameState.PendingCardPlayerUsername, connection.Username, StringComparison.OrdinalIgnoreCase))
                 {
-                    failMessage = "Khong phai luot chon muc tieu the cua ban.";
+                    failMessage = "Không phải lượt chọn mục tiêu thẻ của bạn.";
                 }
                 else
                 {
@@ -185,12 +185,12 @@ namespace Monopoly.Server.Handles
 
                     if (player == null)
                     {
-                        failMessage = "Khong tim thay nguoi choi trong tran.";
+                        failMessage = "Không tìm thấy người chơi trong trận.";
                     }
                     else if (cancel)
                     {
                         GameEngine.ClearPendingCardChoiceUnsafe(room.GameState);
-                        room.GameState.LastActionMessage = $"{player.Username} huy chon muc tieu the.";
+                        room.GameState.LastActionMessage = $"{player.Username} hủy chọn mục tiêu thẻ.";
                         GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
                         broadcastMessage = room.GameState.LastActionMessage;
                         shouldBroadcast = true;
@@ -202,11 +202,11 @@ namespace Monopoly.Server.Handles
                         if (!string.IsNullOrWhiteSpace(effectCode) &&
                             !string.Equals(effectCode, pendingEffectCode, StringComparison.OrdinalIgnoreCase))
                         {
-                            failMessage = "Lua chon khong khop voi the dang cho.";
+                            failMessage = "Lựa chọn không khớp với thẻ đang chọn.";
                         }
                         else if (!room.GameState.PendingCardTargetPositions.Contains(positionIndex))
                         {
-                            failMessage = "Muc tieu khong hop le cho the nay.";
+                            failMessage = "Mục tiêu không hợp lệ cho thẻ này.";
                         }
                         else
                         {

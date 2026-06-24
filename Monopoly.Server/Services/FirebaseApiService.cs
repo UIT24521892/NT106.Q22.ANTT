@@ -10,25 +10,16 @@ using Monopoly.Server.Models.Events;
 
 namespace Monopoly.Server.Services
 {
-    // ============================================================
-    //  FirebaseApiService.cs  (PHIÊN BẢN CẬP NHẬT)
-    //  Thêm: UpdateUserProfileAsync() — cập nhật Username và AvatarId
-    //        vào node USERS/{uid} trên Firebase Realtime Database.
-    // ============================================================
-
     public class FirebaseApiService
     {
         private readonly string API_KEY = "AIzaSyBrkPdAmZGitSBFtqHdvgnrr77iDduLI2g";
-        private readonly string DB_URL_BASE = "https://monopoly-nhom4-nt106q22-default-rtdb.firebaseio.com";
+        private readonly string DB_URL_BASE = 
+            "https://monopoly-nhom4-nt106q22-default-rtdb.firebaseio.com";
 
         private readonly HttpClient _http = new HttpClient();
 
-        // ──────────────────────────────────────────────────────
-        // HÀM CŨ: Xác thực người dùng (giữ nguyên)
-        // ──────────────────────────────────────────────────────
-
-        public async Task<string> AuthenticateUser(string email, string password,
-                                                   string username, bool isLogin)
+        public async Task<string> AuthenticateUser(string email, string password, string username, 
+                                                    bool isLogin)
         {
             string endpoint = isLogin ? "signInWithPassword" : "signUp";
             string url = $"https://identitytoolkit.googleapis.com/v1/accounts:{endpoint}?key={API_KEY}";
@@ -78,7 +69,6 @@ namespace Monopoly.Server.Services
                         Console.WriteLine($"[AUTH ERROR] Get user data failed: {ex.Message}");
                     }
                 }
-
                 return $"SUCCESS|{uid}|{jwtToken}|{email}|avatar_1|0";
             }
             else
@@ -89,32 +79,26 @@ namespace Monopoly.Server.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────
-        // HÀM CŨ: Tạo hồ sơ người dùng ban đầu (giữ nguyên)
-        // ──────────────────────────────────────────────────────
-
-        private async Task<bool> CreateUserInDatabase(string uid, string username,
-                                                      string email, string idToken)
+        private async Task<bool> CreateUserInDatabase(string uid, string username, string email, 
+                                                        string idToken)
         {
             try
             {
                 string dbUrl = $"{DB_URL_BASE}/USERS/{uid}.json?auth={idToken}";
-
+                // Liệu có thể dùng sẵn các packet thiết lập bên .shared được không?
                 var userData = new
                 {
                     Username = username,
                     Email = email,
-                    AvatarId = "avatar_1",        // Avatar mặc định khi đăng ký
+                    AvatarId = "avatar_1",        // Default avatar
                     Money = 2000000,
                     Point = 0,
                     TotalWins = 0,
                     TotalLosses = 0,
                     CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 };
-
                 var content = new StringContent(
                     JsonConvert.SerializeObject(userData), Encoding.UTF8, "application/json");
-
                 var response = await _http.PutAsync(dbUrl, content);
                 return response.IsSuccessStatusCode;
             }
@@ -124,20 +108,6 @@ namespace Monopoly.Server.Services
                 return false;
             }
         }
-
-        // ──────────────────────────────────────────────────────
-        // HÀM MỚI: Cập nhật hồ sơ người chơi
-        // ──────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Cập nhật chỉ 2 trường Username và AvatarId tại USERS/{uid} trên Realtime Database.
-        /// Dùng PATCH thay vì PUT để không ghi đè các trường khác (Money, Point, v.v.)
-        /// </summary>
-        /// <param name="uid">Firebase UID của người dùng cần cập nhật</param>
-        /// <param name="newUsername">Tên người chơi mới</param>
-        /// <param name="newAvatarId">ID avatar mới (VD: "avatar_2")</param>
-        /// <param name="idToken">JWT token từ phiên đăng nhập — xác thực quyền ghi Firebase</param>
-        /// <returns>"SUCCESS_PROFILE" hoặc "FAIL_PROFILE|{lý do}"</returns>
         public async Task<string> UpdateUserProfileAsync(string uid, string newUsername,
                                                          string newAvatarId, string idToken)
         {
@@ -145,8 +115,7 @@ namespace Monopoly.Server.Services
             {
                 // Trỏ thẳng đến node USERS/{uid}, kèm auth token để vượt Security Rules
                 string dbUrl = $"{DB_URL_BASE}/USERS/{uid}.json?auth={idToken}";
-
-                // Chỉ cập nhật 2 trường — PATCH giữ nguyên các trường còn lại
+                // Chỉ cập nhật 2 trường username và avatarId 
                 var patchData = new
                 {
                     Username = newUsername,
@@ -155,8 +124,7 @@ namespace Monopoly.Server.Services
                 };
 
                 string jsonBody = JsonConvert.SerializeObject(patchData);
-
-                // Tạo request PATCH thủ công vì HttpClient không có PatchAsync trước .NET 5
+                // Tạo request PATCH 
                 var request = new HttpRequestMessage(new HttpMethod("PATCH"), dbUrl)
                 {
                     Content = new StringContent(jsonBody, Encoding.UTF8, "application/json")
@@ -173,7 +141,6 @@ namespace Monopoly.Server.Services
                 }
                 else
                 {
-                    // Firebase trả về lý do lỗi trong body
                     Console.WriteLine($"[PROFILE ERROR] Firebase từ chối: {responseBody}");
                     string errorMsg = TryParseFirebaseError(responseBody);
                     return $"FAIL_PROFILE|{errorMsg}";
@@ -186,13 +153,9 @@ namespace Monopoly.Server.Services
             }
         }
 
-        public async Task<bool> UpdatePlayerMatchResultAsync(
-            string uid,
-            string idToken,
-            string displayName,
-            int rank,
-            int scoreEarned,
-            string matchId)
+        public async Task<bool> UpdatePlayerMatchResultAsync(string uid, string idToken, 
+                                                            string displayName, int rank,
+                                                            int scoreEarned, string matchId)
         {
             try
             {
@@ -207,8 +170,7 @@ namespace Monopoly.Server.Services
                 int currentWins = 0;
                 int currentLosses = 0;
 
-                if (userResponse.IsSuccessStatusCode &&
-                    !string.IsNullOrWhiteSpace(userBody) &&
+                if (userResponse.IsSuccessStatusCode && !string.IsNullOrWhiteSpace(userBody) &&
                     userBody != "null")
                 {
                     JObject user = JObject.Parse(userBody);
@@ -331,10 +293,6 @@ namespace Monopoly.Server.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────
-        // HELPER: Phân tích thông điệp lỗi từ Firebase
-        // ──────────────────────────────────────────────────────
-
         private string TryParseFirebaseError(string responseBody)
         {
             try
@@ -347,7 +305,5 @@ namespace Monopoly.Server.Services
                 return "Lỗi không xác định từ Database.";
             }
         }
-    }
-
-    
+    }   
 }

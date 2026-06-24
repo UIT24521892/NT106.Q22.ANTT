@@ -11,7 +11,6 @@ namespace Monopoly.Server.Models
     {
         public TcpClient TcpClient { get; set; }
         public NetworkStream Stream { get; set; }
-
         public string Uid { get; set; }
         public string Username { get; set; }
         public string IdToken { get; set; }
