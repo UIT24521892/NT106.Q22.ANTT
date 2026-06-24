@@ -1609,7 +1609,7 @@ namespace Monopoly.Server.GameLogic
                     IsBot = player.IsBot,
                     PlayerIndex = player.PlayerIndex,
                     Position = 0,
-                    Money = 2000000,
+                    Money = 1000000,
                     IsBankrupt = false,
                     BankruptcyOrder = 0,
                     IsConnected = true,

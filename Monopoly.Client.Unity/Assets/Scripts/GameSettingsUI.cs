@@ -170,10 +170,10 @@ public class GameSettingsUI : MonoBehaviour
         Button settingsButton = CreateButton(canvas, "Btn_Settings", "SET", Blue, Color.white, 18f);
         SetRect(
             settingsButton.GetComponent<RectTransform>(),
-            new Vector2(1f, 1f),
-            new Vector2(1f, 1f),
-            new Vector2(1f, 1f),
-            new Vector2(-18f, -92f),
+            new Vector2(1f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(-145f, 24f),
             new Vector2(76f, 48f));
         settingsButton.onClick.AddListener(TogglePanel);
     }
