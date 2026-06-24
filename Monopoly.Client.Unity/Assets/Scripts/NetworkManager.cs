@@ -512,7 +512,7 @@ public class NetworkManager : MonoBehaviour
     {
         var packet = new
         {
-            Type = "DiceRoll",
+            Type = "ROLL_DICE",
             Payload = new
             {
                 RoomId = GameSession.RoomId,

@@ -21,7 +21,7 @@ namespace Monopoly.Server.Handles
             string email = payload["Email"]?.ToString() ?? "";
             string password = payload["Password"]?.ToString() ?? "";
             string username = payload["Username"]?.ToString() ?? "";
-            bool isLogin = packet["Type"]?.ToString() == "Login";
+            bool isLogin = packet["Type"]?.ToString() == "LOGIN";
 
             Console.WriteLine($"[AUTH] Xử lý {(isLogin ? "Đăng nhập" : "Đăng ký")} cho {email}...");
 

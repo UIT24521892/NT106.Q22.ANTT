@@ -28,7 +28,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "B?n chua ? trong tr?n n�o.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận nào.");
                 return;
             }
 
@@ -41,19 +41,19 @@ namespace Monopoly.Server.Handles
             {
                 if (!ServerState.Rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
                 {
-                    failMessage = "Tr?n d?u kh�ng t?n t?i ho?c chua b?t d?u.";
+                    failMessage = "Trận đấu không tồn tại hoặc chưa bắt đầu.";
                 }
                 else if (room.GameState.IsFinished)
                 {
-                    failMessage = $"Tr?n d?u d� k?t th�c. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
+                    failMessage = $"Trận đấu đã kết thúc. Người thắng: {room.GameState.WinnerUsername}.";
                 }
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
-                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
+                    failMessage = "Đang chờ người chơi chọn mục tiêu thẻ. Hãy hoàn tất chọn thẻ trước";
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {
@@ -64,22 +64,22 @@ namespace Monopoly.Server.Handles
 
                     if (player == null)
                     {
-                        failMessage = "Kh�ng t�m th?y ngu?i choi trong tr?n.";
+                        failMessage = "Không tìm thấy người chơi trong trận.";
                     }
                     else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
                     {
-                        failMessage = $"Chua d?n lu?t c?a b?n. Hi?n t?i l� lu?t c?a {room.GameState.CurrentTurnUsername}.";
+                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
                     }
                     else if (room.GameState.HasRolledThisTurn)
                     {
-                        failMessage = "B?n d� d? x�c x?c trong lu?t n�y. H�y k?t th�c lu?t.";
+                        failMessage = "Bạn đã đổ xúc xắc trong lượt này. Hãy kết thúc lượt.";
                     }
                     else if (!player.IsOnIsland && player.SkipTurnsLeft > 0)
                     {
                         player.SkipTurnsLeft--;
                         string skipMessage = player.SkipReason == "WORLD_TOUR"
-                            ? $"{player.Username} dang ch? chuy?n bay Du L?ch Th? Gi?i v� b? lu?t n�y."
-                            : $"{player.Username} b? d�ng bang giao d?ch v� b? lu?t n�y.";
+                            ? $"{player.Username} đang chờ chuyến bay Du Lịch Thế Giới và bỏ lượt này."
+                            : $"{player.Username} bị đóng băng giao dịch và bỏ lượt này.";
 
                         if (player.SkipTurnsLeft == 0)
                             player.SkipReason = "";
@@ -104,20 +104,20 @@ namespace Monopoly.Server.Handles
                         if (room.GameState.ForceDoubleThisTurn)
                         {
                             room.GameState.ForceDoubleThisTurn = false;
-                            actionMessages.Add("${player.Username} dung Xuc Xac Ma Thuat va roll doi ${dice1}.");
+                            actionMessages.Add("${player.Username} dùng Xúc Xắc Ma Thuật và roll đôi ${dice1}.");
                         }
 
                         if (player.IsOnIsland || player.JailTurnsLeft > 0)
                         {
                             bool canLeaveIsland = dice1 == dice2;
 
-                            actionMessages.Add($"{player.Username} ? �?o Hoang v� d? {dice1} + {dice2} = {diceTotal}.");
+                            actionMessages.Add($"{player.Username} ? Đảo Hoang và đổ {dice1} + {dice2} = {diceTotal}.");
 
                             if (canLeaveIsland)
                             {
                                 player.IsOnIsland = false;
                                 player.JailTurnsLeft = 0;
-                                actionMessages.Add($"{player.Username} l?c d�i v� tho�t �?o Hoang.");
+                                actionMessages.Add($"{player.Username} lắc đôi và thoát Đảo Hoang.");
                                 GameEngine.MovePlayerByDiceUnsafe(room.GameState, player, oldPosition, dice1, dice2, actionMessages, cardDrawEvents);
                             }
                             else if (player.JailTurnsLeft > 1)
@@ -130,7 +130,7 @@ namespace Monopoly.Server.Handles
                                 room.GameState.LastMoveFromPosition = oldPosition;
                                 room.GameState.LastMoveToPosition = oldPosition;
                                 room.GameState.LastFinalPosition = oldPosition;
-                                actionMessages.Add($"{player.Username} chua l?c d�i, c�n {player.JailTurnsLeft} lu?t tr�n �?o Hoang.");
+                                actionMessages.Add($"{player.Username} chưa lắc đôi, còn {player.JailTurnsLeft} lượt trên Đảo Hoang.");
                             }
                             else
                             {
@@ -138,7 +138,7 @@ namespace Monopoly.Server.Handles
                                 player.Money -= islandExitFee;
                                 player.IsOnIsland = false;
                                 player.JailTurnsLeft = 0;
-                                actionMessages.Add($"{player.Username} tr? {islandExitFee:N0} d? r?i �?o Hoang.");
+                                actionMessages.Add($"{player.Username} tr? {islandExitFee:N0} đã rời Đảo Hoang.");
                                 GameEngine.MovePlayerByDiceUnsafe(room.GameState, player, oldPosition, dice1, dice2, actionMessages, cardDrawEvents);
                             }
                         }
@@ -183,7 +183,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "B?n chua ? trong tr?n n�o.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận nào.");
                 return;
             }
 
@@ -195,19 +195,19 @@ namespace Monopoly.Server.Handles
             {
                 if (!ServerState.Rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
                 {
-                    failMessage = "Tr?n d?u kh�ng t?n t?i ho?c chua b?t d?u.";
+                    failMessage = "Trận đấu không tồn tại hoặc chưa bắt đầu.";
                 }
                 else if (room.GameState.IsFinished)
                 {
-                    failMessage = $"Tr?n d?u d� k?t th�c. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
+                    failMessage = $"Trận đấu đã kết thúc. Người thắng: {room.GameState.WinnerUsername}.";
                 }
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
-                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
+                    failMessage = "Đang chờ người chơi chọn mục tiêu thẻ. Hãy hoàn tất chọn thẻ trước.";
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {
@@ -217,15 +217,15 @@ namespace Monopoly.Server.Handles
 
                     if (player == null)
                     {
-                        failMessage = "Kh�ng t�m th?y ngu?i choi trong tr?n.";
+                        failMessage = "Không tìm thấy người chơi trong trận.";
                     }
                     else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
                     {
-                        failMessage = $"Chua d?n lu?t c?a b?n. Hi?n t?i l� lu?t c?a {room.GameState.CurrentTurnUsername}.";
+                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
                     }
                     else if (!room.GameState.HasRolledThisTurn)
                     {
-                        failMessage = "B?n c?n d? x�c x?c tru?c khi k?t th�c lu?t.";
+                        failMessage = "Bạn cần đổ xúc xắc trước khi kết thúc lượt.";
                     }
                     else
                     {
@@ -238,7 +238,7 @@ namespace Monopoly.Server.Handles
                         room.GameState.ForceDoubleThisTurn = false;
                         GameEngine.ResetTurnTimerUnsafe(room.GameState);
                         room.GameState.LastActionMessage =
-                            $"{player.Username} k?t th�c lu?t. �?n lu?t {nextPlayer.Username}.";
+                            $"{player.Username} kết thúc lượt. Đến lượt {nextPlayer.Username}.";
                         GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
 
                         broadcastMessage = room.GameState.LastActionMessage;
@@ -269,7 +269,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "B?n chua ? trong tr?n n�o.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận nào.");
                 return;
             }
 
@@ -281,19 +281,19 @@ namespace Monopoly.Server.Handles
             {
                 if (!ServerState.Rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
                 {
-                    failMessage = "Tr?n d?u kh�ng t?n t?i ho?c chua b?t d?u.";
+                    failMessage = "Trận đấu không tồn tại hoặc chưa bắt đầu.";
                 }
                 else if (room.GameState.IsFinished)
                 {
-                    failMessage = $"Tr?n d?u d� k?t th�c. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
+                    failMessage = $"Trận đấu đã kết thúc. Người thắng: {room.GameState.WinnerUsername}.";
                 }
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
-                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
+                    failMessage = "Đang chờ người chơi chọn mục tiêu thẻ. Hãy hoàn tất chọn thẻ trước.";
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {
@@ -303,35 +303,35 @@ namespace Monopoly.Server.Handles
 
                     if (player == null)
                     {
-                        failMessage = "Kh�ng t�m th?y ngu?i choi trong tr?n.";
+                        failMessage = "Không tìm thấy người chơi trong trận.";
                     }
                     else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
                     {
-                        failMessage = $"Chua d?n lu?t c?a b?n. Hi?n t?i l� lu?t c?a {room.GameState.CurrentTurnUsername}.";
+                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
                     }
                     else if (!room.GameState.HasRolledThisTurn)
                     {
-                        failMessage = "B?n c?n d? x�c x?c tru?c khi mua d?t.";
+                        failMessage = "Bạn cần đổ xúc xắc trước khi mua đất.";
                     }
                     else if (!room.GameState.Properties.TryGetValue(player.Position, out GamePropertyState property))
                     {
-                        failMessage = "Kh�ng t�m th?y th�ng tin � hi?n t?i.";
+                        failMessage = "Không tìm thấy thông tin ô hiện tại.";
                     }
                     else if (property.Type != "City" && property.Type != "Resort")
                     {
-                        failMessage = $"� {property.Name} kh�ng th? mua.";
+                        failMessage = $"Ô {property.Name} không thể mua.";
                     }
                     else if (property.OwnerPlayerIndex >= 0)
                     {
-                        failMessage = $"� {property.Name} d� c� ch?.";
+                        failMessage = $"Ô {property.Name} đã có chủ.";
                     }
                     else if (property.BuyPrice <= 0)
                     {
-                        failMessage = $"� {property.Name} chua c� gi� mua h?p l?.";
+                        failMessage = $"Ô {property.Name} chưa có giá mua hợp lí.";
                     }
                     else if (player.Money < property.BuyPrice)
                     {
-                        failMessage = $"B?n kh�ng d? ti?n d? mua {property.Name}.";
+                        failMessage = $"Bạn không đủ tiền mua {property.Name}.";
                     }
                     else
                     {
@@ -339,7 +339,7 @@ namespace Monopoly.Server.Handles
                         property.OwnerPlayerIndex = player.PlayerIndex;
 
                         room.GameState.LastActionMessage =
-                            $"{player.Username} d� mua {property.Name} v?i gi� {property.BuyPrice:N0}.";
+                            $"{player.Username} đã mua {property.Name} với giá {property.BuyPrice:N0}.";
                         GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
 
                         broadcastMessage = room.GameState.LastActionMessage;
@@ -373,7 +373,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "B?n chua ? trong tr?n n�o.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa trong trận nào.");
                 return;
             }
 
@@ -385,19 +385,19 @@ namespace Monopoly.Server.Handles
             {
                 if (!ServerState.Rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
                 {
-                    failMessage = "Tr?n d?u kh�ng t?n t?i ho?c chua b?t d?u.";
+                    failMessage = "Trận đấu không tồn tại hoặc chưa bắt đầu.";
                 }
                 else if (room.GameState.IsFinished)
                 {
-                    failMessage = $"Tr?n d?u d� k?t th�c. Ngu?i th?ng: {room.GameState.WinnerUsername}.";
+                    failMessage = $"Trận đấu đã kết thúc. Người thắng: {room.GameState.WinnerUsername}.";
                 }
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
-                    failMessage = "Dang cho nguoi choi chon muc tieu the. Hay hoan tat chon the truoc.";
+                    failMessage = "Đang chờ người chơi chọn mục tiêu thẻ. Hãy hoàn tất chọn thẻ trước.";
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {
@@ -407,27 +407,27 @@ namespace Monopoly.Server.Handles
 
                     if (player == null)
                     {
-                        failMessage = "Kh�ng t�m th?y ngu?i choi trong tr?n.";
+                        failMessage = "Không tìm thấy người chơi trong trận.";
                     }
                     else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
                     {
-                        failMessage = $"Chua d?n lu?t c?a b?n. Hi?n t?i l� lu?t c?a {room.GameState.CurrentTurnUsername}.";
+                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
                     }
                     else if (!room.GameState.Properties.TryGetValue(positionIndex, out GamePropertyState property))
                     {
-                        failMessage = "Kh�ng t�m th?y th�ng tin � d?t.";
+                        failMessage = "Không tìm thấy thông tin ô đất.";
                     }
                     else if (property.Type != "City")
                     {
-                        failMessage = $"� {property.Name} kh�ng th? x�y nh�.";
+                        failMessage = $"Ô {property.Name} không thể xây nhà.";
                     }
                     else if (property.OwnerPlayerIndex != player.PlayerIndex)
                     {
-                        failMessage = $"B?n kh�ng s? h?u {property.Name}.";
+                        failMessage = $"Bạn không sở hữu {property.Name}.";
                     }
                     else if (property.HasHotel)
                     {
-                        failMessage = $"{property.Name} d� c� kh�ch s?n.";
+                        failMessage = $"{property.Name} dã có khách sạn.";
                     }
                     else
                     {
@@ -435,11 +435,11 @@ namespace Monopoly.Server.Handles
 
                         if (buildCost <= 0)
                         {
-                            failMessage = $"{property.Name} chua c� chi ph� n�ng c?p h?p l?.";
+                            failMessage = $"{property.Name} chưa có chi phí nâng cấp hợp lí.";
                         }
                         else if (player.Money < buildCost)
                         {
-                            failMessage = $"B?n kh�ng d? ti?n d? n�ng c?p {property.Name}.";
+                            failMessage = $"Bạn không đủ tiền để nâng cấp {property.Name}.";
                         }
                         else
                         {
@@ -456,7 +456,7 @@ namespace Monopoly.Server.Handles
                             }
 
                             room.GameState.LastActionMessage =
-                                $"{player.Username} n�ng c?p {property.Name} l�n {GameEngine.DescribePropertyLevelUnsafe(property)} v?i gi� {buildCost:N0}.";
+                                $"{player.Username} nâng cấp {property.Name} lên {GameEngine.DescribePropertyLevelUnsafe(property)} với giá {buildCost:N0}.";
                             GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
 
                             broadcastMessage = room.GameState.LastActionMessage;
@@ -496,7 +496,7 @@ namespace Monopoly.Server.Handles
                 await NetworkSender.SendJsonPacketAsync(connection.Stream, new
                 {
                     Type = "RESUME_GAME_NONE",
-                    Payload = new { Message = "Kh�ng c� phi�n ngu?i choi d? kh�i ph?c." }
+                    Payload = new { Message = "Không có phiên người chơi để khôi phục." }
                 });
                 return;
             }
@@ -518,7 +518,7 @@ namespace Monopoly.Server.Handles
                     disconnectedPlayer.IsConnected = true;
                     connection.Username = username;
                     connection.CurrentRoomId = room.RoomId;
-                    room.GameState.LastActionMessage = $"{username} d� k?t n?i l?i tr?n.";
+                    room.GameState.LastActionMessage = $"{username} đã kết nối lại trận.";
                     GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
                     resumeRoomSnapshot = room;
                     roomId = room.RoomId;
@@ -526,7 +526,7 @@ namespace Monopoly.Server.Handles
                 }
 
                 if (resumeRoomSnapshot == null)
-                    failMessage = "Kh�ng c� tr?n dang ch? k?t n?i l?i.";
+                    failMessage = "Không có trận đang chờ kết nối lại.";
             }
 
             if (resumeRoomSnapshot == null)
@@ -553,7 +553,7 @@ namespace Monopoly.Server.Handles
                 }
             });
 
-            await NetworkSender.BroadcastGameStateAsync(roomId, $"{username} d� k?t n?i l?i tr?n.");
+            await NetworkSender.BroadcastGameStateAsync(roomId, $"{username} đã kết nối lại trận.");
         }
         public static async Task HandleLeaveRoomAsync(ClientConnection connection, bool sendLeaveSuccess)
         {
@@ -595,20 +595,34 @@ namespace Monopoly.Server.Handles
 
                     connection.CurrentRoomId = "";
 
-                    gameStateMessage = $"{username} d� m?t k?t n?i/r?i tr?n.";
+                    gameStateMessage = $"{username} đã mất kết nối/rời trận.";
 
                     List<GamePlayerState> connectedHumans = room.GameState.Players
                         .Where(p => !p.IsBot && !p.IsBankrupt && p.IsConnected)
                         .OrderBy(p => p.PlayerIndex)
                         .ToList();
 
-                    if (connectedHumans.Count == 1)
+                    if (connectedHumans.Count <= 1)
                     {
                         room.GameState.IsFinished = true;
-                        room.GameState.WinnerUsername = connectedHumans[0].Username;
                         room.GameState.HasRolledThisTurn = true;
                         room.GameState.TurnEndsAtUtcTicks = 0;
-                        gameStateMessage += $" {connectedHumans[0].Username} th?ng tr?n.";
+
+                        if (connectedHumans.Count == 1)
+                        {
+                            room.GameState.WinnerUsername = connectedHumans[0].Username;
+                            gameStateMessage += $" {connectedHumans[0].Username} thắng trận.";
+                        }
+                        else
+                        {
+                            var winner = room.GameState.Players
+                                .Where(p => p.IsConnected && !p.IsBankrupt)
+                                .OrderByDescending(p => p.Money)
+                                .FirstOrDefault();
+                            
+                            room.GameState.WinnerUsername = winner?.Username ?? "";
+                            gameStateMessage += $" Trận đấu kết thúc do không còn người chơi thật.";
+                        }
                     }
                     else if (gamePlayer != null &&
                         room.GameState.CurrentTurnPlayerIndex == gamePlayer.PlayerIndex &&
@@ -622,7 +636,7 @@ namespace Monopoly.Server.Handles
                         room.GameState.HasRolledThisTurn = false;
                         room.GameState.ForceDoubleThisTurn = false;
                         GameEngine.ResetTurnTimerUnsafe(room.GameState);
-                        gameStateMessage += $" �?n lu?t {nextPlayer.Username}.";
+                        gameStateMessage += $" Đến lượt {nextPlayer.Username}.";
                     }
 
                     room.GameState.LastActionMessage = gameStateMessage;
@@ -659,7 +673,7 @@ namespace Monopoly.Server.Handles
                     Type = "LEAVE_ROOM_SUCCESS",
                     Payload = new
                     {
-                        Message = "�� r?i ph�ng."
+                        Message = "Ðã rời phòng."
                     }
                 });
             }
@@ -667,7 +681,7 @@ namespace Monopoly.Server.Handles
             if (shouldBroadcastGameState)
             {
                 await NetworkSender.BroadcastGameStateAsync(roomId, gameStateMessage);
-                Console.WriteLine($"[GAME] {username} r?i tr?n {roomId}.");
+                Console.WriteLine($"[GAME] {username} rời trận {roomId}.");
                 return;
             }
 
@@ -682,19 +696,19 @@ namespace Monopoly.Server.Handles
                             Type = "ROOM_CLOSED",
                             Payload = new
                             {
-                                Message = "Ch? ph�ng d� r?i di. Ph�ng d� b? d�ng."
+                                Message = "Chủ phòng đã rời đi. Phòng đã bị đóng."
                             }
                         });
                     }
                 }
 
-                Console.WriteLine($"[ROOM] Ph�ng {roomId} d� b? d�ng.");
+                Console.WriteLine($"[ROOM] Phòng {roomId} đã bị đóng.");
             }
             else
             {
                 await NetworkSender.BroadcastRoomUpdateAsync(roomId);
 
-                Console.WriteLine($"[ROOM] {username} r?i ph�ng {roomId}.");
+                Console.WriteLine($"[ROOM] {username} rời phòng {roomId}.");
             }
         }
     }

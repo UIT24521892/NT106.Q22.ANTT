@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Monopoly.Server.Models.State;
 using Monopoly.Server.Services;
 using Monopoly.Server.Network;
 
@@ -21,7 +20,6 @@ namespace Monopoly.Server.GameLogic
         {
             if (gameState.IsPaused)
                 return;
-
             gameState.TurnDurationSeconds = 45;
             gameState.TurnEndsAtUtcTicks = DateTime.UtcNow.AddSeconds(45).Ticks;
             gameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
@@ -642,10 +640,9 @@ namespace Monopoly.Server.GameLogic
                 List<string> actionMessages)
         {
             GamePropertyState target = gameState.Properties.Values
-                .Where(p => p.Type == "City" &&
-                            p.OwnerPlayerIndex >= 0 &&
-                            p.OwnerPlayerIndex != player.PlayerIndex &&
-                            (p.HasHotel || p.HouseCount > 0))
+                .Where(p => p.Type == "City" && p.OwnerPlayerIndex >= 0 &&
+                    p.OwnerPlayerIndex != player.PlayerIndex &&
+                    (p.HasHotel || p.HouseCount > 0))
                 .OrderByDescending(p => p.HasHotel ? 4 : p.HouseCount)
                 .FirstOrDefault();
 
@@ -673,9 +670,8 @@ namespace Monopoly.Server.GameLogic
                 List<string> actionMessages)
         {
             GamePropertyState target = gameState.Properties.Values
-                .Where(p => p.OwnerPlayerIndex >= 0 &&
-                            p.OwnerPlayerIndex != player.PlayerIndex &&
-                            (p.Type == "City" || p.Type == "Resort"))
+                .Where(p => p.OwnerPlayerIndex >= 0 && p.OwnerPlayerIndex != player.PlayerIndex &&
+                    (p.Type == "City" || p.Type == "Resort"))
                 .OrderByDescending(GetCurrentRentUnsafe)
                 .FirstOrDefault();
 
@@ -775,7 +771,6 @@ namespace Monopoly.Server.GameLogic
                 case "FLIGHT":
                     targets.AddRange(BoardDatabase.Squares.Keys.OrderBy(p => p));
                     break;
-
                 case "FREE_UPGRADE":
                     targets.AddRange(gameState.Properties.Values
                         .Where(p => p.Type == "City" &&
@@ -784,7 +779,6 @@ namespace Monopoly.Server.GameLogic
                         .OrderBy(p => p.PositionIndex)
                         .Select(p => p.PositionIndex));
                     break;
-
                 case "EARTHQUAKE":
                     targets.AddRange(gameState.Properties.Values
                         .Where(p => p.Type == "City" &&
@@ -794,7 +788,6 @@ namespace Monopoly.Server.GameLogic
                         .OrderBy(p => p.PositionIndex)
                         .Select(p => p.PositionIndex));
                     break;
-
                 case "POWER_OUTAGE":
                     targets.AddRange(gameState.Properties.Values
                         .Where(p => p.OwnerPlayerIndex >= 0 &&
@@ -803,7 +796,6 @@ namespace Monopoly.Server.GameLogic
                         .OrderBy(p => p.PositionIndex)
                         .Select(p => p.PositionIndex));
                     break;
-
                 case "MOVE_CHAMPIONSHIP":
                     targets.AddRange(gameState.Properties.Values
                         .Where(p => p.Type == "City" &&
@@ -829,13 +821,13 @@ namespace Monopoly.Server.GameLogic
 
             if (gameState == null || player == null)
             {
-                failMessage = "Khong tim thay trang thai game hoac nguoi choi.";
+                failMessage = "Không tìm thấy trạng thái game hoặc người chơi.";
                 return false;
             }
 
             if (!PlayerHasHeldCardUnsafe(player, effectCode))
             {
-                failMessage = "Ban khong so huu the nay hoac the da duoc dung.";
+                failMessage = "Bạn không sở hữu thẻ này hoặc thẻ đã được dùng.";
                 return false;
             }
 
@@ -843,7 +835,7 @@ namespace Monopoly.Server.GameLogic
             {
                 if (!targetPosition.HasValue)
                 {
-                    failMessage = "The nay can chon muc tieu.";
+                    failMessage = "Thẻ này cần chọn mục tiêu.";
                     return false;
                 }
 
@@ -851,7 +843,7 @@ namespace Monopoly.Server.GameLogic
 
                 if (!validTargets.Contains(targetPosition.Value))
                 {
-                    failMessage = "Muc tieu khong hop le cho the nay.";
+                    failMessage = "Mục tiêu không hợp lệ cho thẻ này.";
                     return false;
                 }
             }
@@ -861,13 +853,13 @@ namespace Monopoly.Server.GameLogic
                 case "FREE_RENT":
                     player.HasFreeRentCard = false;
                     player.IsFreeRentShieldActive = true;
-                    actionMessages.Add($"{player.Username} kich hoat Khien Mien Tru cho lan tra tien thue tiep theo.");
+                    actionMessages.Add($"{player.Username} kích hoạt Khiên Miễn Trừ cho lần trả tiền thuế tiếp theo.");
                     return true;
 
                 case "ESCAPE_ISLAND":
                     if (!player.IsOnIsland && player.JailTurnsLeft <= 0)
                     {
-                        failMessage = "Chi co the dung the thoat Dao Hoang khi dang o Dao Hoang.";
+                        failMessage = "Chỉ có thể dùng để thoát Đảo Hoang khi đang ở Đảo Hoang.";
                         return false;
                     }
 
@@ -876,25 +868,25 @@ namespace Monopoly.Server.GameLogic
                     player.JailTurnsLeft = 0;
                     player.SkipTurnsLeft = 0;
                     player.SkipReason = "";
-                    actionMessages.Add($"{player.Username} dung Truc Thang Cuu Ho va thoat Dao Hoang.");
+                    actionMessages.Add($"{player.Username} dùng Trực Thăng Cứu Hộ và thoát Đảo Hoang.");
                     return true;
 
                 case "FORCE_DOUBLE":
                     if (gameState.HasRolledThisTurn)
                     {
-                        failMessage = "Chi co the dung Xuc Xac Ma Thuat truoc khi do xuc xac.";
+                        failMessage = "Chỉ có thể dùng Xúc Xắc Ma Thuật trước khi đổ xúc xắc.";
                         return false;
                     }
 
                     if (!player.IsOnIsland && player.SkipTurnsLeft > 0)
                     {
-                        failMessage = "Khong the dung Xuc Xac Ma Thuat khi dang bi mat luot.";
+                        failMessage = "Không thể dùng Xúc Xắc Ma Thuật khi đang bị mất lượt.";
                         return false;
                     }
 
                     player.HasForceDoubleCard = false;
                     gameState.ForceDoubleThisTurn = true;
-                    actionMessages.Add($"{player.Username} kich hoat Xuc Xac Ma Thuat cho lan roll nay.");
+                    actionMessages.Add($"{player.Username} kích hoạt Xúc Xắc Ma Thuật cho lần roll này.");
                     return true;
 
                 case "FLIGHT":
@@ -913,7 +905,7 @@ namespace Monopoly.Server.GameLogic
                     return ApplyMoveChampionshipCardUnsafe(gameState, player, targetPosition.Value, actionMessages, out failMessage);
 
                 default:
-                    failMessage = $"The {effectCode} chua duoc ho tro trong hand.";
+                    failMessage = $"The {effectCode} chưa được hỗ trợ trong handle.";
                     return false;
             }
         }
@@ -929,7 +921,7 @@ namespace Monopoly.Server.GameLogic
 
             if (!BoardDatabase.Squares.ContainsKey(targetPosition))
             {
-                failMessage = "O dich khong hop le.";
+                failMessage = "Ô đích không hợp lệ.";
                 return false;
             }
 
@@ -942,10 +934,10 @@ namespace Monopoly.Server.GameLogic
             {
                 const long startBonus = 300000;
                 player.Money += startBonus;
-                actionMessages.Add($"{player.Username} bay qua Bat Dau va nhan {startBonus:N0}.");
+                actionMessages.Add($"{player.Username} bay qua Bắt Đầu và nhận {startBonus:N0}.");
             }
 
-            actionMessages.Add($"{player.Username} dung Ve May Bay tu o {oldPosition} den o {targetPosition}.");
+            actionMessages.Add($"{player.Username} dùng Vé Máy Bay từ ô {oldPosition} đến ô {targetPosition}.");
             ApplyRentOnLandingUnsafe(gameState, player, targetPosition, actionMessages);
             ApplySpecialSquareEffectUnsafe(gameState, player, targetPosition, actionMessages, cardDrawEvents);
 
@@ -969,7 +961,7 @@ namespace Monopoly.Server.GameLogic
 
             if (!gameState.Properties.TryGetValue(targetPosition, out GamePropertyState property))
             {
-                failMessage = "Khong tim thay o dat can nang cap.";
+                failMessage = "Không tìm thấy ô đất cần nâng cấp.";
                 return false;
             }
 
@@ -977,7 +969,7 @@ namespace Monopoly.Server.GameLogic
                 property.OwnerPlayerIndex != player.PlayerIndex ||
                 property.HasHotel)
             {
-                failMessage = "O dat nay khong the nang cap mien phi.";
+                failMessage = "Ô đất này không thể nâng cấp miễn phí.";
                 return false;
             }
 
@@ -993,7 +985,7 @@ namespace Monopoly.Server.GameLogic
                 property.HouseCount++;
             }
 
-            actionMessages.Add($"{player.Username} dung Giay Phep Xay Dung nang cap {property.Name} len {DescribePropertyLevelUnsafe(property)} mien phi.");
+            actionMessages.Add($"{player.Username} dùng Giấy Phép Xây Dựng nâng cấp {property.Name} lên {DescribePropertyLevelUnsafe(property)} miễn phí.");
             return true;
         }
         private static bool ApplyEarthquakeCardUnsafe(
@@ -1011,7 +1003,7 @@ namespace Monopoly.Server.GameLogic
                 property.OwnerPlayerIndex == player.PlayerIndex ||
                 (!property.HasHotel && property.HouseCount <= 0))
             {
-                failMessage = "Muc tieu Dong Dat khong hop le.";
+                failMessage = "Mục tiêu Động Đất không hợp lệ.";
                 return false;
             }
 
@@ -1027,7 +1019,7 @@ namespace Monopoly.Server.GameLogic
                 property.HouseCount = Math.Max(0, property.HouseCount - 1);
             }
 
-            actionMessages.Add($"{player.Username} dung Dong Dat lam {property.Name} giam 1 cap.");
+            actionMessages.Add($"{player.Username} dùng Động Đất làm {property.Name} giảm 1 cấp.");
             return true;
         }
         private static bool ApplyPowerOutageCardUnsafe(
@@ -1044,13 +1036,13 @@ namespace Monopoly.Server.GameLogic
                 property.OwnerPlayerIndex == player.PlayerIndex ||
                 (property.Type != "City" && property.Type != "Resort"))
             {
-                failMessage = "Muc tieu Cup Dien khong hop le.";
+                failMessage = "Mục tiêu Cúp Điện không hợp lệ.";
                 return false;
             }
 
             player.HasPowerOutageCard = false;
             property.PowerOutageTurn = gameState.TurnNumber + 2;
-            actionMessages.Add($"{player.Username} dung Cup Dien lam {property.Name} mat dien trong 2 luot.");
+            actionMessages.Add($"{player.Username} dùng Cúp Điện làm {property.Name} mất điện trong 2 lượt.");
             return true;
         }
         private static bool ApplyMoveChampionshipCardUnsafe(
@@ -1066,13 +1058,13 @@ namespace Monopoly.Server.GameLogic
                 property.Type != "City" ||
                 property.OwnerPlayerIndex != player.PlayerIndex)
             {
-                failMessage = "Muc tieu dang cai giai dau khong hop le.";
+                failMessage = "Mục tiêu đăng cai giải đấu không hợp lệ.";
                 return false;
             }
 
             player.HasMoveChampionshipCard = false;
             gameState.WorldChampionshipPosition = targetPosition;
-            actionMessages.Add($"{player.Username} doi Giai Vo Dich ve {property.Name}.");
+            actionMessages.Add($"{player.Username} đổi Giải Vô Địch về {property.Name}.");
             return true;
         }
         public static void ClearPendingCardChoiceUnsafe(GameState gameState)

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,17 +19,17 @@ namespace Monopoly.Server.Network
             {
                 JObject packet = JObject.Parse(jsonPacket);
                 string packetType = packet["Type"]?.ToString() ?? "";
-
                 if (IsBlockedWhilePaused(packetType, connection))
                 {
-                    await NetworkSender.SendGameActionFailedAsync(connection, "Trận đấu đang tạm dừng.");
+                    await NetworkSender.SendGameActionFailedAsync(connection, 
+                        "Trận đấu đang tạm dừng.");
                     return;
                 }
 
                 switch (packetType)
                 {
-                    case "Login":
-                    case "Register":
+                    case "LOGIN":
+                    case "REGISTER":
                         await AuthHandler.HandleAuthAsync(packet, connection);
                         break;
 
@@ -65,24 +65,19 @@ namespace Monopoly.Server.Network
                         await TcpServer.HandleDisconnectAsync(connection);
                         connection.TcpClient?.Close();
                         break;
-
-                    case "DiceRoll":
                     case "ROLL_DICE":
                         await GameHandler.HandleDiceRollAsync(connection);
                         break;
 
-                    case "EndTurn":
                     case "END_TURN":
                         await GameHandler.HandleEndTurnAsync(connection);
                         break;
 
                     case "BUY_PROPERTY":
-                    case "BuyProperty":
                         await GameHandler.HandleBuyPropertyAsync(connection);
                         break;
 
                     case "BUILD_PROPERTY":
-                    case "BuildProperty":
                         await GameHandler.HandleBuildPropertyAsync(packet, connection);
                         break;
 
@@ -91,7 +86,6 @@ namespace Monopoly.Server.Network
                         break;
 
                     case "USE_CARD":
-                    case "UseCard":
                         await GameHandler.HandleUseCardAsync(packet, connection);
                         break;
 
@@ -119,7 +113,6 @@ namespace Monopoly.Server.Network
                         await GameControlHandler.HandleSurrenderAsync(connection);
                         break;
 
-                    case "GAME_CHAT":
                     case "CHAT_MESSAGE":
                         await RoomHandler.HandleGameChatAsync(packet, connection);
                         break;
@@ -129,13 +122,13 @@ namespace Monopoly.Server.Network
                         break;
 
                     default:
-                        Console.WriteLine($"[C?NH BÁO] Packet không xác d?nh: {packetType}");
+                        Console.WriteLine($"[CẢNH BÁO] Packet không xác định: {packetType}");
                         break;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[L?I X? LÝ GÓI TIN] {ex.Message}");
+                Console.WriteLine($"[LỖI XỬ LÝ GÓI TIN] {ex.Message}");
                 Console.WriteLine($"[RAW] {jsonPacket}");
             }
         }
@@ -175,12 +168,12 @@ namespace Monopoly.Server.Network
 
             string[] blockedPacketTypes =
             {
-                "DiceRoll", "ROLL_DICE",
-                "EndTurn", "END_TURN",
-                "BUY_PROPERTY", "BuyProperty",
-                "BUILD_PROPERTY", "BuildProperty",
+                "ROLL_DICE",
+                "END_TURN",
+                "BUY_PROPERTY",
+                "BUILD_PROPERTY",
                 "SELL_PROPERTY_FOR_DEBT",
-                "USE_CARD", "UseCard",
+                "USE_CARD",
                 "CARD_CHOICE_MADE"
             };
 

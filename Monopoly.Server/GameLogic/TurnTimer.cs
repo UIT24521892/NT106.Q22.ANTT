@@ -77,8 +77,8 @@ namespace Monopoly.Server.GameLogic
                                 room.GameState.IsBotPlaying = false; // Reset cờ bot
                                 GameEngine.ResetTurnTimerUnsafe(room.GameState);
 
-                                string currentUsername = currentPlayer?.Username ?? "Nguoi choi";
-                                room.GameState.LastActionMessage = $"{currentUsername} het thoi gian luot. Den luot {nextPlayer.Username}.";
+                                string currentUsername = currentPlayer?.Username ?? "Người chơi";
+                                room.GameState.LastActionMessage = $"{currentUsername} hết thời gian lượt. Đến lượt {nextPlayer.Username}.";
                                 GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
 
                                 expiredTurns.Add((room.RoomId, room.GameState.LastActionMessage));

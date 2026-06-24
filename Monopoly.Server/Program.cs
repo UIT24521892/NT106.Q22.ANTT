@@ -35,7 +35,6 @@ namespace Monopoly.Server
 
                 Console.WriteLine($"[CONNECT] Client mới: {tcpClient.Client.RemoteEndPoint}");
 
-                // Không await ở đây để server tiếp tục nhận client khác
                 _ = TcpServer.HandleClientAsync(tcpClient);
             }
         }

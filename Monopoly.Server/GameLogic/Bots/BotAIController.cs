@@ -15,7 +15,7 @@ namespace Monopoly.Server.GameLogic.Bots
         {
             Console.WriteLine($"[BOT] Lượt của bot {bot.Username} bắt đầu.");
 
-            // 1. Nghỉ một chút trước khi làm gì đó (giả lập delay người chơi)
+            // Giả lập delay như real player
             await Task.Delay(1000);
 
             lock (ServerState.Lock)

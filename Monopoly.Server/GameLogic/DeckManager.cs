@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Monopoly.Shared.Models.Configs.Models;
 using Monopoly.Shared.Models.Configs.StaticData;
+
 namespace Monopoly.Server.GameLogic
 {
     public class DeckManager
@@ -15,8 +16,6 @@ namespace Monopoly.Server.GameLogic
             _random = new Random();
             InitializeDeck();
         }
-
-        // Bước 1: Khởi tạo và phân bổ số lượng bài
         private void InitializeDeck()
         {
             _deck.Clear();
@@ -45,7 +44,6 @@ namespace Monopoly.Server.GameLogic
             Console.WriteLine($"[DeckManager] Đã khởi tạo và xào xong tụ bài: {_deck.Count} lá.");
         }
 
-        // Bước 2: Thuật toán xáo trộn Fisher-Yates chuẩn xác
         private void ShuffleDeck()
         {
             int n = _deck.Count;
@@ -80,7 +78,6 @@ namespace Monopoly.Server.GameLogic
             return CardDatabase.Cards[drawnCardId];
         }
 
-        // Hàm phụ để kiểm tra xem còn bao nhiêu lá (tùy chọn)
         public int GetRemainingCardsCount()
         {
             return _deck.Count;
