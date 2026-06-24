@@ -135,7 +135,7 @@ namespace Monopoly.Server.Network
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[L?I X? LÝ GÓI TIN] {ex.Message}");
+                Console.WriteLine($"[LỖI XỬ LÝ GÓI TIN] {ex.Message}");
                 Console.WriteLine($"[RAW] {jsonPacket}");
             }
         }

@@ -1,4 +1,4 @@
-﻿using Monopoly.Server.Models;
+using Monopoly.Server.Models;
 using Monopoly.Server.Models.Events;
 using Monopoly.Server.Models.State;
 using Monopoly.Shared.Models.Configs.StaticData;
@@ -602,13 +602,27 @@ namespace Monopoly.Server.Handles
                         .OrderBy(p => p.PlayerIndex)
                         .ToList();
 
-                    if (connectedHumans.Count == 1)
+                    if (connectedHumans.Count <= 1)
                     {
                         room.GameState.IsFinished = true;
-                        room.GameState.WinnerUsername = connectedHumans[0].Username;
                         room.GameState.HasRolledThisTurn = true;
                         room.GameState.TurnEndsAtUtcTicks = 0;
-                        gameStateMessage += $" {connectedHumans[0].Username} thắng trận.";
+
+                        if (connectedHumans.Count == 1)
+                        {
+                            room.GameState.WinnerUsername = connectedHumans[0].Username;
+                            gameStateMessage += $" {connectedHumans[0].Username} thắng trận.";
+                        }
+                        else
+                        {
+                            var winner = room.GameState.Players
+                                .Where(p => p.IsConnected && !p.IsBankrupt)
+                                .OrderByDescending(p => p.Money)
+                                .FirstOrDefault();
+                            
+                            room.GameState.WinnerUsername = winner?.Username ?? "";
+                            gameStateMessage += $" Trận đấu kết thúc do không còn người chơi thật.";
+                        }
                     }
                     else if (gamePlayer != null &&
                         room.GameState.CurrentTurnPlayerIndex == gamePlayer.PlayerIndex &&
