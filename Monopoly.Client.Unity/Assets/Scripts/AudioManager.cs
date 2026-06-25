@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Audio;
 
@@ -8,6 +9,9 @@ public class AudioManager : MonoBehaviour
     private const string SfxKey = "audio.sfx";
     private const string MuteKey = "audio.mute";
     private static AudioManager instance;
+
+    // Cache clip nạp theo tên từ Resources/ để khỏi load lại nhiều lần.
+    private readonly Dictionary<string, AudioClip> clipCache = new Dictionary<string, AudioClip>();
 
     [SerializeField] private AudioMixer audioMixer;
     [SerializeField] private AudioSource musicSource;
@@ -83,6 +87,32 @@ public class AudioManager : MonoBehaviour
     {
         if (clip != null)
             sfxSource.PlayOneShot(clip);
+    }
+
+    // Overload tiện dụng: phát hiệu ứng theo tên file trong Resources/Audio/.
+    // Thiếu file thì tự bỏ qua (no-op), không gây lỗi.
+    public void PlaySfx(string key)
+    {
+        PlaySfx(LoadClip(key));
+    }
+
+    // Phát nhạc nền theo tên file trong Resources/Audio/.
+    public void PlayMusic(string key)
+    {
+        PlayMusic(LoadClip(key));
+    }
+
+    private AudioClip LoadClip(string key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return null;
+
+        if (clipCache.TryGetValue(key, out AudioClip cached))
+            return cached;
+
+        AudioClip clip = Resources.Load<AudioClip>($"Audio/{key}");
+        clipCache[key] = clip; // cache cả null để khỏi load lại file thiếu
+        return clip;
     }
 
     private void ApplySavedVolumes()

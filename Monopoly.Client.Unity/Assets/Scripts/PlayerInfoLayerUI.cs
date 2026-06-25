@@ -123,16 +123,22 @@ public class PlayerInfoLayerUI : MonoBehaviour
         detailText.alignment = TextAlignmentOptions.MidlineLeft;
         badgeText.alignment = TextAlignmentOptions.MidlineRight;
 
-        nameText.fontSize = 15f;
-        detailText.fontSize = 11f;
-        badgeText.fontSize = 12f;
+        nameText.fontSize = 14f;
+        detailText.fontSize = 10.5f;
+        badgeText.fontSize = 11.5f;
+        nameText.enableAutoSizing = true;
+        nameText.fontSizeMin = 10f;
+        nameText.fontSizeMax = 14f;
         detailText.enableAutoSizing = true;
         detailText.fontSizeMin = 8f;
-        detailText.fontSizeMax = 11f;
+        detailText.fontSizeMax = 10.5f;
+        badgeText.enableAutoSizing = true;
+        badgeText.fontSizeMin = 9f;
+        badgeText.fontSizeMax = 11.5f;
 
-        SetStretch(nameText.rectTransform, 76f, 4f, 4f, 62f);
-        SetStretch(detailText.rectTransform, 76f, 34f, 4f, 34f);
-        SetStretch(badgeText.rectTransform, 76f, 68f, 4f, 4f);
+        SetStretch(nameText.rectTransform, 100f, 4f, 6f, 62f);
+        SetStretch(detailText.rectTransform, 100f, 34f, 6f, 34f);
+        SetStretch(badgeText.rectTransform, 100f, 68f, 6f, 4f);
 
         return new PlayerCard(panelObject, rect, background, nameText, detailText, badgeText, keepSceneLayout: true);
     }
@@ -255,15 +261,24 @@ public class PlayerInfoLayerUI : MonoBehaviour
 
         TextMeshProUGUI nameText = CreateText("Txt_Name", cardRect, 16f, FontStyles.Bold);
         nameText.alignment = TextAlignmentOptions.MidlineLeft;
-        SetStretch(nameText.rectTransform, 10f, 6f, 72f, 44f);
+        nameText.enableAutoSizing = true;
+        nameText.fontSizeMin = 10f;
+        nameText.fontSizeMax = 16f;
+        SetStretch(nameText.rectTransform, 14f, 6f, 72f, 44f);
 
         TextMeshProUGUI detailText = CreateText("Txt_Detail", cardRect, 13f, FontStyles.Normal);
         detailText.color = new Color(0.9f, 0.96f, 1f, 1f);
         detailText.alignment = TextAlignmentOptions.MidlineLeft;
-        SetStretch(detailText.rectTransform, 10f, 32f, 10f, 8f);
+        detailText.enableAutoSizing = true;
+        detailText.fontSizeMin = 9f;
+        detailText.fontSizeMax = 13f;
+        SetStretch(detailText.rectTransform, 14f, 32f, 10f, 8f);
 
         TextMeshProUGUI badgeText = CreateText("Txt_Badge", cardRect, 13f, FontStyles.Bold);
         badgeText.alignment = TextAlignmentOptions.Center;
+        badgeText.enableAutoSizing = true;
+        badgeText.fontSizeMin = 9f;
+        badgeText.fontSizeMax = 13f;
         SetAnchored(
             badgeText.rectTransform,
             new Vector2(1f, 1f),

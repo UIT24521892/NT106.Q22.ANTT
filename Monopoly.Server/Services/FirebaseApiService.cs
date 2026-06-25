@@ -90,8 +90,8 @@ namespace Monopoly.Server.Services
                 {
                     Username = username,
                     Email = email,
-                    AvatarId = "avatar_1",        // Default avatar
-                    Money = 2000000,
+                    AvatarId = "avatar_1",        // Avatar mặc định khi đăng ký
+                    Money = 1000000,
                     Point = 0,
                     TotalWins = 0,
                     TotalLosses = 0,

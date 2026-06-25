@@ -68,22 +68,18 @@ namespace Monopoly.Server.GameLogic
                             // Xử lý Timeout
                             if (room.GameState.TurnEndsAtUtcTicks > 0 && nowTicks >= room.GameState.TurnEndsAtUtcTicks)
                             {
-                                GamePlayerState nextPlayer = GameEngine.GetNextTurnPlayerUnsafe(room.GameState);
-
-                                room.GameState.CurrentTurnPlayerIndex = nextPlayer.PlayerIndex;
-                                room.GameState.CurrentTurnUsername = nextPlayer.Username;
-                                room.GameState.TurnNumber++;
-                                room.GameState.HasRolledThisTurn = false;
+                                GameEngine.StartNextTurnUnsafe(room.GameState, out GamePlayerState? nextPlayer);
                                 room.GameState.IsBotPlaying = false; // Reset cờ bot
                                 GameEngine.ResetTurnTimerUnsafe(room.GameState);
 
                                 string currentUsername = currentPlayer?.Username ?? "Người chơi";
-                                room.GameState.LastActionMessage = $"{currentUsername} hết thời gian lượt. Đến lượt {nextPlayer.Username}.";
+                                string nextUsername = nextPlayer?.Username ?? "Người chơi";
+                                room.GameState.LastActionMessage = $"{currentUsername} hết thời gian lượt. Đến lượt {nextUsername}.";
                                 GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
 
                                 expiredTurns.Add((room.RoomId, room.GameState.LastActionMessage));
 
-                                Console.WriteLine($"[TURN_TIMEOUT] Room={room.RoomId}, From={currentUsername}, Next={nextPlayer.Username}, Turn={room.GameState.TurnNumber}");
+                                Console.WriteLine($"[TURN_TIMEOUT] Room={room.RoomId}, From={currentUsername}, Next={nextUsername}, Turn={room.GameState.TurnNumber}");
                             }
                         }
                     }
