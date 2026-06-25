@@ -507,3 +507,31 @@ Unity cần chỉnh:
 4. Thêm clip và nối event cho audio.
 5. Polish settings thành prefab nếu có design.
 6. Thực hiện cấu hình Internet cuối cùng.
+
+## 8. Quy Tắc Cập Nhật Tiến Độ
+
+Đây là file trạng thái chính của project. Sau mỗi thay đổi về tính năng, gameplay, network, UI Unity, scene/prefab, cấu hình build hoặc sửa lỗi:
+
+1. Cập nhật trạng thái và mô tả của task liên quan trong tài liệu này.
+2. Ghi rõ file, scene hoặc prefab đã thay đổi.
+3. Ghi hành vi mới, lỗi đã sửa và các giới hạn còn lại.
+4. Ghi kết quả build/test thực tế; không đánh dấu hoàn thành nếu chưa kiểm tra.
+5. Thêm một mục mới ở đầu phần `Nhật ký thay đổi`.
+
+Thay đổi chỉ liên quan đến tài liệu không được ghi nhận như một tính năng đã hoàn thành.
+
+## 9. Nhật Ký Thay Đổi
+
+### 2026-06-25
+
+- Đã resolve merge `origin/feature/logic_game` với `main` trên branch local `merge/feature-logic-game-resolved`, commit `708bdcb`.
+- Đã xử lý 36 conflict hunk trong `GameEngine.cs`, `TurnTimer.cs`, `GameHandler.cs` và `FirebaseApiService.cs`.
+- Giữ các fix encoding tiếng Việt và xử lý khi không còn người chơi thật từ `main`; đồng thời nhận gameplay/UI mới từ nhánh feature.
+- Server build thành công: `0` lỗi, `77` cảnh báo.
+- Tám test `GameEngineTests` chạy thành công.
+- Unity `2022.3.62f3` import và compile batch mode thành công, không có lỗi C#.
+- Chưa push được branch lên GitHub vì remote HTTPS chưa có credential trên máy.
+- Thiết lập `NT106_FEATURE_STATUS_AND_TASK_PLAN.md` làm nguồn theo dõi tiến độ chính.
+- Bổ sung quy tắc bắt buộc cập nhật trạng thái, file đã đổi và kết quả build/test sau mỗi thay đổi.
+- Xác nhận server build thành công bằng .NET SDK `8.0.422`: `0` lỗi, `107` cảnh báo.
+- Xác nhận Unity Editor `2022.3.62f3` đã được cài và khớp với phiên bản của project.
