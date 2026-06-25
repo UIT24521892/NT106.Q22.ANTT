@@ -43,3 +43,9 @@ sysinfo.txt
 *.VC.db
 
 # TUYỆT ĐỐI KHÔNG ĐƯỢC THÊM *.meta VÀO ĐÂY!
+
+# ==========================================
+# 4. CLAUDE CODE - CẤU HÌNH CÁ NHÂN
+# ==========================================
+.claude/settings.local.json
+.mcp.json

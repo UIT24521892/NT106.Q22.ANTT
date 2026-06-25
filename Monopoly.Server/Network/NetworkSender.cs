@@ -87,6 +87,7 @@ namespace Monopoly.Server.Network
             bool shouldBroadcastGameOver = false;
             List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
             string matchId = "";
+            string endReason = "";
 
             lock (ServerState.Lock)
             {
@@ -105,6 +106,9 @@ namespace Monopoly.Server.Network
 
                     rankings = GameEngine.BuildGameOverRankingsUnsafe(gameState);
                     matchId = gameState.MatchId;
+                    endReason = string.IsNullOrWhiteSpace(gameState.EndReason)
+                        ? "Trận đấu kết thúc"
+                        : gameState.EndReason;
                     gameState.GameOverBroadcasted = true;
                     shouldBroadcastGameOver = true;
                 }
@@ -129,10 +133,10 @@ namespace Monopoly.Server.Network
 
             if (shouldBroadcastGameOver)
             {
-                await BroadcastGameOverAsync(roomId, matchId, rankings);
+                await BroadcastGameOverAsync(roomId, matchId, endReason, rankings);
             }
         }
-        public static async Task BroadcastGameOverAsync(string roomId, string matchId, List<GameOverRankingResult> rankings)
+        public static async Task BroadcastGameOverAsync(string roomId, string matchId, string reason, List<GameOverRankingResult> rankings)
         {
             await BroadcastToRoomAsync(roomId, new
             {
@@ -140,6 +144,7 @@ namespace Monopoly.Server.Network
                 Payload = new
                 {
                     MatchId = matchId,
+                    Reason = reason,
                     Rankings = rankings
                 }
             });

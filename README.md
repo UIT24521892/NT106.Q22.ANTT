@@ -14,6 +14,11 @@
 dotnet run --project Monopoly.Server/Monopoly.Server.csproj
 ```
 
+### Chạy test gameplay
+```bash
+dotnet run --project Monopoly.Server/Monopoly.Server.csproj -- --run-tests
+```
+
 ### Build phần .NET
 Nếu chỉ cần kiểm tra server và shared library:
 ```bash
@@ -28,7 +33,7 @@ dotnet build MonopolyGame.sln
 Lưu ý: `Monopoly.Client` là Windows Forms app, target `net8.0-windows`. Khi build trên GitHub Actions/Linux/macOS, project đã bật `EnableWindowsTargeting` để tránh lỗi Windows targeting. Nếu cần chạy client WinForms thật sự, hãy chạy trên Windows.
 
 ### Unity client
-Mở thư mục `Monopoly.Client.Unity` bằng Unity Editor và cài các package cần thiết:
+Mở thư mục `Monopoly.Client.Unity` bằng Unity Editor `2022.3.62f3`. Các package chính:
 - `com.unity.nuget.newtonsoft-json`
 - TextMeshPro
 - Unity UI

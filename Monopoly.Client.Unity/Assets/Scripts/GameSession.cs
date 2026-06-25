@@ -24,7 +24,7 @@ public static class GameSession
         if (gameState == null)
             return;
 
-        CurrentState = gameState;
+         CurrentState = gameState;
         RoomId = gameState.RoomId;
         MapName = gameState.MapName;
     }

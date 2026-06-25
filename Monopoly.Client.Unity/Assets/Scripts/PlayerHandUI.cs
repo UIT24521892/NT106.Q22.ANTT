@@ -59,7 +59,7 @@ public class PlayerHandUI : MonoBehaviour
         {
             statusText.text = localPlayer.IsFreeRentShieldActive
                 ? "Khien mien tru dang kich hoat"
-                : (hasStatus ? $"Chon muc tieu cho {state.PendingCardEffectCode}" : "");
+                : (hasStatus ? GetFriendlyPrompt(state.PendingCardEffectCode) : "");
         }
 
         bool canUseAnyCard = CanUseCards(state, localPlayer);
@@ -195,6 +195,21 @@ public class PlayerHandUI : MonoBehaviour
             cards.Add(new CardDisplay("Dang Cai Giai Dau", "MOVE_CHAMPIONSHIP", cardColor));
 
         return cards;
+    }
+
+    private string GetFriendlyPrompt(string effectCode)
+    {
+        switch (effectCode)
+        {
+            case "WORLD_TOUR": return "Chon diem den Du Lich The Gioi";
+            case "WORLD_CHAMPIONSHIP_HOST": return "Chon noi dang cai Giai Vo Dich";
+            case "FLIGHT": return "Chon diem den cho Ve May Bay";
+            case "FREE_UPGRADE": return "Chon dat de Nang Cap Mien Phi";
+            case "EARTHQUAKE": return "Chon dat doi thu de dung Dong Dat";
+            case "POWER_OUTAGE": return "Chon dat doi thu de Cup Dien";
+            case "MOVE_CHAMPIONSHIP": return "Chon dat cua ban de doi Giai Vo Dich";
+            default: return $"Chon muc tieu cho the {effectCode}";
+        }
     }
 
     private bool CanUseCards(GameStateData state, GamePlayerStateData localPlayer)
