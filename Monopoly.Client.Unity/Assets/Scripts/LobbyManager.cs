@@ -193,15 +193,37 @@ public class LobbyManager : MonoBehaviour
     /// <summary>
     /// Tải thông tin người chơi từ PlayerSession (singleton giả định đã lưu sau đăng nhập)
     /// </summary>
+    
     private void LoadPlayerInfo()
     {
-        // Giả định PlayerSession.Instance đã lưu dữ liệu sau khi AuthManager đăng nhập thành công
-        // Bạn cần tạo class PlayerSession hoặc thay thế bằng cách lấy data tương ứng.
         if (txtPlayerUsername != null)
             txtPlayerUsername.text = PlayerSession.Instance?.Username ?? "Player";
 
         if (txtPlayerBalance != null)
             txtPlayerBalance.text = $"Tổng điểm: {PlayerSession.Instance?.Point ?? 0}";
+
+        ApplyAvatarSprite(PlayerSession.Instance?.AvatarId);
+    }
+
+    private void ApplyAvatarSprite(string avatarId)
+    {
+        if (imgPlayerAvatar == null || avatarSprites == null || avatarSprites.Length == 0)
+            return;
+
+        if (string.IsNullOrWhiteSpace(avatarId))
+            avatarId = avatarIds[0];
+
+        int idx = System.Array.IndexOf(avatarIds, avatarId);
+
+        // Nếu Firebase có avatarId lạ thì fallback avatar_1
+        if (idx < 0)
+            idx = 0;
+
+        if (idx < avatarSprites.Length && avatarSprites[idx] != null)
+        {
+            imgPlayerAvatar.sprite = avatarSprites[idx];
+            imgPlayerAvatar.preserveAspect = true;
+        }
     }
 
     // ──────────────────────────────────────────────────────────
@@ -808,8 +830,8 @@ public class LobbyManager : MonoBehaviour
         if (btnSaveProfile != null)
             btnSaveProfile.interactable = false;
 
-        if (txtSaveProfileBtn != null)
-            txtSaveProfileBtn.text = "ĐANG LƯU...";
+        // if (txtSaveProfileBtn != null)
+            // txtSaveProfileBtn.text = "ĐANG LƯU...";
 
         ShowProfileStatus("Đang gửi yêu cầu...", isError: false);
 
@@ -831,6 +853,10 @@ public class LobbyManager : MonoBehaviour
     public void OnProfileUpdateSuccess(string newUsername, string newAvatarId)
     {
         PlayerSession.Instance?.UpdateProfile(newUsername, newAvatarId);
+
+          _selectedAvatarId = newAvatarId;
+        HighlightSelectedAvatar();
+
         RefreshMainMenuPlayerInfo();
 
         if (txtProfileCurrentName != null)
@@ -839,10 +865,10 @@ public class LobbyManager : MonoBehaviour
         if (btnSaveProfile != null)
             btnSaveProfile.interactable = true;
 
-        if (txtSaveProfileBtn != null)
-            txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+        // if (txtSaveProfileBtn != null)
+            // txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
 
-        ShowProfileStatus("✓ Cập nhật thành công!", isError: false);
+        ShowProfileStatus("Cập nhật thành công!", isError: false);
     }
 
     public void OnProfileUpdateFailed(string errorMessage)
@@ -850,8 +876,8 @@ public class LobbyManager : MonoBehaviour
         if (btnSaveProfile != null)
             btnSaveProfile.interactable = true;
 
-        if (txtSaveProfileBtn != null)
-            txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
+        // if (txtSaveProfileBtn != null)
+        //     txtSaveProfileBtn.text = "LƯU THAY ĐỔI";
 
         ShowProfileStatus($"✗ Lỗi: {errorMessage}", isError: true);
     }
@@ -864,13 +890,7 @@ public class LobbyManager : MonoBehaviour
         if (txtPlayerBalance != null)
             txtPlayerBalance.text = $"Tổng điểm: {PlayerSession.Instance?.Point ?? 0}";
 
-        if (imgPlayerAvatar != null && avatarSprites != null)
-        {
-            int idx = System.Array.IndexOf(avatarIds, PlayerSession.Instance?.AvatarId ?? "");
-
-            if (idx >= 0 && idx < avatarSprites.Length && avatarSprites[idx] != null)
-                imgPlayerAvatar.sprite = avatarSprites[idx];
-        }
+        ApplyAvatarSprite(PlayerSession.Instance?.AvatarId);
     }
 
     private void ShowProfileStatus(string message, bool isError)
