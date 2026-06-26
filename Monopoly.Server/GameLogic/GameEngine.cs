@@ -1751,5 +1751,18 @@ namespace Monopoly.Server.GameLogic
             errorMessage = "";
             return true;
         }
-    }
+    
+        public static void StartNextTurnUnsafe(GameState gameState, out GamePlayerState? nextPlayer)
+        {
+            nextPlayer = GetNextTurnPlayerUnsafe(gameState);
+            if (nextPlayer != null)
+            {
+                gameState.CurrentTurnPlayerIndex = nextPlayer.PlayerIndex;
+                gameState.CurrentTurnUsername = nextPlayer.Username;
+                gameState.HasRolledThisTurn = false;
+                gameState.ForceDoubleThisTurn = false;
+                gameState.TurnNumber++;
+            }
+        }
+}
 }
