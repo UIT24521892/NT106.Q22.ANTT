@@ -1724,67 +1724,32 @@ namespace Monopoly.Server.GameLogic
                 }
             }
         }
-        public static void StartNextTurnUnsafe(GameState gameState, out GamePlayerState? nextPlayer)
+    
+        public static bool TryBuyPropertyUnsafe(GameState gameState, GamePlayerState player, GamePropertyState property, out string errorMessage)
         {
-            if (gameState == null || gameState.Players.Count == 0)
-            {
-                nextPlayer = null;
-                return;
-            }
+            if (property.Type != "City" && property.Type != "Resort") { errorMessage = $"Ô {property.Name} không thể mua."; return false; }
+            if (property.OwnerPlayerIndex >= 0) { errorMessage = $"Ô {property.Name} đã có chủ."; return false; }
+            if (property.BuyPrice <= 0) { errorMessage = $"Ô {property.Name} chưa có giá mua hợp lệ."; return false; }
+            if (player.Money < property.BuyPrice) { errorMessage = $"Bạn không đủ tiền mua {property.Name}."; return false; }
+            player.Money -= property.BuyPrice;
+            property.OwnerPlayerIndex = player.PlayerIndex;
+            errorMessage = "";
+            return true;
+        }
 
-            int safetyCounter = 0;
-            int maxPlayers = gameState.Players.Count;
-
-            while (safetyCounter < maxPlayers)
-            {
-                gameState.CurrentTurnPlayerIndex++;
-                if (gameState.CurrentTurnPlayerIndex >= maxPlayers)
-                {
-                    gameState.CurrentTurnPlayerIndex = 0;
-                    gameState.TurnNumber++;
-                }
-
-                GamePlayerState candidate = gameState.Players[gameState.CurrentTurnPlayerIndex];
-                if (candidate.IsBankrupt)
-                {
-                    safetyCounter++;
-                    continue;
-                }
-
-                if (candidate.SkipTurnsLeft > 0)
-                {
-                    candidate.SkipTurnsLeft--;
-                    string skipMsg = string.IsNullOrEmpty(candidate.SkipReason) 
-                        ? "bị mất lượt" 
-                        : $"bị mất lượt ({candidate.SkipReason})";
-                    AddGameLogUnsafe(gameState, $"{candidate.Username} {skipMsg}. Còn lại {candidate.SkipTurnsLeft} lượt.");
-
-                    if (candidate.SkipTurnsLeft <= 0)
-                    {
-                        candidate.SkipReason = "";
-                    }
-                    
-                    safetyCounter++;
-                    continue;
-                }
-
-                nextPlayer = candidate;
-                gameState.CurrentTurnUsername = nextPlayer.Username;
-                nextPlayer.ConsecutiveDoubles = 0;
-
-                gameState.HasRolledThisTurn = false;
-                gameState.ForceDoubleThisTurn = false;
-
-                return;
-            }
-
-            nextPlayer = gameState.Players.FirstOrDefault(p => !p.IsBankrupt);
-            if (nextPlayer != null)
-            {
-                 gameState.CurrentTurnPlayerIndex = nextPlayer.PlayerIndex;
-                 gameState.CurrentTurnUsername = nextPlayer.Username;
-            }
+        public static bool TryBuildPropertyUnsafe(GameState gameState, GamePlayerState player, GamePropertyState property, out string errorMessage)
+        {
+            if (property.Type != "City") { errorMessage = $"Ô {property.Name} không thể xây nhà."; return false; }
+            if (property.OwnerPlayerIndex != player.PlayerIndex) { errorMessage = $"Bạn không sở hữu {property.Name}."; return false; }
+            if (property.HasHotel) { errorMessage = $"{property.Name} đã có khách sạn."; return false; }
+            long buildCost = GetBuildCostUnsafe(property);
+            if (buildCost <= 0) { errorMessage = $"Lỗi cấu hình giá xây dựng cho {property.Name}."; return false; }
+            if (player.Money < buildCost) { errorMessage = $"Bạn không đủ tiền xây nhà tại {property.Name}."; return false; }
+            player.Money -= buildCost;
+            if (property.HouseCount < 3 && !property.HasHotel) { property.HouseCount++; }
+            else if (property.HouseCount == 3 && !property.HasHotel) { property.HasHotel = true; }
+            errorMessage = "";
+            return true;
         }
     }
 }
-
