@@ -472,11 +472,12 @@ Unity cần chỉnh:
 - Kéo dropdown vào field `Dropdown Match Duration` của `LobbyManager`.
 - Đồng hồ GameScene không cần kéo thả.
 
-### AUDIO-01 Audio Manager - Đã triển khai nền tảng
+### AUDIO-01 Audio Manager - Đã triển khai code và asset
 
 - `AudioManager` giữ Music/SFX source qua scene và lưu volume/mute bằng `PlayerPrefs`.
 - Có API `PlayMusic(AudioClip)` và `PlaySfx(AudioClip)`.
-- Import clip vào `Assets/Audio`; có thể tạo `AudioMixer` với `MasterVolume`, `MusicVolume`, `SfxVolume`.
+- Đã thêm các clip `build`, `click`, `dice`, `jump` trong `Assets/Resources/Audio`.
+- Chưa kiểm tra đầy đủ âm thanh trong một ván multiplayer thực tế.
 
 ### SETTINGS-01 Settings Menu - Đã triển khai code
 
@@ -493,11 +494,11 @@ Unity cần chỉnh:
 
 - `SURRENDER_GAME` xử lý người chơi theo luồng phá sản, giải phóng tài sản và kiểm tra game over.
 
-### NET-01/NET-02 Internet Public Server - Làm cuối cùng
+### NET-01/NET-02 Internet Public Server - Đã có cấu hình, chưa deploy
 
-- Tiếp tục test bằng localhost/LAN.
-- Sau khi timer, audio, settings, pause, surrender và resume ổn định mới bỏ IP hard-code.
-- Bước cuối deploy server lên VPS, mở TCP port/firewall và kiểm thử hai mạng Internet khác nhau.
+- `ServerConnectionConfig` đọc endpoint từ `StreamingAssets/server-config.json`.
+- Server hỗ trợ cấu hình port và đã có `INTERNET_DEPLOYMENT_GUIDE.md`.
+- Chưa deploy VPS, mở firewall hoặc kiểm thử hai mạng Internet khác nhau.
 
 ### Thứ tự tiếp theo
 
@@ -507,3 +508,51 @@ Unity cần chỉnh:
 4. Thêm clip và nối event cho audio.
 5. Polish settings thành prefab nếu có design.
 6. Thực hiện cấu hình Internet cuối cùng.
+
+## 8. Gameplay Và UI Bổ Sung - Đã Merge Code
+
+### GAME-DOUBLE/JAIL - Đã triển khai và có test
+
+- Đổ đôi được thêm lượt; ba lần đôi liên tiếp đưa người chơi vào Đảo Hoang.
+- Đảo Hoang cho tối đa ba lượt lắc đôi, sau đó trả phí để rời đảo.
+- Logic chuyển lượt dùng chung `StartNextTurnUnsafe`.
+
+### GAME-MONOPOLY - Đã triển khai và có test
+
+- Tăng tiền thuê khi sở hữu trọn nhóm màu.
+- Bổ sung điều kiện thắng nhanh theo Resort Monopoly, Line Monopoly và Triple Monopoly.
+- World Tour cho người chơi chọn điểm đến; Giải Vô Địch cho chọn thành phố đăng cai.
+
+### UI-MONEY/BUILD - Đã triển khai code
+
+- `MoneyFlowUI` hiển thị biến động tiền và hiệu ứng thanh toán.
+- `PropertyBuildMarkerUI` hiển thị marker nhà/khách sạn.
+- `PlayerInfoLayerUI` và demo layout đã được điều chỉnh.
+- Cần kiểm tra trực quan và multiplayer trong Unity Editor.
+
+## 9. Quy Tắc Cập Nhật Tiến Độ
+
+Đây là file trạng thái chính của project. Sau mỗi thay đổi về tính năng, gameplay, network, UI Unity, scene/prefab, cấu hình build hoặc sửa lỗi:
+
+1. Cập nhật trạng thái và mô tả của task liên quan trong tài liệu này.
+2. Ghi rõ file, scene hoặc prefab đã thay đổi.
+3. Ghi hành vi mới, lỗi đã sửa và các giới hạn còn lại.
+4. Ghi kết quả build/test thực tế; không đánh dấu hoàn thành nếu chưa kiểm tra.
+5. Thêm một mục mới ở đầu phần `Nhật ký thay đổi`.
+
+Thay đổi chỉ liên quan đến tài liệu không được ghi nhận như một tính năng đã hoàn thành.
+
+## 10. Nhật Ký Thay Đổi
+
+### 2026-06-25
+
+- Đã merge `origin/feature/logic_game` vào `main` thông qua branch `merge/feature-logic-game-resolved`.
+- Đã xử lý 36 conflict hunk trong `GameEngine.cs`, `TurnTimer.cs`, `GameHandler.cs` và `FirebaseApiService.cs`.
+- Giữ các fix encoding tiếng Việt và xử lý khi không còn người chơi thật từ `main`.
+- Bổ sung gameplay đổ đôi/Đảo Hoang, monopoly rent và điều kiện thắng nhanh.
+- Bổ sung `MoneyFlowUI`, marker nhà/khách sạn, audio asset và cấu hình public server.
+- Sửa null-safety khi chuyển lượt, chuỗi nội suy Xúc Xắc Ma Thuật và các text gameplay lỗi dấu.
+- Server build thành công: `0` lỗi, `103` cảnh báo khi build lại Shared và Server.
+- Tám test `GameEngineTests` chạy thành công.
+- Unity `2022.3.62f3` import và compile batch mode thành công, không có lỗi C#.
+- Merge local hoàn tất trên `main` tại commit `1d76700`; chưa push được `origin/main` vì máy chưa có GitHub credential.

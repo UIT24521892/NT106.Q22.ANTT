@@ -24,10 +24,11 @@ public class GameSceneUIBinder : MonoBehaviour
         DiceVisualUI.EnsureExists();
         PlayerHandUI.EnsureExists().Refresh(GameSession.CurrentState);
         PlayerInfoLayerUI.EnsureExists();
+        MoneyFlowUI.EnsureExists();
         GameOverUI.EnsureExists();
         GameEventPopupUI.EnsureExists().ResetEvents();
         PropertySaleUI.EnsureExists().Refresh(GameSession.CurrentState);
-        AudioManager.EnsureExists();
+        AudioManager.EnsureExists().PlayMusic("bgm");
         GameSettingsUI.EnsureExists().Refresh(GameSession.CurrentState);
     }
 
