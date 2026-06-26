@@ -42,6 +42,7 @@ public class NetworkManager : MonoBehaviour
     private string lastGameActionError = "";
     private string lastClientActionStatus = "";
     private long serverClockOffsetTicks = 0;
+    public long EstimatedServerNowTicks => System.DateTime.UtcNow.Ticks + serverClockOffsetTicks;
     private const int MaxChatMessages = 30;
     private readonly List<ChatMessageData> gameChatMessages = new List<ChatMessageData>();
 
@@ -675,7 +676,7 @@ public class NetworkManager : MonoBehaviour
 
         var packet = new
         {
-            Type = "GAME_CHAT",
+            Type = "CHAT_MESSAGE",
             Payload = new
             {
                 RoomId = GameSession.RoomId,

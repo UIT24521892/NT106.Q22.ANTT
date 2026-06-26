@@ -100,7 +100,7 @@ public class GameSettingsUI : MonoBehaviour
 
         long referenceTicks = state.IsPaused && state.PauseStartedAtUtcTicks > 0
             ? state.PauseStartedAtUtcTicks
-            : DateTime.UtcNow.Ticks;
+            : NetworkManager.Instance != null ? NetworkManager.Instance.EstimatedServerNowTicks : DateTime.UtcNow.Ticks;
         int seconds = Mathf.Max(0, (int)((state.MatchEndsAtUtcTicks - referenceTicks) / TimeSpan.TicksPerSecond));
         timerText.text = $"{seconds / 60:00}:{seconds % 60:00}";
         timerText.color = seconds <= 60 ? new Color(0.95f, 0.25f, 0.15f) : Color.white;

@@ -1524,8 +1524,32 @@ namespace Monopoly.Server.GameLogic
                 }
             }
         }
+    
+        public static bool TryBuyPropertyUnsafe(GameState gameState, GamePlayerState player, GamePropertyState property, out string errorMessage)
+        {
+            if (property.Type != "City" && property.Type != "Resort") { errorMessage = $"Ô {property.Name} không thể mua."; return false; }
+            if (property.OwnerPlayerIndex >= 0) { errorMessage = $"Ô {property.Name} đã có chủ."; return false; }
+            if (property.BuyPrice <= 0) { errorMessage = $"Ô {property.Name} chưa có giá mua hợp lệ."; return false; }
+            if (player.Money < property.BuyPrice) { errorMessage = $"Bạn không đủ tiền mua {property.Name}."; return false; }
+            player.Money -= property.BuyPrice;
+            property.OwnerPlayerIndex = player.PlayerIndex;
+            errorMessage = "";
+            return true;
+        }
+
+        public static bool TryBuildPropertyUnsafe(GameState gameState, GamePlayerState player, GamePropertyState property, out string errorMessage)
+        {
+            if (property.Type != "City") { errorMessage = $"Ô {property.Name} không thể xây nhà."; return false; }
+            if (property.OwnerPlayerIndex != player.PlayerIndex) { errorMessage = $"Bạn không sở hữu {property.Name}."; return false; }
+            if (property.HasHotel) { errorMessage = $"{property.Name} đã có khách sạn."; return false; }
+            long buildCost = GetBuildCostUnsafe(property);
+            if (buildCost <= 0) { errorMessage = $"Lỗi cấu hình giá xây dựng cho {property.Name}."; return false; }
+            if (player.Money < buildCost) { errorMessage = $"Bạn không đủ tiền xây nhà tại {property.Name}."; return false; }
+            player.Money -= buildCost;
+            if (property.HouseCount < 3 && !property.HasHotel) { property.HouseCount++; }
+            else if (property.HouseCount == 3 && !property.HasHotel) { property.HasHotel = true; }
+            errorMessage = "";
+            return true;
+        }
     }
 }
-
-
-

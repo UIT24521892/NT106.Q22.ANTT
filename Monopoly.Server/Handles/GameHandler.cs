@@ -266,7 +266,6 @@ namespace Monopoly.Server.Handles
         public static async Task HandleBuyPropertyAsync(ClientConnection connection)
         {
             string roomId = connection.CurrentRoomId;
-
             if (string.IsNullOrWhiteSpace(roomId))
             {
                 await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận nào.");
@@ -289,16 +288,16 @@ namespace Monopoly.Server.Handles
                 }
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
-                    failMessage = "Đang chờ người chơi chọn mục tiêu thẻ. Hãy hoàn tất chọn thẻ trước.";
+                    failMessage = "Đang chờ người chơi chọn mục tiêu thẻ.";
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản.";
                 }
                 else
                 {
                     GamePlayerState player = room.GameState.Players.FirstOrDefault(
-                        p => p.Username == connection.Username && !p.IsBot && p.IsConnected
+                        p => p.Username == connection.Username && !p.IsBot && p.IsConnected && !p.IsBankrupt
                     );
 
                     if (player == null)
@@ -307,7 +306,7 @@ namespace Monopoly.Server.Handles
                     }
                     else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
                     {
-                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
+                        failMessage = $"Chưa đến lượt của bạn.";
                     }
                     else if (!room.GameState.HasRolledThisTurn)
                     {
@@ -317,39 +316,16 @@ namespace Monopoly.Server.Handles
                     {
                         failMessage = "Không tìm thấy thông tin ô hiện tại.";
                     }
-                    else if (property.Type != "City" && property.Type != "Resort")
+                    else if (!GameEngine.TryBuyPropertyUnsafe(room.GameState, player, property, out failMessage))
                     {
-                        failMessage = $"Ô {property.Name} không thể mua.";
-                    }
-                    else if (property.OwnerPlayerIndex >= 0)
-                    {
-                        failMessage = $"Ô {property.Name} đã có chủ.";
-                    }
-                    else if (property.BuyPrice <= 0)
-                    {
-                        failMessage = $"Ô {property.Name} chưa có giá mua hợp lí.";
-                    }
-                    else if (player.Money < property.BuyPrice)
-                    {
-                        failMessage = $"Bạn không đủ tiền mua {property.Name}.";
+                        // failMessage set by GameEngine
                     }
                     else
                     {
-                        player.Money -= property.BuyPrice;
-                        property.OwnerPlayerIndex = player.PlayerIndex;
-
-                        room.GameState.LastActionMessage =
-                            $"{player.Username} đã mua {property.Name} với giá {property.BuyPrice:N0}.";
+                        room.GameState.LastActionMessage = $"{player.Username} đã mua {property.Name} với giá {property.BuyPrice:N0}.";
                         GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
-
                         broadcastMessage = room.GameState.LastActionMessage;
                         shouldBroadcast = true;
-
-                        Console.WriteLine(
-                            $"[BUY_PROPERTY] Room={roomId}, Player={player.Username}, " +
-                            $"Property={property.Name}, Position={property.PositionIndex}, " +
-                            $"Price={property.BuyPrice}, MoneyLeft={player.Money}"
-                        );
                     }
                 }
             }
@@ -373,7 +349,7 @@ namespace Monopoly.Server.Handles
 
             if (string.IsNullOrWhiteSpace(roomId))
             {
-                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa trong trận nào.");
+                await NetworkSender.SendGameActionFailedAsync(connection, "Bạn chưa ở trong trận nào.");
                 return;
             }
 
@@ -393,11 +369,11 @@ namespace Monopoly.Server.Handles
                 }
                 else if (room.GameState.IsWaitingForCardChoice)
                 {
-                    failMessage = "Đang chờ người chơi chọn mục tiêu thẻ. Hãy hoàn tất chọn thẻ trước.";
+                    failMessage = "Đang chờ chọn mục tiêu thẻ.";
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản.";
                 }
                 else
                 {
@@ -411,63 +387,24 @@ namespace Monopoly.Server.Handles
                     }
                     else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
                     {
-                        failMessage = $"Chưa đến lượt của bạn. Hiện tại là lượt của {room.GameState.CurrentTurnUsername}.";
+                        failMessage = $"Chưa đến lượt của bạn.";
                     }
                     else if (!room.GameState.Properties.TryGetValue(positionIndex, out GamePropertyState property))
                     {
                         failMessage = "Không tìm thấy thông tin ô đất.";
                     }
-                    else if (property.Type != "City")
+                    else if (!GameEngine.TryBuildPropertyUnsafe(room.GameState, player, property, out failMessage))
                     {
-                        failMessage = $"Ô {property.Name} không thể xây nhà.";
-                    }
-                    else if (property.OwnerPlayerIndex != player.PlayerIndex)
-                    {
-                        failMessage = $"Bạn không sở hữu {property.Name}.";
-                    }
-                    else if (property.HasHotel)
-                    {
-                        failMessage = $"{property.Name} dã có khách sạn.";
+                        // failMessage set by GameEngine
                     }
                     else
                     {
                         long buildCost = GameEngine.GetBuildCostUnsafe(property);
-
-                        if (buildCost <= 0)
-                        {
-                            failMessage = $"{property.Name} chưa có chi phí nâng cấp hợp lí.";
-                        }
-                        else if (player.Money < buildCost)
-                        {
-                            failMessage = $"Bạn không đủ tiền để nâng cấp {property.Name}.";
-                        }
-                        else
-                        {
-                            player.Money -= buildCost;
-
-                            if (property.HouseCount >= 3)
-                            {
-                                property.HouseCount = 3;
-                                property.HasHotel = true;
-                            }
-                            else
-                            {
-                                property.HouseCount++;
-                            }
-
-                            room.GameState.LastActionMessage =
-                                $"{player.Username} nâng cấp {property.Name} lên {GameEngine.DescribePropertyLevelUnsafe(property)} với giá {buildCost:N0}.";
-                            GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
-
-                            broadcastMessage = room.GameState.LastActionMessage;
-                            shouldBroadcast = true;
-
-                            Console.WriteLine(
-                                $"[BUILD_PROPERTY] Room={roomId}, Player={player.Username}, " +
-                                $"Property={property.Name}, Position={property.PositionIndex}, " +
-                                $"Cost={buildCost}, Level={GameEngine.DescribePropertyLevelUnsafe(property)}, MoneyLeft={player.Money}"
-                            );
-                        }
+                        string levelDesc = GameEngine.DescribePropertyLevelUnsafe(property);
+                        room.GameState.LastActionMessage = $"{player.Username} đã xây {levelDesc} tại {property.Name} với giá {buildCost:N0}.";
+                        GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                        broadcastMessage = room.GameState.LastActionMessage;
+                        shouldBroadcast = true;
                     }
                 }
             }

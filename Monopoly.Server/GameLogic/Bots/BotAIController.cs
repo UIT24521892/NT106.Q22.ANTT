@@ -120,54 +120,60 @@ namespace Monopoly.Server.GameLogic.Bots
                 }
 
                 // Nếu vẫn còn sống sót
+                
                 if (!bot.IsBankrupt && bot.JailTurnsLeft <= 0)
                 {
-                    // Lấy ô hiện tại
                     if (room.GameState.Properties.TryGetValue(bot.Position, out GamePropertyState property))
                     {
                         if (property.Type == "City" || property.Type == "Resort")
                         {
-                            if (property.OwnerPlayerIndex < 0) // Ô trống
+                            if (property.OwnerPlayerIndex < 0) 
                             {
-                                // Quyết định mua
                                 long safeBuffer = 100000;
                                 bool completesColorSet = CompletesColorSet(room.GameState, bot, property);
                                 
                                 if (bot.Money - property.BuyPrice > safeBuffer || completesColorSet)
                                 {
-                                    if (bot.Money >= property.BuyPrice)
+                                    if (GameEngine.TryBuyPropertyUnsafe(room.GameState, bot, property, out string err))
                                     {
-                                        bot.Money -= property.BuyPrice;
-                                        property.OwnerPlayerIndex = bot.PlayerIndex;
                                         string msg = $"{bot.Username} quyết định mua {property.Name} với giá {property.BuyPrice:N0}.";
                                         GameEngine.AddGameLogUnsafe(room.GameState, msg);
                                         room.GameState.LastActionMessage = msg;
                                     }
                                 }
                             }
-                            else if (property.OwnerPlayerIndex == bot.PlayerIndex && property.Type == "City") // Ô của mình
+                            else if (property.OwnerPlayerIndex == bot.PlayerIndex && property.Type == "City") 
                             {
-                                // Quyết định xây nhà
                                 long safeBuffer = 200000;
                                 long buildCost = GameEngine.GetBuildCostUnsafe(property);
                                 
                                 if (buildCost > 0 && bot.Money - buildCost > safeBuffer)
                                 {
-                                    bot.Money -= buildCost;
-                                    if (property.HouseCount < 3 && !property.HasHotel)
+                                    if (GameEngine.TryBuildPropertyUnsafe(room.GameState, bot, property, out string err))
                                     {
-                                        property.HouseCount++;
+                                        string lvl = GameEngine.DescribePropertyLevelUnsafe(property);
+                                        string msg = $"{bot.Username} xây {lvl} tại {property.Name} với giá {buildCost:N0}.";
+                                        GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                                        room.GameState.LastActionMessage = msg;
                                     }
-                                    else if (property.HouseCount == 3 && !property.HasHotel)
-                                    {
-                                        property.HasHotel = true;
-                                    }
-                                    
-                                    string lvl = GameEngine.DescribePropertyLevelUnsafe(property);
-                                    string msg = $"{bot.Username} xây {lvl} tại {property.Name} với giá {buildCost:N0}.";
-                                    GameEngine.AddGameLogUnsafe(room.GameState, msg);
-                                    room.GameState.LastActionMessage = msg;
                                 }
+                            }
+                        }
+                    }
+
+                    if (bot.HasFreeRentCard || bot.HasEscapeIslandCard || bot.HasFlightCard || bot.HasFreeUpgradeCard)
+                    {
+                        string effectCode = "";
+                        if (bot.HasFreeRentCard) effectCode = "FREE_RENT";
+                        else if (bot.HasFreeUpgradeCard) effectCode = "FREE_UPGRADE";
+                        
+                        if (!string.IsNullOrEmpty(effectCode))
+                        {
+                            if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, effectCode, null, new System.Collections.Generic.List<string>(), new System.Collections.Generic.List<Monopoly.Server.Models.Events.CardDrawEvent>(), out string err))
+                            {
+                                string msg = $"{bot.Username} đã dùng thẻ Cơ Hội.";
+                                GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                                room.GameState.LastActionMessage = msg;
                             }
                         }
                     }
@@ -235,22 +241,17 @@ namespace Monopoly.Server.GameLogic.Bots
             return (owned + 1) == propertiesInSet.Count;
         }
 
+        
         private static void HandleBotDebtUnsafe(GameState gameState, GamePlayerState bot)
         {
             var botProps = gameState.Properties.Values.Where(p => p.OwnerPlayerIndex == bot.PlayerIndex).ToList();
-            
-            // Bán đất lẻ tẻ trước (Không thuộc set hoàn chỉnh)
             botProps = botProps.OrderBy(p => CompletesColorSet(gameState, bot, p)).ThenBy(p => p.BuyPrice).ToList();
 
             foreach (var prop in botProps)
             {
                 if (bot.Money >= 0) break;
 
-                // Bán giá một nửa (hoặc giá thanh lý tuỳ rule)
-                long sellValue = prop.BuyPrice / 2;
-                if (prop.HouseCount > 0) sellValue += (prop.HouseCount * 100000); // Giả định nhà
-                if (prop.HasHotel) sellValue += 500000;
-
+                long sellValue = GameEngine.GetPropertySaleValueUnsafe(prop);
                 bot.Money += sellValue;
                 prop.OwnerPlayerIndex = -1;
                 prop.HouseCount = 0;
