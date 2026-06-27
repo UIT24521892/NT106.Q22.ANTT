@@ -120,7 +120,7 @@ namespace Monopoly.Server.GameLogic
 
             if (rawPosition >= boardSize)
             {
-                const long startBonus = 300000;
+                const long startBonus = 200000;
                 player.Money += startBonus;
                 actionMessages.Add($"{player.Username} đi qua Bắt Đầu và nhận {startBonus:N0}.");
             }
@@ -969,7 +969,7 @@ namespace Monopoly.Server.GameLogic
 
             if (targetPosition < oldPosition)
             {
-                const long startBonus = 300000;
+                const long startBonus = 200000;
                 player.Money += startBonus;
                 actionMessages.Add($"{player.Username} bay qua Bắt Đầu và nhận {startBonus:N0}.");
             }
@@ -1127,7 +1127,7 @@ namespace Monopoly.Server.GameLogic
 
             if (targetPosition < oldPosition)
             {
-                const long startBonus = 300000;
+                const long startBonus = 200000;
                 player.Money += startBonus;
                 actionMessages.Add($"{player.Username} bay qua Bắt Đầu và nhận {startBonus:N0}.");
             }
@@ -1601,7 +1601,7 @@ namespace Monopoly.Server.GameLogic
                     IsBot = player.IsBot,
                     PlayerIndex = player.PlayerIndex,
                     Position = 0,
-                    Money = 1000000,
+                    Money = 500000,
                     IsBankrupt = false,
                     BankruptcyOrder = 0,
                     IsConnected = true,
@@ -1742,6 +1742,12 @@ namespace Monopoly.Server.GameLogic
             if (property.Type != "City") { errorMessage = $"Ô {property.Name} không thể xây nhà."; return false; }
             if (property.OwnerPlayerIndex != player.PlayerIndex) { errorMessage = $"Bạn không sở hữu {property.Name}."; return false; }
             if (property.HasHotel) { errorMessage = $"{property.Name} đã có khách sạn."; return false; }
+            int firstRoundTurnLimit = Math.Max(1, gameState.Players.Count);
+            if (gameState.TurnNumber <= firstRoundTurnLimit && property.HouseCount >= 1)
+            {
+                errorMessage = "Vòng đầu tiên chỉ được xây tối đa 1 nhà trên mỗi thành phố.";
+                return false;
+            }
             long buildCost = GetBuildCostUnsafe(property);
             if (buildCost <= 0) { errorMessage = $"Lỗi cấu hình giá xây dựng cho {property.Name}."; return false; }
             if (player.Money < buildCost) { errorMessage = $"Bạn không đủ tiền xây nhà tại {property.Name}."; return false; }

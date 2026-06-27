@@ -52,8 +52,8 @@ namespace Monopoly.Server.GameLogic
                 MapName = "Classic"
             };
 
-            state.Players.Add(new GamePlayerState { PlayerIndex = 0, Username = "PlayerA", Money = 1000000, IsConnected = true });
-            state.Players.Add(new GamePlayerState { PlayerIndex = 1, Username = "PlayerB", Money = 1000000, IsConnected = true });
+            state.Players.Add(new GamePlayerState { PlayerIndex = 0, Username = "PlayerA", Money = 500000, IsConnected = true });
+            state.Players.Add(new GamePlayerState { PlayerIndex = 1, Username = "PlayerB", Money = 500000, IsConnected = true });
 
             foreach (var kvp in BoardDatabase.Squares)
             {
@@ -176,18 +176,18 @@ namespace Monopoly.Server.GameLogic
             var state = CreateMockGameState();
             var player = state.Players[0];
             player.Position = 10;
-            player.Money = 1000000;
+            player.Money = 500000;
 
             List<string> msgs = new List<string>();
             List<CardDrawEvent> drawEvents = new List<CardDrawEvent>();
             string failMsg;
 
-            // Target position 5 (passed Start, should get 300,000 bonus)
+            // Target position 5 (passed Start, should get 200,000 bonus)
             bool success = GameEngine.TryApplyHeldCardEffectUnsafe(state, player, "WORLD_TOUR", 5, msgs, drawEvents, out failMsg);
 
             Assert(success, $"WORLD_TOUR should succeed, but failed with: {failMsg}");
             Assert(player.Position == 5, "Player should be moved to position 5");
-            Assert(player.Money == 1300000, "Player should receive pass Start bonus");
+            Assert(player.Money == 700000, "Player should receive pass Start bonus");
 
             Console.WriteLine("World Tour Choice test passed.");
         }

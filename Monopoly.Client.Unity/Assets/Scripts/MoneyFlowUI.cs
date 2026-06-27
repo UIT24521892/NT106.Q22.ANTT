@@ -312,7 +312,7 @@ public class MoneyFlowUI : MonoBehaviour
             case 2: // dưới-trái
                 return new CornerLayout(new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(16f, 140f));
             case 3: // dưới-phải
-                return new CornerLayout(new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-16f, 300f));
+                return new CornerLayout(new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-16f, 140f));
             default:
                 return new CornerLayout(new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -118f - (playerIndex * 56f)));
         }

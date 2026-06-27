@@ -173,7 +173,7 @@ public class GameSettingsUI : MonoBehaviour
             new Vector2(1f, 0f),
             new Vector2(1f, 0f),
             new Vector2(1f, 0f),
-            new Vector2(-145f, 24f),
+            new Vector2(-390f, 20f),
             new Vector2(76f, 48f));
         settingsButton.onClick.AddListener(TogglePanel);
     }
@@ -203,6 +203,10 @@ public class GameSettingsUI : MonoBehaviour
         ConfigureSlider(sfxSlider, audio.SfxVolume, audio.SetSfxVolume);
         muteToggle.isOn = audio.IsMuted;
         muteToggle.onValueChanged.AddListener(audio.SetMuted);
+        pauseButton.onClick.AddListener(() => AudioManager.EnsureExists().PlayUiClick());
+        voteButton.onClick.AddListener(() => AudioManager.EnsureExists().PlayUiClick());
+        surrenderButton.onClick.AddListener(() => AudioManager.EnsureExists().PlayUiClick());
+        closeButton.onClick.AddListener(() => AudioManager.EnsureExists().PlayUiClick());
         pauseButton.onClick.AddListener(HandlePause);
         voteButton.onClick.AddListener(() => NetworkManager.Instance?.SendPauseVote(true));
         surrenderButton.onClick.AddListener(HandleSurrender);
@@ -367,6 +371,7 @@ public class GameSettingsUI : MonoBehaviour
         root.GetComponent<Image>().color = background;
         TextMeshProUGUI text = CreateText(root.transform, "Text", label, fontSize, FontStyles.Bold, foreground);
         SetStretch(text.rectTransform, 8f, 4f, 8f, 4f);
+        root.GetComponent<Button>().onClick.AddListener(() => AudioManager.EnsureExists().PlayUiClick());
         return root.GetComponent<Button>();
     }
 
