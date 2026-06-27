@@ -8,12 +8,14 @@ public class ChanceCardUI : MonoBehaviour
 {
     private RectTransform popupRoot;
     private Image panelImage;
+    private Image headerImage;
     private TextMeshProUGUI cardTypeText;
     private TextMeshProUGUI cardNameText;
     private TextMeshProUGUI drawnByText;
     private TextMeshProUGUI effectText;
     private Button closeButton;
     private Coroutine hideRoutine;
+    private Coroutine revealRoutine;
 
     public static ChanceCardUI EnsureExists()
     {
@@ -35,17 +37,12 @@ public class ChanceCardUI : MonoBehaviour
     {
         BuildUi();
 
-        Color accentColor = GetCardTypeColor(cardType);
-        panelImage.color = new Color(0.06f, 0.07f, 0.08f, 0.96f);
-        cardTypeText.color = accentColor;
-        cardNameText.color = accentColor;
-        drawnByText.color = Color.white;
-        effectText.color = Color.white;
+        panelImage.color = new Color(0.96f, 0.94f, 0.9f, 0.99f);
 
-        cardTypeText.text = string.IsNullOrWhiteSpace(cardType) ? "CHANCE CARD" : $"{cardType.ToUpperInvariant()} CARD";
-        cardNameText.text = string.IsNullOrWhiteSpace(cardName) ? "Unknown Card" : cardName;
+        cardTypeText.text = "CO HOI";
+        cardNameText.text = "Dang rut the...";
         drawnByText.text = $"Drawn by: {ShortName(drawnByUsername)}";
-        effectText.text = string.IsNullOrWhiteSpace(detailEffect) ? cardId : detailEffect;
+        effectText.text = "Gold / Silver / Wood";
 
         popupRoot.SetAsLastSibling();
         popupRoot.gameObject.SetActive(true);
@@ -53,7 +50,10 @@ public class ChanceCardUI : MonoBehaviour
         if (hideRoutine != null)
             StopCoroutine(hideRoutine);
 
-        hideRoutine = StartCoroutine(AutoHideAfterDelay());
+        if (revealRoutine != null)
+            StopCoroutine(revealRoutine);
+
+        revealRoutine = StartCoroutine(RevealCardAfterShuffle(drawnByUsername, cardId, cardName, cardType, detailEffect));
     }
 
     private void BuildUi()
@@ -78,42 +78,76 @@ public class ChanceCardUI : MonoBehaviour
         popupRoot.anchorMax = new Vector2(0.5f, 0.5f);
         popupRoot.pivot = new Vector2(0.5f, 0.5f);
         popupRoot.anchoredPosition = new Vector2(0f, 60f);
-        popupRoot.sizeDelta = new Vector2(500f, 340f);
+        popupRoot.sizeDelta = new Vector2(560f, 360f);
 
         panelImage = rootObject.GetComponent<Image>();
-        panelImage.color = new Color(0.06f, 0.07f, 0.08f, 0.96f);
+        panelImage.color = new Color(0.96f, 0.94f, 0.9f, 0.99f);
         panelImage.raycastTarget = true;
 
+        headerImage = CreateImage("Img_ChanceCardHeader", popupRoot, GetCardTypeColor("Golden"));
+        SetRect(headerImage.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(0f, 92f));
+
         cardTypeText = CreateText("Txt_CardType", popupRoot, "", 16f, FontStyles.Bold);
-        cardTypeText.alignment = TextAlignmentOptions.TopLeft;
+        cardTypeText.alignment = TextAlignmentOptions.Center;
         cardTypeText.enableWordWrapping = false;
         cardTypeText.overflowMode = TextOverflowModes.Ellipsis;
-        SetStretch(cardTypeText.rectTransform, 24f, 20f, 88f, 288f);
+        SetRect(cardTypeText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-34f, -18f), new Vector2(-120f, 28f));
 
         cardNameText = CreateText("Txt_CardName", popupRoot, "", 28f, FontStyles.Bold);
-        cardNameText.alignment = TextAlignmentOptions.TopLeft;
+        cardNameText.alignment = TextAlignmentOptions.Center;
         cardNameText.enableWordWrapping = true;
         cardNameText.overflowMode = TextOverflowModes.Ellipsis;
-        cardNameText.lineSpacing = -8f;
-        SetStretch(cardNameText.rectTransform, 24f, 56f, 48f, 206f);
+        cardNameText.enableAutoSizing = true;
+        cardNameText.fontSizeMin = 20f;
+        cardNameText.fontSizeMax = 30f;
+        SetRect(cardNameText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-34f, -56f), new Vector2(-120f, 40f));
 
         drawnByText = CreateText("Txt_CardDrawnBy", popupRoot, "", 15f, FontStyles.Normal);
-        drawnByText.alignment = TextAlignmentOptions.TopLeft;
+        drawnByText.alignment = TextAlignmentOptions.Center;
         drawnByText.enableWordWrapping = false;
         drawnByText.overflowMode = TextOverflowModes.Ellipsis;
-        SetStretch(drawnByText.rectTransform, 24f, 140f, 48f, 168f);
+        SetStretch(drawnByText.rectTransform, 42f, 118f, 42f, 202f);
 
         effectText = CreateText("Txt_CardEffect", popupRoot, "", 18f, FontStyles.Normal);
-        effectText.alignment = TextAlignmentOptions.TopLeft;
+        effectText.alignment = TextAlignmentOptions.Center;
         effectText.enableWordWrapping = true;
         effectText.overflowMode = TextOverflowModes.Ellipsis;
-        effectText.lineSpacing = -4f;
-        SetStretch(effectText.rectTransform, 24f, 178f, 48f, 70f);
+        effectText.lineSpacing = 2f;
+        SetStretch(effectText.rectTransform, 52f, 168f, 52f, 82f);
 
         closeButton = CreateButton("Btn_CloseChanceCard", popupRoot, "X", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(44f, 38f));
         closeButton.onClick.AddListener(Hide);
 
         popupRoot.gameObject.SetActive(false);
+    }
+
+    private IEnumerator RevealCardAfterShuffle(string drawnByUsername, string cardId, string cardName, string cardType, string detailEffect)
+    {
+        string[] types = { "Golden", "Silver", "Wooden" };
+        float duration = 1.45f;
+        float elapsed = 0f;
+        int index = 0;
+
+        while (elapsed < duration)
+        {
+            string type = types[index % types.Length];
+            ApplyCardTypeStyle(type);
+            cardTypeText.text = $"{GetCardTypeDisplayName(type)} CARD";
+            cardNameText.text = "Dang rut the...";
+            effectText.text = "Dang xao bai...";
+
+            index++;
+            elapsed += 0.12f;
+            yield return new WaitForSecondsRealtime(0.12f);
+        }
+
+        ApplyCardTypeStyle(cardType);
+        cardTypeText.text = string.IsNullOrWhiteSpace(cardType) ? "CHANCE CARD" : $"{GetCardTypeDisplayName(cardType)} CARD";
+        cardNameText.text = string.IsNullOrWhiteSpace(cardName) ? "Unknown Card" : cardName;
+        drawnByText.text = $"Drawn by: {ShortName(drawnByUsername)}";
+        effectText.text = string.IsNullOrWhiteSpace(detailEffect) ? cardId : detailEffect;
+        revealRoutine = null;
+        hideRoutine = StartCoroutine(AutoHideAfterDelay());
     }
 
     private IEnumerator AutoHideAfterDelay()
@@ -128,6 +162,12 @@ public class ChanceCardUI : MonoBehaviour
         {
             StopCoroutine(hideRoutine);
             hideRoutine = null;
+        }
+
+        if (revealRoutine != null)
+        {
+            StopCoroutine(revealRoutine);
+            revealRoutine = null;
         }
 
         if (popupRoot != null)
@@ -176,6 +216,18 @@ public class ChanceCardUI : MonoBehaviour
         return button;
     }
 
+    private Image CreateImage(string name, Transform parent, Color color)
+    {
+        GameObject imageObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform rect = imageObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+
+        Image image = imageObject.GetComponent<Image>();
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
     private void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 sizeDelta)
     {
         rect.anchorMin = anchorMin;
@@ -207,6 +259,37 @@ public class ChanceCardUI : MonoBehaviour
             default:
                 return new Color(1f, 0.86f, 0.42f, 1f);
         }
+    }
+
+    private void ApplyCardTypeStyle(string cardType)
+    {
+        Color accentColor = GetCardTypeColor(cardType);
+        Color textColor = GetReadableHeaderTextColor(accentColor);
+
+        if (headerImage != null)
+            headerImage.color = accentColor;
+
+        cardTypeText.color = textColor;
+        cardNameText.color = textColor;
+        drawnByText.color = new Color(0.16f, 0.16f, 0.16f, 1f);
+        effectText.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+    }
+
+    private string GetCardTypeDisplayName(string cardType)
+    {
+        switch ((cardType ?? "").Trim().ToLowerInvariant())
+        {
+            case "golden": return "GOLD";
+            case "silver": return "SILVER";
+            case "wooden": return "WOOD";
+            default: return "CHANCE";
+        }
+    }
+
+    private Color GetReadableHeaderTextColor(Color background)
+    {
+        float luminance = background.r * 0.299f + background.g * 0.587f + background.b * 0.114f;
+        return luminance > 0.62f ? new Color(0.06f, 0.06f, 0.06f, 1f) : Color.white;
     }
 
     private string ShortName(string username)

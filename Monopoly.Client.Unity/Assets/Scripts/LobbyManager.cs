@@ -94,6 +94,9 @@ public class LobbyManager : MonoBehaviour
     private bool isReady = false;           // Trạng thái sẵn sàng của người chơi này
     private bool isHost = false;            // Người chơi này có phải chủ phòng không?
     private string currentRoomId = "";      // Mã phòng hiện tại đang tham gia
+    private readonly int[] matchDurationOptions = { 10, 20, 30, 60 };
+    private Slider sliderMatchDuration;
+    private TMP_Text txtMatchDurationValue;
 
     // ──────────────────────────────────────────────────────────
     // SECTION 6: KHỞI TẠO
@@ -176,7 +179,10 @@ public class LobbyManager : MonoBehaviour
     private void InitMatchDurationDropdown()
     {
         if (dropdownMatchDuration == null)
+        {
+            BuildRuntimeMatchDurationSlider();
             return;
+        }
 
         dropdownMatchDuration.ClearOptions();
         dropdownMatchDuration.AddOptions(new List<string>
@@ -188,6 +194,129 @@ public class LobbyManager : MonoBehaviour
         });
         dropdownMatchDuration.value = 1;
         dropdownMatchDuration.RefreshShownValue();
+    }
+
+    private void BuildRuntimeMatchDurationSlider()
+    {
+        if (panelRoomSettings == null || sliderMatchDuration != null)
+            return;
+
+        RectTransform parent = panelRoomSettings.transform as RectTransform;
+        if (parent == null)
+            return;
+
+        GameObject root = new GameObject("Runtime_MatchDuration", typeof(RectTransform));
+        root.transform.SetParent(parent, false);
+        RectTransform rootRect = root.GetComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0.5f, 0.5f);
+        rootRect.anchorMax = new Vector2(0.5f, 0.5f);
+        rootRect.pivot = new Vector2(0.5f, 0.5f);
+        rootRect.anchoredPosition = new Vector2(0f, -145f);
+        rootRect.sizeDelta = new Vector2(430f, 78f);
+
+        TMP_Text label = CreateRuntimeText(root.transform, "Txt_MatchDurationLabel", "Thoi gian tran", 20f, FontStyles.Bold);
+        SetRuntimeRect(label.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -2f), new Vector2(220f, 30f));
+
+        txtMatchDurationValue = CreateRuntimeText(root.transform, "Txt_MatchDurationValue", "20 phut", 20f, FontStyles.Bold);
+        txtMatchDurationValue.alignment = TextAlignmentOptions.Right;
+        SetRuntimeRect(txtMatchDurationValue.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(0f, -2f), new Vector2(140f, 30f));
+
+        sliderMatchDuration = CreateRuntimeSlider(root.transform, "Slider_MatchDuration");
+        SetRuntimeRect(sliderMatchDuration.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(0f, 34f));
+        sliderMatchDuration.minValue = 0;
+        sliderMatchDuration.maxValue = matchDurationOptions.Length - 1;
+        sliderMatchDuration.wholeNumbers = true;
+        sliderMatchDuration.value = 1;
+        sliderMatchDuration.onValueChanged.AddListener(OnMatchDurationSliderChanged);
+        OnMatchDurationSliderChanged(sliderMatchDuration.value);
+    }
+
+    private void OnMatchDurationSliderChanged(float value)
+    {
+        if (txtMatchDurationValue == null)
+            return;
+
+        int index = Mathf.Clamp(Mathf.RoundToInt(value), 0, matchDurationOptions.Length - 1);
+        txtMatchDurationValue.text = $"{matchDurationOptions[index]} phut";
+    }
+
+    private int GetSelectedMatchDurationMinutes()
+    {
+        int durationIndex = 1;
+        if (dropdownMatchDuration != null)
+            durationIndex = dropdownMatchDuration.value;
+        else if (sliderMatchDuration != null)
+            durationIndex = Mathf.RoundToInt(sliderMatchDuration.value);
+
+        return matchDurationOptions[Mathf.Clamp(durationIndex, 0, matchDurationOptions.Length - 1)];
+    }
+
+    private TMP_Text CreateRuntimeText(Transform parent, string name, string text, float fontSize, FontStyles style)
+    {
+        TMP_Text label = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TMP_Text>();
+        label.transform.SetParent(parent, false);
+        label.text = text;
+        label.fontSize = fontSize;
+        label.fontStyle = style;
+        label.color = Color.white;
+        label.alignment = TextAlignmentOptions.Left;
+        label.raycastTarget = false;
+        return label;
+    }
+
+    private Slider CreateRuntimeSlider(Transform parent, string name)
+    {
+        GameObject root = new GameObject(name, typeof(RectTransform), typeof(Slider));
+        root.transform.SetParent(parent, false);
+        Slider slider = root.GetComponent<Slider>();
+
+        Image background = CreateRuntimeImage(root.transform, "Background", new Color(0.72f, 0.76f, 0.79f, 1f));
+        SetRuntimeRect(background.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(0f, 8f));
+
+        RectTransform fillArea = new GameObject("Fill Area", typeof(RectTransform)).GetComponent<RectTransform>();
+        fillArea.SetParent(root.transform, false);
+        fillArea.anchorMin = Vector2.zero;
+        fillArea.anchorMax = Vector2.one;
+        fillArea.offsetMin = new Vector2(8f, 10f);
+        fillArea.offsetMax = new Vector2(-8f, -10f);
+
+        Image fill = CreateRuntimeImage(fillArea, "Fill", new Color(0.08f, 0.48f, 0.76f, 1f));
+        fill.rectTransform.anchorMin = Vector2.zero;
+        fill.rectTransform.anchorMax = Vector2.one;
+        fill.rectTransform.offsetMin = Vector2.zero;
+        fill.rectTransform.offsetMax = Vector2.zero;
+
+        RectTransform handleArea = new GameObject("Handle Slide Area", typeof(RectTransform)).GetComponent<RectTransform>();
+        handleArea.SetParent(root.transform, false);
+        handleArea.anchorMin = Vector2.zero;
+        handleArea.anchorMax = Vector2.one;
+        handleArea.offsetMin = new Vector2(12f, 0f);
+        handleArea.offsetMax = new Vector2(-12f, 0f);
+
+        Image handle = CreateRuntimeImage(handleArea, "Handle", new Color(0.04f, 0.22f, 0.34f, 1f));
+        SetRuntimeRect(handle.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(26f, 26f));
+
+        slider.fillRect = fill.rectTransform;
+        slider.handleRect = handle.rectTransform;
+        slider.targetGraphic = handle;
+        return slider;
+    }
+
+    private Image CreateRuntimeImage(Transform parent, string name, Color color)
+    {
+        Image image = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image)).GetComponent<Image>();
+        image.transform.SetParent(parent, false);
+        image.color = color;
+        return image;
+    }
+
+    private void SetRuntimeRect(RectTransform rect, Vector2 min, Vector2 max, Vector2 pivot, Vector2 position, Vector2 size)
+    {
+        rect.anchorMin = min;
+        rect.anchorMax = max;
+        rect.pivot = pivot;
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
     }
 
     /// <summary>
@@ -397,9 +526,7 @@ public class LobbyManager : MonoBehaviour
         int maxPlayers = (int)sliderMaxPlayers.value;
         int botCount = (int)sliderBotCount.value;
         string selectedMap = dropdownMap.options[dropdownMap.value].text;
-        int[] durationOptions = { 10, 20, 30, 60 };
-        int durationIndex = dropdownMatchDuration != null ? dropdownMatchDuration.value : 1;
-        int matchDurationMinutes = durationOptions[Mathf.Clamp(durationIndex, 0, durationOptions.Length - 1)];
+        int matchDurationMinutes = GetSelectedMatchDurationMinutes();
 
         if (botCount >= maxPlayers)
         {

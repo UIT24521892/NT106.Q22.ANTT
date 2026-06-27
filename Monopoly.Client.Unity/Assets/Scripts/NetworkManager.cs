@@ -158,6 +158,7 @@ public class NetworkManager : MonoBehaviour
             return;
 
         button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(() => AudioManager.EnsureExists().PlayUiClick());
         button.onClick.AddListener(action);
     }
 
@@ -1059,8 +1060,6 @@ public class NetworkManager : MonoBehaviour
 
                         ChanceCardUI.EnsureExists()
                             .ShowCard(drawnByUsername, cardId, cardName, cardType, detailEffect);
-                        GameEventPopupUI.EnsureExists()
-                            .ShowCardDrawn(drawnByUsername, cardId, cardName, cardType, detailEffect);
                         AudioManager.EnsureExists().PlaySfx("card");
 
                         Debug.Log(

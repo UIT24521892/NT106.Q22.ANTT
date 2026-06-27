@@ -537,7 +537,10 @@ public class BoardTokenManager : MonoBehaviour
         List<Vector2> dicePath = BuildMovePath(visualFromPosition, diceLandingPosition, slot);
 
         foreach (Vector2 target in dicePath)
+        {
+            AudioManager.EnsureExists().PlaySfx("jump");
             yield return AnimateStep(token, target);
+        }
 
         if (finalPosition != diceLandingPosition)
         {
@@ -552,8 +555,18 @@ public class BoardTokenManager : MonoBehaviour
 
         BoardTileInfoUI tileInfo = FindObjectOfType<BoardTileInfoUI>();
 
-        if (tileInfo != null && !tileInfo.IsSelectingCardTarget)
+        if (tileInfo != null && !tileInfo.IsSelectingCardTarget && !IsChanceTile(finalPosition))
             tileInfo.ShowTileInfo(finalPosition);
+    }
+
+    private bool IsChanceTile(int position)
+    {
+        GameStateData state = GameSession.CurrentState;
+        return state != null &&
+            state.Properties != null &&
+            state.Properties.TryGetValue(position, out GamePropertyStateData property) &&
+            property != null &&
+            string.Equals(property.Type, "Chance", StringComparison.OrdinalIgnoreCase);
     }
 
     private IEnumerator AnimateStep(TokenView token, Vector2 target)

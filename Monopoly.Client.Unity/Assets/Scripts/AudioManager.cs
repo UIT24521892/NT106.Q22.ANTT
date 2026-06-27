@@ -12,6 +12,7 @@ public class AudioManager : MonoBehaviour
 
     // Cache clip nạp theo tên từ Resources/ để khỏi load lại nhiều lần.
     private readonly Dictionary<string, AudioClip> clipCache = new Dictionary<string, AudioClip>();
+    private readonly HashSet<string> warnedMissingClips = new HashSet<string>();
 
     [SerializeField] private AudioMixer audioMixer;
     [SerializeField] private AudioSource musicSource;
@@ -96,6 +97,11 @@ public class AudioManager : MonoBehaviour
         PlaySfx(LoadClip(key));
     }
 
+    public void PlayUiClick()
+    {
+        PlaySfx("click");
+    }
+
     // Phát nhạc nền theo tên file trong Resources/Audio/.
     public void PlayMusic(string key)
     {
@@ -112,6 +118,8 @@ public class AudioManager : MonoBehaviour
 
         AudioClip clip = Resources.Load<AudioClip>($"Audio/{key}");
         clipCache[key] = clip; // cache cả null để khỏi load lại file thiếu
+        if (clip == null && warnedMissingClips.Add(key))
+            Debug.LogWarning($"[AudioManager] Missing audio clip Resources/Audio/{key}. Add {key}.wav/.mp3/.ogg to enable this sound.");
         return clip;
     }
 

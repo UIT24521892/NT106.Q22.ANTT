@@ -11,6 +11,8 @@ public class GameChatUI : MonoBehaviour
 {
     private const int MaxVisibleMessages = 8;
     private const string ChatPanelPrefabPath = "UI/ChatPanel";
+    private static readonly Vector2 ChatTogglePosition = new Vector2(-260f, 20f);
+    private static readonly Vector2 ChatWindowPosition = new Vector2(-260f, 20f);
 
     private RectTransform panelRect;
     private Button toggleButton;
@@ -68,7 +70,7 @@ public class GameChatUI : MonoBehaviour
         panelRect.anchorMin = new Vector2(1f, 0f);
         panelRect.anchorMax = new Vector2(1f, 0f);
         panelRect.pivot = new Vector2(1f, 0f);
-        panelRect.anchoredPosition = new Vector2(-20f, 20f);
+        panelRect.anchoredPosition = ChatWindowPosition;
         panelRect.sizeDelta = new Vector2(420f, 210f);
 
         Image panelImage = panelObject.GetComponent<Image>();
@@ -225,6 +227,8 @@ public class GameChatUI : MonoBehaviour
         chatLogText = sceneChatLog;
         bubbleLayer = FindChildRect(chatPanel.transform, "Runtime_ChatBubbles");
 
+        ApplyBottomLeftSafePlacement();
+
         if (bubbleLayer == null)
             bubbleLayer = CreateBubbleLayer(canvas.transform as RectTransform);
 
@@ -260,7 +264,7 @@ public class GameChatUI : MonoBehaviour
         buttonRect.anchorMin = new Vector2(1f, 0f);
         buttonRect.anchorMax = new Vector2(1f, 0f);
         buttonRect.pivot = new Vector2(1f, 0f);
-        buttonRect.anchoredPosition = new Vector2(-20f, 20f);
+        buttonRect.anchoredPosition = ChatTogglePosition;
         buttonRect.sizeDelta = new Vector2(110f, 42f);
 
         Image image = buttonObject.GetComponent<Image>();
@@ -274,6 +278,26 @@ public class GameChatUI : MonoBehaviour
         label.alignment = TextAlignmentOptions.Center;
         SetStretchWithPadding(label.rectTransform, 0f, 0f, 0f, 0f);
         return button;
+    }
+
+    private void ApplyBottomLeftSafePlacement()
+    {
+        RectTransform toggleRect = toggleButton != null ? toggleButton.transform as RectTransform : null;
+        if (toggleRect != null)
+        {
+            toggleRect.anchorMin = new Vector2(1f, 0f);
+            toggleRect.anchorMax = new Vector2(1f, 0f);
+            toggleRect.pivot = new Vector2(1f, 0f);
+            toggleRect.anchoredPosition = ChatTogglePosition;
+        }
+
+        if (panelRect != null)
+        {
+            panelRect.anchorMin = new Vector2(1f, 0f);
+            panelRect.anchorMax = new Vector2(1f, 0f);
+            panelRect.pivot = new Vector2(1f, 0f);
+            panelRect.anchoredPosition = ChatWindowPosition;
+        }
     }
 
     private Button CreateCloseButton(Transform parent)
@@ -494,6 +518,7 @@ public class GameChatUI : MonoBehaviour
 
     private void OpenPanel()
     {
+        AudioManager.EnsureExists().PlayUiClick();
         ShowChatWindow();
 
         if (panelRect != null && !usingScenePanel)
@@ -512,6 +537,7 @@ public class GameChatUI : MonoBehaviour
 
     private void ClosePanel()
     {
+        AudioManager.EnsureExists().PlayUiClick();
         HideChatWindow();
 
         if (toggleButton != null)
@@ -571,6 +597,7 @@ public class GameChatUI : MonoBehaviour
         if (string.IsNullOrWhiteSpace(message))
             return;
 
+        AudioManager.EnsureExists().PlayUiClick();
         NetworkManager.Instance.SendGameChatMessage(message);
         inputField.text = "";
         inputField.ActivateInputField();
