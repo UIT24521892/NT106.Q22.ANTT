@@ -66,7 +66,7 @@ namespace Monopoly.Server.GameLogic.Bots
                 }
             }
             
-            await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
+            await NetworkSender.BroadcastGameStateAsync(room.RoomId, $"Lượt của {bot.Username} bắt đầu...");
             await Task.Delay(1500);
 
             List<CardDrawEvent> cardEvents = new List<CardDrawEvent>();
@@ -151,6 +151,9 @@ namespace Monopoly.Server.GameLogic.Bots
 
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
             await Task.Delay(4000);
+
+            string previousMessage = room.GameState.LastActionMessage;
+            bool shouldBroadcastNewAction = false;
 
             lock (ServerState.Lock)
             {
@@ -258,10 +261,19 @@ namespace Monopoly.Server.GameLogic.Bots
                         }
                     }
                 }
+                
+                // Track if we need to broadcast a new action
+                if (room.GameState.LastActionMessage != previousMessage)
+                {
+                    shouldBroadcastNewAction = true;
+                }
             }
 
-            await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
-            await Task.Delay(2500);
+            if (shouldBroadcastNewAction)
+            {
+                await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
+                await Task.Delay(2500);
+            }
 
             lock (ServerState.Lock)
             {
