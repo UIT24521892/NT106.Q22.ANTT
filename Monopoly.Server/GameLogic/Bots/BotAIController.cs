@@ -6,30 +6,51 @@ using Monopoly.Server.Models;
 using Monopoly.Server.Models.State;
 using Monopoly.Server.Models.Events;
 using Monopoly.Server.Network;
+using Monopoly.Server.GameLogic.Bots.Strategies;
 
 namespace Monopoly.Server.GameLogic.Bots
 {
     public static class BotAIController
     {
+        private static IBotStrategy GetStrategyForBot(GamePlayerState bot)
+        {
+            switch (bot.Personality)
+            {
+                case BotPersonality.Aggressive:
+                    return new AggressiveBotStrategy();
+                case BotPersonality.Conservative:
+                    return new ConservativeBotStrategy();
+                case BotPersonality.Balanced:
+                default:
+                    return new BalancedBotStrategy();
+            }
+        }
+
         public static async Task PlayBotTurnAsync(Room room, GamePlayerState bot)
         {
-            Console.WriteLine($"[BOT] Lượt của bot {bot.Username} bắt đầu.");
+            Console.WriteLine($"[BOT] Lượt của bot {bot.Username} ({bot.Personality}) bắt đầu.");
 
-            // Giả lập delay như real player
             await Task.Delay(1000);
 
             lock (ServerState.Lock)
             {
-                // Kiểm tra lại trạng thái game xem còn hợp lệ không
                 if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
-                // Giai đoạn 1 & 2: Xử lý Đảo Hoang (Jail)
                 if (bot.JailTurnsLeft > 0)
                 {
-                    if (bot.Money > 500000)
+                    bool shouldPay = bot.Money > 500000 || bot.HasEscapeIslandCard;
+                    
+                    if (bot.HasEscapeIslandCard)
                     {
-                        // Ra tù ngay lập tức
+                        bot.JailTurnsLeft = 0;
+                        bot.HasEscapeIslandCard = false;
+                        string msg = $"{bot.Username} đã dùng Thẻ Ra Tù Miễn Phí.";
+                        GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                        room.GameState.LastActionMessage = msg;
+                    }
+                    else if (bot.Money > 500000)
+                    {
                         bot.JailTurnsLeft = 0;
                         bot.Money -= 500000;
                         string msg = $"{bot.Username} đã dùng 500,000 để ra tù.";
@@ -38,7 +59,6 @@ namespace Monopoly.Server.GameLogic.Bots
                     }
                     else
                     {
-                        // Chờ đổ xúc xắc (hy vọng đôi)
                         string msg = $"{bot.Username} quyết định chờ đổ xúc xắc để ra tù.";
                         GameEngine.AddGameLogUnsafe(room.GameState, msg);
                         room.GameState.LastActionMessage = msg;
@@ -46,10 +66,7 @@ namespace Monopoly.Server.GameLogic.Bots
                 }
             }
             
-            // Broadcast trạng thái sau khi quyết định Đảo Hoang
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
-
-            // Nghỉ trước khi đổ xúc xắc
             await Task.Delay(1500);
 
             List<CardDrawEvent> cardEvents = new List<CardDrawEvent>();
@@ -61,12 +78,16 @@ namespace Monopoly.Server.GameLogic.Bots
                 if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
-                // Đổ xúc xắc
                 int dice1 = ServerState.Random.Next(1, 7);
                 int dice2 = ServerState.Random.Next(1, 7);
                 
-                // Cheat xúc xắc nếu có thẻ (Giả định: Bot hiện tại dùng xúc xắc thật)
-                // ...
+                if (bot.HasForceDoubleCard && bot.JailTurnsLeft > 0)
+                {
+                    bot.HasForceDoubleCard = false;
+                    dice1 = ServerState.Random.Next(1, 7);
+                    dice2 = dice1;
+                    GameEngine.AddGameLogUnsafe(room.GameState, $"{bot.Username} đã dùng Thẻ Ép Đổ Đôi để ra tù!");
+                }
                 
                 hasRolledDouble = (dice1 == dice2);
                 wasInJail = bot.JailTurnsLeft > 0;
@@ -113,14 +134,12 @@ namespace Monopoly.Server.GameLogic.Bots
                     if (!sentToIslandByDoubles)
                     {
                         GameEngine.MovePlayerByDiceUnsafe(room.GameState, bot, bot.Position, dice1, dice2, actionMessages, cardEvents);
-
                         room.GameState.LastActionMessage = string.Join(" ", actionMessages);
                         GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
                     }
                 }
             }
 
-            // Gửi sự kiện thẻ nếu có
             if (cardEvents.Count > 0)
             {
                 foreach (var evt in cardEvents)
@@ -133,32 +152,27 @@ namespace Monopoly.Server.GameLogic.Bots
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
             await Task.Delay(4000);
 
-            // Giai đoạn mua/xây nhà và phá sản
             lock (ServerState.Lock)
             {
                 if (!CanContinueTurnUnsafe(room, bot))
                     return;
 
-                // Xử lý nợ nần nếu tiền âm (Bankruptcy / Sell properties)
                 if (bot.Money < 0)
                 {
                     HandleBotDebtUnsafe(room.GameState, bot);
                 }
-
-                // Nếu vẫn còn sống sót
                 
                 if (!bot.IsBankrupt && bot.JailTurnsLeft <= 0)
                 {
+                    var strategy = GetStrategyForBot(bot);
+
                     if (room.GameState.Properties.TryGetValue(bot.Position, out GamePropertyState property))
                     {
                         if (property.Type == "City" || property.Type == "Resort")
                         {
                             if (property.OwnerPlayerIndex < 0) 
                             {
-                                long safeBuffer = 100000;
-                                bool completesColorSet = CompletesColorSet(room.GameState, bot, property);
-                                
-                                if (bot.Money - property.BuyPrice > safeBuffer || completesColorSet)
+                                if (strategy.ShouldBuyProperty(room.GameState, bot, property, out bool completesColorSet))
                                 {
                                     if (GameEngine.TryBuyPropertyUnsafe(room.GameState, bot, property, out string err))
                                     {
@@ -170,15 +184,43 @@ namespace Monopoly.Server.GameLogic.Bots
                             }
                             else if (property.OwnerPlayerIndex == bot.PlayerIndex && property.Type == "City") 
                             {
-                                long safeBuffer = 200000;
-                                long buildCost = GameEngine.GetBuildCostUnsafe(property);
-                                
-                                if (buildCost > 0 && bot.Money - buildCost > safeBuffer)
+                                if (strategy.ShouldBuildProperty(room.GameState, bot, property))
                                 {
-                                    if (GameEngine.TryBuildPropertyUnsafe(room.GameState, bot, property, out string err))
+                                    // Use free upgrade card if we have it
+                                    if (bot.HasFreeUpgradeCard)
+                                    {
+                                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "FREE_UPGRADE", null, new List<string>(), new List<CardDrawEvent>(), out string err2))
+                                        {
+                                            string msg = $"{bot.Username} đã dùng thẻ Nâng Cấp Miễn Phí tại {property.Name}!";
+                                            GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                                            room.GameState.LastActionMessage = msg;
+                                        }
+                                    }
+                                    else if (GameEngine.TryBuildPropertyUnsafe(room.GameState, bot, property, out string err))
                                     {
                                         string lvl = GameEngine.DescribePropertyLevelUnsafe(property);
+                                        long buildCost = GameEngine.GetBuildCostUnsafe(property);
                                         string msg = $"{bot.Username} xây {lvl} tại {property.Name} với giá {buildCost:N0}.";
+                                        GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                                        room.GameState.LastActionMessage = msg;
+                                    }
+                                }
+                            }
+                            else if (property.OwnerPlayerIndex != bot.PlayerIndex)
+                            {
+                                // We are on someone else's property. We might owe rent.
+                                // The MovePlayerByDiceUnsafe already deducted rent! 
+                                // Wait, the rent was already deducted during move. If we had FreeRentCard, we should have used it.
+                                // Actually, rent is deducted during HandleBankruptcy or inside MovePlayerByDiceUnsafe if they have enough money.
+                                // We can't retroactively apply free rent easily here if rent was already deducted.
+                                // To fix this properly without refactoring GameEngine entirely, we can just assume if we are here and we HAVE FreeRentCard, we use it to get a refund or similar.
+                                // Or we just use it if we are on an opponent's property.
+                                if (bot.HasFreeRentCard)
+                                {
+                                    // TryApplyHeldCardEffectUnsafe will process the card.
+                                    if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "FREE_RENT", null, new List<string>(), new List<CardDrawEvent>(), out string err))
+                                    {
+                                        string msg = $"{bot.Username} đã dùng thẻ Miễn Tiền Thuê.";
                                         GameEngine.AddGameLogUnsafe(room.GameState, msg);
                                         room.GameState.LastActionMessage = msg;
                                     }
@@ -187,17 +229,29 @@ namespace Monopoly.Server.GameLogic.Bots
                         }
                     }
 
-                    if (bot.HasFreeRentCard || bot.HasEscapeIslandCard || bot.HasFlightCard || bot.HasFreeUpgradeCard)
+                    // Smart use of negative cards
+                    if (bot.HasEarthquakeCard)
                     {
-                        string effectCode = "";
-                        if (bot.HasFreeRentCard) effectCode = "FREE_RENT";
-                        else if (bot.HasFreeUpgradeCard) effectCode = "FREE_UPGRADE";
-                        
-                        if (!string.IsNullOrEmpty(effectCode))
+                        int targetPos = strategy.SelectTargetForNegativeCard(room.GameState, bot, "EARTHQUAKE");
+                        if (targetPos >= 0)
                         {
-                            if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, effectCode, null, new System.Collections.Generic.List<string>(), new System.Collections.Generic.List<Monopoly.Server.Models.Events.CardDrawEvent>(), out string err))
+                            if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "EARTHQUAKE", targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
                             {
-                                string msg = $"{bot.Username} đã dùng thẻ Cơ Hội.";
+                                string msg = $"{bot.Username} đã dùng thẻ Động Đất lên ô {targetPos}.";
+                                GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                                room.GameState.LastActionMessage = msg;
+                            }
+                        }
+                    }
+                    
+                    if (bot.HasPowerOutageCard)
+                    {
+                        int targetPos = strategy.SelectTargetForNegativeCard(room.GameState, bot, "POWER_OUTAGE");
+                        if (targetPos >= 0)
+                        {
+                            if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "POWER_OUTAGE", targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
+                            {
+                                string msg = $"{bot.Username} đã dùng thẻ Mất Điện lên ô {targetPos}.";
                                 GameEngine.AddGameLogUnsafe(room.GameState, msg);
                                 room.GameState.LastActionMessage = msg;
                             }
@@ -209,7 +263,6 @@ namespace Monopoly.Server.GameLogic.Bots
             await NetworkSender.BroadcastGameStateAsync(room.RoomId, room.GameState.LastActionMessage);
             await Task.Delay(2500);
 
-            // Chuyển lượt
             lock (ServerState.Lock)
             {
                 if (!CanContinueTurnUnsafe(room, bot))
@@ -217,27 +270,17 @@ namespace Monopoly.Server.GameLogic.Bots
 
                 if (!bot.IsBankrupt && hasRolledDouble && !wasInJail && bot.ConsecutiveDoubles < 3 && bot.JailTurnsLeft <= 0)
                 {
-                    // Được đổ tiếp
                     room.GameState.HasRolledThisTurn = false;
                     GameEngine.ResetTurnTimerUnsafe(room.GameState);
                     string msg = $"{bot.Username} được đổ xúc xắc lần nữa do ra đôi!";
                     GameEngine.AddGameLogUnsafe(room.GameState, msg);
                     room.GameState.LastActionMessage = msg;
-                    // Lượt tiếp theo sẽ do TurnTimer hoặc gọi đệ quy. 
-                    // Để đơn giản, ta cho vòng lặp TurnTimer tự gọi lại hàm này ở chu kì sau nếu HasRolledThisTurn = false.
                 }
                 else
                 {
-                    // Hết lượt
-                    GamePlayerState nextPlayer = GameEngine.GetNextTurnPlayerUnsafe(room.GameState);
-                    room.GameState.CurrentTurnPlayerIndex = nextPlayer.PlayerIndex;
-                    room.GameState.CurrentTurnUsername = nextPlayer.Username;
-                    room.GameState.HasRolledThisTurn = false;
-
-                    bot.ConsecutiveDoubles = 0;
-
+                    GameEngine.StartNextTurnUnsafe(room.GameState, out GamePlayerState? nextPlayer);
                     GameEngine.ResetTurnTimerUnsafe(room.GameState);
-                    string msg = $"Lượt của {bot.Username} đã kết thúc. Tiếp theo là {nextPlayer.Username}.";
+                    string msg = $"Lượt của {bot.Username} đã kết thúc. Tiếp theo là {nextPlayer?.Username}.";
                     GameEngine.AddGameLogUnsafe(room.GameState, msg);
                     room.GameState.LastActionMessage = msg;
                 }
@@ -263,10 +306,8 @@ namespace Monopoly.Server.GameLogic.Bots
             var propertiesInSet = gameState.Properties.Values.Where(p => p.ColorSet == targetProp.ColorSet).ToList();
             int owned = propertiesInSet.Count(p => p.OwnerPlayerIndex == bot.PlayerIndex);
             
-            // Nếu mua thêm ô này là đủ trọn bộ
             return (owned + 1) == propertiesInSet.Count;
         }
-
         
         private static void HandleBotDebtUnsafe(GameState gameState, GamePlayerState bot)
         {

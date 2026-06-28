@@ -6,10 +6,18 @@ using System.Threading.Tasks;
 
 namespace Monopoly.Server.Models.State
 {
+    public enum BotPersonality
+    {
+        Balanced,
+        Aggressive,
+        Conservative
+    }
+
     public class GamePlayerState
     {
         public string Username { get; set; } = "";
         public bool IsBot { get; set; }
+        public BotPersonality Personality { get; set; } = BotPersonality.Balanced;
         public int PlayerIndex { get; set; }
         public int Position { get; set; }
         public long Money { get; set; }

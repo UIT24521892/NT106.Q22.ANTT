@@ -1599,6 +1599,7 @@ namespace Monopoly.Server.GameLogic
                 {
                     Username = player.Username,
                     IsBot = player.IsBot,
+                    Personality = player.IsBot ? (BotPersonality)ServerState.Random.Next(0, 3) : BotPersonality.Balanced,
                     PlayerIndex = player.PlayerIndex,
                     Position = 0,
                     Money = 500000,
