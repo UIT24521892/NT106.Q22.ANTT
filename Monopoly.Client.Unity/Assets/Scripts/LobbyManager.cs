@@ -540,6 +540,7 @@ public class LobbyManager : MonoBehaviour
             Payload = new
             {
                 HostUsername = PlayerSession.Instance?.Username,
+                AvatarId = PlayerSession.Instance?.AvatarId ?? "avatar_1",
                 MaxPlayers = maxPlayers,
                 BotCount = botCount,
                 MapName = selectedMap,
@@ -707,11 +708,9 @@ public class LobbyManager : MonoBehaviour
     {
         if (playerListContainer == null || playerSlotPrefab == null) return;
 
-        // Xóa toàn bộ slot cũ trước khi vẽ lại
         foreach (Transform child in playerListContainer)
             Destroy(child.gameObject);
 
-        // Tạo slot UI mới cho mỗi người chơi
         foreach (var player in players)
         {
             GameObject slot = Instantiate(playerSlotPrefab, playerListContainer);
@@ -723,7 +722,8 @@ public class LobbyManager : MonoBehaviour
                     username: player.Username,
                     isReady: player.IsReady,
                     isHost: player.IsHost,
-                    isBot: player.IsBot
+                    isBot: player.IsBot,
+                    avatarId: player.AvatarId
                 );
             }
         }
@@ -1094,7 +1094,8 @@ public class LobbyManager : MonoBehaviour
             Payload = new
             {
                 RoomId = roomId,
-                Username = PlayerSession.Instance?.Username
+                Username = PlayerSession.Instance?.Username,
+                AvatarId = PlayerSession.Instance?.AvatarId ?? "avatar_1"
             }
         };
 
@@ -1190,7 +1191,7 @@ public class PlayerSlotData
     public bool IsReady;
     public bool IsHost;
     public bool IsBot;
-    public string AvatarUrl; // URL ảnh avatar (nếu có)
+    public string AvatarId; // ID avatar của người chơi, ví dụ: "avatar_1", "avatar_2", ...
 }
 // ═══════════════════════════════════════
 // SECTION 16: ROOM LIST / JOIN ROOM / SERVER CALLBACKS

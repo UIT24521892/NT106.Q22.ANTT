@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.Linq;
 
 public class PlayerInfoLayerUI : MonoBehaviour
 {
@@ -14,6 +15,77 @@ public class PlayerInfoLayerUI : MonoBehaviour
     private RectTransform root;
     private float nextRefreshTime;
     private bool usingScenePanels;
+
+    private static readonly Dictionary<string, Sprite> avatarCache = new Dictionary<string, Sprite>();
+
+    private Image FindOrCreateAvatarImage(Transform parent)
+    {
+        Transform found = parent.Find("Img_Avatar");
+        bool created = false;
+
+        if (found == null)
+        {
+            GameObject avatarObject = new GameObject(
+                "Img_Avatar",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image)
+            );
+
+            avatarObject.transform.SetParent(parent, false);
+            found = avatarObject.transform;
+            created = true;
+        }
+
+        Image image = found.GetComponent<Image>();
+
+        if (image == null)
+            image = found.gameObject.AddComponent<Image>();
+
+        image.raycastTarget = false;
+        image.preserveAspect = true;
+
+        if (created)
+        {
+            RectTransform rect = image.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(45f, 0f);
+            rect.sizeDelta = new Vector2(64f, 64f);
+        }
+
+        return image;
+    }
+
+    private static Sprite LoadAvatarSprite(string avatarId)
+    {
+        if (string.IsNullOrWhiteSpace(avatarId))
+            avatarId = "avatar_1";
+
+        if (avatarCache.TryGetValue(avatarId, out Sprite cached))
+            return cached;
+
+        Sprite sprite = Resources.Load<Sprite>($"Avatars/{avatarId}");
+
+        if (sprite == null && avatarId != "avatar_1")
+            sprite = Resources.Load<Sprite>("Avatars/avatar_1");
+
+        avatarCache[avatarId] = sprite;
+        return sprite;
+    }
+
+    private static string GetAvatarId(GamePlayerStateData player)
+    {
+        if (player != null && !string.IsNullOrWhiteSpace(player.AvatarId))
+            return player.AvatarId;
+
+        PlayerSlotData slot = GameSession.Players?.FirstOrDefault(
+            p => string.Equals(p.Username, player?.Username, StringComparison.OrdinalIgnoreCase)
+        );
+
+        return string.IsNullOrWhiteSpace(slot?.AvatarId) ? "avatar_1" : slot.AvatarId;
+    }
 
     public static PlayerInfoLayerUI EnsureExists()
     {
@@ -140,7 +212,18 @@ public class PlayerInfoLayerUI : MonoBehaviour
         SetStretch(detailText.rectTransform, 100f, 34f, 6f, 34f);
         SetStretch(badgeText.rectTransform, 100f, 68f, 6f, 4f);
 
-        return new PlayerCard(panelObject, rect, background, nameText, detailText, badgeText, keepSceneLayout: true);
+        Image avatarImage = FindOrCreateAvatarImage(panelObject.transform);
+
+        return new PlayerCard(
+            panelObject,
+            rect,
+            background,
+            nameText,
+            detailText,
+            badgeText,
+            avatarImage,
+            keepSceneLayout: true
+        );
     }
 
     private TextMeshProUGUI GetOrCreatePanelText(
@@ -288,7 +371,19 @@ public class PlayerInfoLayerUI : MonoBehaviour
             new Vector2(62f, 24f)
         );
 
-        PlayerCard card = new PlayerCard(cardObject, cardRect, background, nameText, detailText, badgeText, keepSceneLayout: false);
+        Image avatarImage = FindOrCreateAvatarImage(cardObject.transform);
+
+        PlayerCard card = new PlayerCard(
+            cardObject,
+            cardRect,
+            background,
+            nameText,
+            detailText,
+            badgeText,
+            avatarImage,
+            keepSceneLayout: false
+        );
+
         cardsByPlayerIndex[playerIndex] = card;
         return card;
     }
@@ -440,6 +535,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
         private readonly TextMeshProUGUI detailText;
         private readonly TextMeshProUGUI badgeText;
         private readonly bool keepSceneLayout;
+        private readonly Image avatarImage;
 
         public PlayerCard(
             GameObject root,
@@ -448,6 +544,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
             TextMeshProUGUI nameText,
             TextMeshProUGUI detailText,
             TextMeshProUGUI badgeText,
+            Image avatarImage,
             bool keepSceneLayout)
         {
             Root = root;
@@ -457,6 +554,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
             this.detailText = detailText;
             this.badgeText = badgeText;
             this.keepSceneLayout = keepSceneLayout;
+            this.avatarImage = avatarImage;
         }
 
         public void SetCorner(CornerLayout layout)
@@ -472,6 +570,16 @@ public class PlayerInfoLayerUI : MonoBehaviour
 
         public void Update(GamePlayerStateData player, GameStateData state, bool isLocal, int ownedCount)
         {
+            if (avatarImage != null)
+            {
+                avatarImage.sprite = PlayerInfoLayerUI.LoadAvatarSprite(
+                    PlayerInfoLayerUI.GetAvatarId(player)
+                );
+
+                avatarImage.enabled = avatarImage.sprite != null;
+                avatarImage.preserveAspect = true;
+            }
+
             bool isCurrentTurn = player.PlayerIndex == state.CurrentTurnPlayerIndex && !state.IsFinished;
             string status = player.IsBankrupt ? "BANKRUPT" : player.IsConnected ? "ACTIVE" : "OFFLINE";
             string badge = isCurrentTurn ? "TURN" : status;
