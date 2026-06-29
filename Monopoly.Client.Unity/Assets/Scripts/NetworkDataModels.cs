@@ -114,6 +114,7 @@ public class GamePlayerStateData
     public bool IsBankrupt;
     public int BankruptcyOrder;
     public bool IsConnected;
+    public string AvatarId;
     public int ConsecutiveDoubles;
     public int JailTurnsLeft;
     public bool HasFreeRentCard;

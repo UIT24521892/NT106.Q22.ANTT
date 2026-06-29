@@ -20,6 +20,7 @@ namespace Monopoly.Server.Handles
             JObject payload = PacketHelper.GetPayloadObject(packet);
 
             string hostUsername = payload["HostUsername"]?.ToString() ?? connection.Username;
+            string hostAvatarId = payload["AvatarId"]?.ToString() ?? "avatar_1";
             int maxPlayers = payload["MaxPlayers"]?.Value<int>() ?? 4;
             int botCount = payload["BotCount"]?.Value<int>() ?? 0;
             string mapName = payload["MapName"]?.ToString() ?? "Classic";
@@ -87,7 +88,8 @@ namespace Monopoly.Server.Handles
                     IsReady = true,
                     IsHost = true,
                     IsBot = false,
-                    PlayerIndex = 0
+                    PlayerIndex = 0,
+                    AvatarId = hostAvatarId
                 });
 
                 for (int i = 0; i < botCount && room.Players.Count < maxPlayers; i++)
@@ -98,7 +100,8 @@ namespace Monopoly.Server.Handles
                         IsReady = true,
                         IsHost = false,
                         IsBot = true,
-                        PlayerIndex = room.Players.Count
+                        PlayerIndex = room.Players.Count,
+                        AvatarId = "avatar_4"
                     });
                 }
 
@@ -164,7 +167,7 @@ namespace Monopoly.Server.Handles
 
             string roomId = payload["RoomId"]?.ToString() ?? "";
             string username = payload["Username"]?.ToString() ?? connection.Username;
-
+            string avatarId = payload["AvatarId"]?.ToString() ?? "avatar_1";
             if (string.IsNullOrWhiteSpace(username))
             {
                 await NetworkSender.SendJsonPacketAsync(connection.Stream, new
@@ -272,7 +275,8 @@ namespace Monopoly.Server.Handles
                         IsReady = false,
                         IsHost = false,
                         IsBot = false,
-                        PlayerIndex = room.Players.Count
+                        PlayerIndex = room.Players.Count,
+                        AvatarId = avatarId
                     });
 
                     mapName = room.MapName;
