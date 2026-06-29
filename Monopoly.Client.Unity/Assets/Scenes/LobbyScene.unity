@@ -1324,6 +1324,8 @@ MonoBehaviour:
   txtStatus: {fileID: 0}
   imgReadyIndicator: {fileID: 0}
   crownIcon: {fileID: 0}
+  imgAvatar: {fileID: 0}
+  avatarSprites: []
 --- !u!1 &200896771
 GameObject:
   m_ObjectHideFlags: 0
@@ -2677,7 +2679,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &606633193
 RectTransform:
   m_ObjectHideFlags: 0

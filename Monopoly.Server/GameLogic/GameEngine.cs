@@ -1602,6 +1602,7 @@ namespace Monopoly.Server.GameLogic
                     Personality = player.IsBot ? (BotPersonality)ServerState.Random.Next(0, 3) : BotPersonality.Balanced,
                     PlayerIndex = player.PlayerIndex,
                     Position = 0,
+                    AvatarId = string.IsNullOrWhiteSpace(player.AvatarId) ? "avatar_1" : player.AvatarId,
                     Money = 500000,
                     IsBankrupt = false,
                     BankruptcyOrder = 0,

@@ -16,6 +16,7 @@ namespace Monopoly.Server.Models.State
     public class GamePlayerState
     {
         public string Username { get; set; } = "";
+        public string AvatarId { get; set; } = "avatar_1";
         public bool IsBot { get; set; }
         public BotPersonality Personality { get; set; } = BotPersonality.Balanced;
         public int PlayerIndex { get; set; }

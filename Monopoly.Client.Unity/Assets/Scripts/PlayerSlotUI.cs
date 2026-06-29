@@ -9,12 +9,24 @@ public class PlayerSlotUI : MonoBehaviour
     [SerializeField] private Image imgReadyIndicator;
     [SerializeField] private GameObject crownIcon;
 
+    [Header("Avatar")]
+    [SerializeField] private Image imgAvatar;
+    [SerializeField] private Sprite[] avatarSprites;
+
+    private readonly string[] avatarIds =
+    {
+        "avatar_1",
+        "avatar_2",
+        "avatar_3",
+        "avatar_4"
+    };
+
     private static readonly Color ColorReady = new Color(0.2f, 0.85f, 0.3f);
     private static readonly Color ColorNotReady = new Color(0.9f, 0.3f, 0.3f);
     private static readonly Color ColorBot = new Color(0.5f, 0.5f, 0.9f);
     private static readonly Color ColorUsername = new Color(0.12f, 0.08f, 0.04f, 1f);
 
-    public void Setup(string username, bool isReady, bool isHost, bool isBot)
+    public void Setup(string username, bool isReady, bool isHost, bool isBot, string avatarId)
     {
         AutoBindMissingReferences();
         NormalizeSlotVisuals();
@@ -50,6 +62,28 @@ public class PlayerSlotUI : MonoBehaviour
             crownIcon.SetActive(isHost);
             crownIcon.transform.SetAsLastSibling();
         }
+
+        ApplyAvatar(avatarId);
+    }
+
+    private void ApplyAvatar(string avatarId)
+    {
+        if (imgAvatar == null || avatarSprites == null || avatarSprites.Length == 0)
+            return;
+
+        if (string.IsNullOrWhiteSpace(avatarId))
+            avatarId = "avatar_1";
+
+        int index = System.Array.IndexOf(avatarIds, avatarId);
+
+        if (index < 0)
+            index = 0;
+
+        if (index < avatarSprites.Length && avatarSprites[index] != null)
+        {
+            imgAvatar.sprite = avatarSprites[index];
+            imgAvatar.preserveAspect = true;
+        }
     }
 
     private void AutoBindMissingReferences()
@@ -57,6 +91,7 @@ public class PlayerSlotUI : MonoBehaviour
         Transform usernameTransform = transform.Find("Txt_Username");
         Transform statusTransform = transform.Find("Txt_Status");
         Transform readyTransform = transform.Find("Img_ReadyDot");
+        Transform avatarTransform = transform.Find("Img_Avatar");
         Transform crownTransform = transform.Find("Icon_Crown");
 
         if (txtUsername == null && usernameTransform != null)
@@ -67,6 +102,9 @@ public class PlayerSlotUI : MonoBehaviour
 
         if (imgReadyIndicator == null && readyTransform != null)
             imgReadyIndicator = readyTransform.GetComponent<Image>();
+
+        if (imgAvatar == null && avatarTransform != null)
+            imgAvatar = avatarTransform.GetComponent<Image>();
 
         if (crownIcon == null && crownTransform != null)
             crownIcon = crownTransform.gameObject;
@@ -110,6 +148,20 @@ public class PlayerSlotUI : MonoBehaviour
                 }
             }
         }
+
+        if (imgAvatar == null)
+        {
+            Image[] images = GetComponentsInChildren<Image>(true);
+
+            foreach (Image image in images)
+            {
+                if (image.name.ToLower().Contains("avatar"))
+                {
+                    imgAvatar = image;
+                    break;
+                }
+            }
+        }
     }
 
     private void NormalizeSlotVisuals()
@@ -126,14 +178,19 @@ public class PlayerSlotUI : MonoBehaviour
             }
         }
 
+        if (imgAvatar != null)
+        {
+            imgAvatar.raycastTarget = false;
+            imgAvatar.preserveAspect = true;
+        }
+
         ConfigureText(txtUsername);
         ConfigureText(txtStatus);
     }
 
     private void ConfigureText(TMP_Text text)
     {
-        if (text == null)
-            return;
+        if (text == null) return;
 
         text.raycastTarget = false;
         text.enableWordWrapping = false;
