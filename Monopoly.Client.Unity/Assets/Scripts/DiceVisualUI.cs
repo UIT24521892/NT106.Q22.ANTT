@@ -7,7 +7,9 @@ using UnityEngine.UI;
 public class DiceVisualUI : MonoBehaviour
 {
     private const float RefreshInterval = 0.1f;
-    private const float RollAnimationSeconds = 0.5f;
+    private const float RollAnimationSeconds = 1.25f;
+    private const float RollFaceChangeInterval = 0.08f;
+    private const float RollSpinDegreesPerSecond = 360f;
     private const string DiceFaceResourceFolder = "DiceFaces";
 
     private GameObject dicePanel;
@@ -115,16 +117,35 @@ public class DiceVisualUI : MonoBehaviour
     private IEnumerator AnimateToServerDice(int dice1, int dice2, int total)
     {
         float elapsed = 0f;
+        float nextFaceChangeTime = 0f;
 
         while (elapsed < RollAnimationSeconds)
         {
-            SetDiceValues(Random.Range(1, 7), Random.Range(1, 7), 0);
+            if (elapsed >= nextFaceChangeTime)
+            {
+                SetDiceValues(Random.Range(1, 7), Random.Range(1, 7), 0);
+                nextFaceChangeTime = elapsed + RollFaceChangeInterval;
+            }
+
+            SetDiceRotation(elapsed * RollSpinDegreesPerSecond);
             elapsed += Time.unscaledDeltaTime;
             yield return null;
         }
 
+        SetDiceRotation(0f);
         SetDiceValues(dice1, dice2, total);
         rollRoutine = null;
+    }
+
+    private void SetDiceRotation(float zDegrees)
+    {
+        Quaternion rotation = Quaternion.Euler(0f, 0f, zDegrees);
+
+        if (dice1Image != null)
+            dice1Image.rectTransform.localRotation = rotation;
+
+        if (dice2Image != null)
+            dice2Image.rectTransform.localRotation = rotation;
     }
 
     private void SetDiceValues(int dice1, int dice2, int total)
