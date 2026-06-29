@@ -516,7 +516,6 @@ public class BoardTokenManager : MonoBehaviour
     {
         return state != null &&
             player != null &&
-            state.HasRolledThisTurn &&
             state.CurrentTurnPlayerIndex == player.PlayerIndex &&
             state.LastMovedPlayerIndex == player.PlayerIndex &&
             state.LastDiceTotal > 0 &&

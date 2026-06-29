@@ -81,12 +81,12 @@ The active system has three main layers:
 | 32-square board database | ✅ Done | Static board order, type, price, rent, and color data are defined centrally. |
 | Server-authoritative dice | ✅ Done | Human rolls use cryptographic random generation; bot rolls use server random generation. |
 | Token movement synchronization | ✅ Done | Uses `LastMoveFromPosition`, `LastMoveToPosition`, and `LastFinalPosition`. |
-| Pass Start reward | ✅ Done | Awards 300,000 when crossing Start. |
+| Pass Start reward | ✅ Done | Awards 200,000 when crossing Start. |
 | Turn timer | ✅ Done | Default turn duration is 45 seconds; timeout advances the turn. |
 | Match countdown | ✅ Done | Server ends matches at configured 10/20/30/60-minute duration. |
 | Property purchase | ✅ Done | City and resort squares can be bought if unowned and affordable. |
 | Rent payment | ✅ Done | Rent is based on property level and active card effects. |
-| Build houses | ✅ Done | City properties support three houses. |
+| Build houses | ✅ Done | City properties support three houses; during the first round each city can be built up to one house only. |
 | Build hotel | ✅ Done | Hotel follows three houses. |
 | Complete color-set rule | ❌ Not started | Current build validation does not require ownership of the complete color group. |
 | Property marker visualization | ⚠️ Partial | Runtime markers now load `Resources/UI/house` and `Resources/UI/hotel` sprites (lightly tinted by owner) when present, and fall back to colored UI bars when the sprite assets are missing. |
@@ -95,7 +95,7 @@ The active system has three main layers:
 | Tax squares | ✅ Done | Fixed debt is charged through the common debt system. |
 | Resort squares | ✅ Done | Includes Hawaii, Nice, Dubai, Cyprus, and Bali. |
 | Lost Island/jail behavior | ✅ Done | Player attempts doubles and eventually pays an exit fee. |
-| World Tour | ✅ Done | Applies skip-turn behavior. |
+| World Tour | ✅ Done | Human players choose a destination; choosing a lower board index counts as passing Start and awards the Start bonus. Bots still apply skip-turn behavior. |
 | World Championship | ✅ Done | Charges opponents and supports movement through a card effect. |
 | Chance card draw | ✅ Done | Global deck contains 97 generated card copies and reshuffles when exhausted. |
 | Immediate card effects | ✅ Done | Fine, jackpot, jail, skip turn, tax penalty, charity, and world-tour effects are implemented. |
@@ -116,7 +116,7 @@ The active system has three main layers:
 | Pause request and voting | ✅ Done | Connected active humans vote; timers are shifted while paused. |
 | Resume paused game | ⚠️ Partial | Any active player can resume gameplay without a second vote. |
 | Surrender | ✅ Done | Surrender is handled as bankruptcy. |
-| Audio settings | ✅ Done | Volume, music, effects, mute, and PlayerPrefs exist; SFX are now wired to dice roll, buy, build, card draw and game over, with background music on entering GameScene. Clips load by name from `Resources/Audio/` and no-op gracefully if a file is missing. |
+| Audio settings | ✅ Done | Volume, music, effects, mute, and PlayerPrefs exist; SFX are wired to dice, buy, build, card draw, game over, UI click, and token jump, with background music on entering GameScene. Missing clips log a warning once. |
 
 ### Debt, property sale, and bankruptcy
 
@@ -185,7 +185,7 @@ The active system has three main layers:
 | Center dice UI | ✅ Done | Two dice sprites, total text, animation, and match timer are supported. |
 | Board token animation | ✅ Done | Tokens animate through board point transforms. |
 | Property popup | ⚠️ Partial | Functionally rich but generated at runtime and still being visually refined. |
-| Chance card popup | ⚠️ Partial | Runtime compact card popup exists; final art/prefab design is not complete. |
+| Chance card popup | ⚠️ Partial | Runtime chance-card popup now uses a tile-card style with a header that cycles Gold/Silver/Wood colors before revealing the drawn card's actual type; final authored prefab/art is still pending. |
 | Full-screen event popup | ✅ Done | Queues bankruptcy, debt, card, loss, and error messages. |
 | Property sale UI | ✅ Done | Full-screen selectable property list for debt settlement. |
 | Chat prefab/runtime fallback | ✅ Done | Prefab is preferred with scene/runtime fallback. |
@@ -563,13 +563,14 @@ Important economy/rule values currently encoded in source:
 
 | Rule | Current value |
 |---|---|
-| Starting money | 2,000,000 |
-| Pass Start reward | 300,000 |
+| Starting money | 500,000 |
+| Pass Start reward | 200,000 |
 | Turn duration | 45 seconds |
 | Match duration options | 10, 20, 30, 60 minutes |
 | Tax charge | 100,000 |
 | Lost Island final exit fee | 200,000 |
 | Houses before hotel | 3 |
+| First-round build cap | Max 1 house per city during the first full player round |
 | First-place score | 100 |
 | Second-place score | 50 |
 | Third-place score | 20 |
@@ -640,8 +641,8 @@ Do not reorder board entries or scene board points independently. Token movement
 9. Property build markers show the actual house count as 1–3 discrete house icons in a centered row (procedurally drawn body + roof, tinted by owner color); a hotel replaces them with a single wide red building (procedural trapezoid-roof sprite). `Resources/UI/house`/`hotel` sprites are used if supplied, else the code-drawn sprites are used (no asset required).
 10. No final `Resources/UI/GameSettingsPanel.prefab` was found, so settings commonly use runtime fallback.
 11. Fixed pixel positions and sizes can overlap at resolutions other than the primary 1920x1080 target.
-12. Audio event hookups now exist (dice/buy/build/card/game-over SFX + GameScene background music), loading clips by name from `Resources/Audio/`; the actual clip files (`dice, card, gameover, buy, build, bgm`) still need to be added.
-13. Settings-launcher placement can conflict with player information depending on scene layout.
+12. Audio event hookups now exist (dice/buy/build/card/game-over/UI-click/token-jump SFX + GameScene background music), loading clips by name from `Resources/Audio/`; `build`, `click`, `dice`, and `jump` assets exist, while `buy`, `card`, `gameover`, and `bgm` still need to be added.
+13. Chat/settings launchers are shifted left to avoid the four-player bottom-right player panel, but the layout is still fixed-pixel and should be checked after resolution changes.
 14. Some UI scripts search objects by name, creating fragile scene coupling.
 15. Direct `StreamingAssets` file access is suitable for the current desktop target but is not portable to every Unity platform.
 
