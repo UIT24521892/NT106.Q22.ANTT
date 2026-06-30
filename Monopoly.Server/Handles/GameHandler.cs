@@ -18,7 +18,7 @@ namespace Monopoly.Server.Handles
 {
     public static partial class GameHandler
     {
-        private static int RollDie()
+        private static int RollDice()
         {
             return RandomNumberGenerator.GetInt32(1, 7);
         }
@@ -53,7 +53,7 @@ namespace Monopoly.Server.Handles
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả nợ {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {
@@ -97,8 +97,8 @@ namespace Monopoly.Server.Handles
                     else
                     {
                         int boardSize = BoardDatabase.Squares.Count;
-                        int dice1 = RollDie();
-                        int dice2 = room.GameState.ForceDoubleThisTurn ? dice1 : RollDie();
+                        int dice1 = RollDice();
+                        int dice2 = room.GameState.ForceDoubleThisTurn ? dice1 : RollDice();
                         int diceTotal = dice1 + dice2;
                         int oldPosition = player.Position;
 
@@ -236,7 +236,7 @@ namespace Monopoly.Server.Handles
                 }
                 else if (room.GameState.IsWaitingForPropertySale)
                 {
-                    failMessage = $"Äang chá» {room.GameState.PendingSalePlayerUsername} bÃ¡n tÃ i sáº£n Ä‘á»ƒ tráº£ {room.GameState.PendingDebtReason}.";
+                    failMessage = $"Đang chờ {room.GameState.PendingSalePlayerUsername} bán tài sản để trả nợ {room.GameState.PendingDebtReason}.";
                 }
                 else
                 {

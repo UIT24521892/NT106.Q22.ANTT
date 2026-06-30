@@ -24,11 +24,10 @@ namespace Monopoly.Shared.Models.Configs.StaticData
             { "CARD_GOLD_04", new ChanceCardConfig
                 { ID = "CARD_GOLD_04", Name = "Giấy Phép Xây Dựng", Type = "Golden", EffectCode = "FREE_UPGRADE",
                   DetailEffect = "Thẻ Nâng Cấp: Tự động nâng cấp miễn phí 1 bậc cho một thành phố của bạn." } },
-            
-            // --- NEW: Tính năng ép xúc xắc của Business Tour ---
             { "CARD_GOLD_05", new ChanceCardConfig
                 { ID = "CARD_GOLD_05", Name = "Xúc Xắc Ma Thuật", Type = "Golden", EffectCode = "FORCE_DOUBLE",
                   DetailEffect = "Sử dụng trước khi đổ: Lượt xúc xắc này của bạn chắc chắn sẽ ra số Đôi." } },
+            
             { "CARD_SILVER_06", new ChanceCardConfig
                 { ID = "CARD_SILVER_06", Name = "Chuyến Bay Đêm", Type = "Silver", EffectCode = "GO_TO_WORLD_TOUR",
                   DetailEffect = "Bay khẩn cấp! Đi thẳng đến ô Du Lịch Thế Giới (Sân bay) để chờ cất cánh vào lượt sau." } },
@@ -54,8 +53,6 @@ namespace Monopoly.Shared.Models.Configs.StaticData
             { "CARD_WOOD_04", new ChanceCardConfig
                 { ID = "CARD_WOOD_04", Name = "Tình Nghi Gian Lận", Type = "Wooden", EffectCode = "GO_TO_JAIL",
                   DetailEffect = "Bắt quả tang gian lận! Lập tức bị đày ra Đảo Hoang nghỉ mát." } },
-            
-            // --- NEW: Các thẻ phạt đau đớn nhất ---
             { "CARD_WOOD_05", new ChanceCardConfig
                 { ID = "CARD_WOOD_05", Name = "Đóng Băng Giao Dịch", Type = "Wooden", EffectCode = "SKIP_TURN",
                   DetailEffect = "Tài khoản bị phong tỏa tạm thời. Bạn bị mất lượt đi tiếp theo!" } },

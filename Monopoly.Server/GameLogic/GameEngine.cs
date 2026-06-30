@@ -236,7 +236,7 @@ namespace Monopoly.Server.GameLogic
 
             if (player.IsBot)
             {
-                SellBotPropertiesForDebtUnsafe(gameState, player, remainingDebt, creditorPlayerIndex, debtReason, actionMessages);
+                Monopoly.Server.GameLogic.Bots.BotHelper.AutoSellPropertiesForDebtUnsafe(gameState, player, remainingDebt, creditorPlayerIndex, debtReason, actionMessages);
                 return;
             }
 
@@ -402,48 +402,9 @@ namespace Monopoly.Server.GameLogic
             }
         }
 
-        private static void SellBotPropertiesForDebtUnsafe(
-                GameState gameState,
-                GamePlayerState bot,
-                long remainingDebt,
-                int creditorPlayerIndex,
-                string debtReason,
-                List<string> actionMessages)
-        {
-            List<GamePropertyState> botProperties = gameState.Properties.Values
-                .Where(p => p.OwnerPlayerIndex == bot.PlayerIndex)
-                .OrderBy(GetPropertySaleValueUnsafe)
-                .ToList();
 
-            foreach (GamePropertyState property in botProperties)
-            {
-                if (remainingDebt <= 0)
-                    break;
 
-                long saleValue = GetPropertySaleValueUnsafe(property);
-                string propertyName = property.Name;
-                ReleasePropertyUnsafe(property);
-
-                long paidToDebt = Math.Min(saleValue, remainingDebt);
-                remainingDebt -= paidToDebt;
-                PayDebtRecipientUnsafe(gameState, creditorPlayerIndex, paidToDebt);
-
-                long surplus = saleValue - paidToDebt;
-
-                if (surplus > 0)
-                    bot.Money += surplus;
-
-                actionMessages.Add($"{bot.Username} tự bán {propertyName} thu {saleValue:N0} để trả {debtReason}.");
-            }
-
-            if (remainingDebt > 0)
-            {
-                actionMessages.Add($"{bot.Username} vẫn còn nợ {remainingDebt:N0} sau khi thanh lý tài sản.");
-                HandleBankruptcyUnsafe(gameState, bot, actionMessages);
-            }
-        }
-
-        private static void PayDebtRecipientUnsafe(GameState gameState, int creditorPlayerIndex, long amount)
+        public static void PayDebtRecipientUnsafe(GameState gameState, int creditorPlayerIndex, long amount)
         {
             if (amount <= 0 || creditorPlayerIndex < 0)
                 return;
@@ -454,7 +415,7 @@ namespace Monopoly.Server.GameLogic
                 creditor.Money += amount;
         }
 
-        private static void ReleasePropertyUnsafe(GamePropertyState property)
+        public static void ReleasePropertyUnsafe(GamePropertyState property)
         {
             property.OwnerPlayerIndex = -1;
             property.HouseCount = 0;
@@ -1599,6 +1560,7 @@ namespace Monopoly.Server.GameLogic
                 {
                     Username = player.Username,
                     IsBot = player.IsBot,
+                    Personality = player.IsBot ? (BotPersonality)ServerState.Random.Next(0, 3) : BotPersonality.Balanced,
                     PlayerIndex = player.PlayerIndex,
                     Position = 0,
                     AvatarId = string.IsNullOrWhiteSpace(player.AvatarId) ? "avatar_1" : player.AvatarId,
