@@ -104,6 +104,20 @@ namespace Monopoly.Server.GameLogic.Bots
                 }
 
 
+                if (bot.HasMoveChampionshipCard)
+                {
+                    int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "MOVE_CHAMPIONSHIP");
+                    if (targetPos >= 0)
+                    {
+                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "MOVE_CHAMPIONSHIP", targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
+                        {
+                            string msg = $"{bot.Username} đã dùng thẻ Đăng Cai để chuyển Giải Vô Địch về ô {targetPos}.";
+                            GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                            room.GameState.LastActionMessage = msg;
+                        }
+                    }
+                }
+
                 if (bot.HasFlightCard)
                 {
                     int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "FLIGHT");
@@ -256,6 +270,20 @@ namespace Monopoly.Server.GameLogic.Bots
                                 {
                                     // Use free upgrade card if we have it
                     
+                if (bot.HasMoveChampionshipCard)
+                {
+                    int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "MOVE_CHAMPIONSHIP");
+                    if (targetPos >= 0)
+                    {
+                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "MOVE_CHAMPIONSHIP", targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
+                        {
+                            string msg = $"{bot.Username} đã dùng thẻ Đăng Cai để chuyển Giải Vô Địch về ô {targetPos}.";
+                            GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                            room.GameState.LastActionMessage = msg;
+                        }
+                    }
+                }
+
                 if (bot.HasFlightCard)
                 {
                     int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "FLIGHT");

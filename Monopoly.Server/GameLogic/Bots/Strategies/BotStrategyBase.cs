@@ -85,6 +85,10 @@ namespace Monopoly.Server.GameLogic.Bots.Strategies
                 // Hành vi giống Du lịch thế giới: bay đến ô tốt nhất
                 return SelectTargetForWorldTour(gameState, bot);
             }
+            if (cardType == "MOVE_CHAMPIONSHIP")
+            {
+                return SelectTargetForWorldChampionship(gameState, bot);
+            }
 
             var myProps = gameState.Properties.Values
                 .Where(p => p.OwnerPlayerIndex == bot.PlayerIndex && p.Type == "City")

@@ -65,7 +65,7 @@ namespace Monopoly.Server.GameLogic
                     isChampionshipPosition = false;
 
                     bool hasCity = gameState.Properties.Values.Any(p => p.Type == "City" && p.OwnerPlayerIndex == player.PlayerIndex);
-                    if (hasCity && !player.IsBot)
+                    if (hasCity)
                     {
                         gameState.IsWaitingForCardChoice = true;
                         gameState.PendingCardEffectCode = "WORLD_CHAMPIONSHIP_HOST";
@@ -76,20 +76,11 @@ namespace Monopoly.Server.GameLogic
                     break;
 
                 case "WorldTour":
-                    if (!player.IsBot)
-                    {
-                        gameState.IsWaitingForCardChoice = true;
-                        gameState.PendingCardEffectCode = "WORLD_TOUR";
-                        gameState.PendingCardPlayerUsername = player.Username;
-                        gameState.PendingCardTargetPositions = BuildCardTargetPositionsUnsafe(gameState, player, "WORLD_TOUR");
-                        actionMessages.Add($"{player.Username} đang chọn điểm đến Du Lịch Thế Giới.");
-                    }
-                    else
-                    {
-                        player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
-                        player.SkipReason = "WORLD_TOUR";
-                        actionMessages.Add($"{player.Username} đến Du Lịch Thế Giới và đợi đi tiếp.");
-                    }
+                    gameState.IsWaitingForCardChoice = true;
+                    gameState.PendingCardEffectCode = "WORLD_TOUR";
+                    gameState.PendingCardPlayerUsername = player.Username;
+                    gameState.PendingCardTargetPositions = BuildCardTargetPositionsUnsafe(gameState, player, "WORLD_TOUR");
+                    actionMessages.Add($"{player.Username} đang chọn điểm đến Du Lịch Thế Giới.");
                     break;
             }
 
@@ -541,9 +532,11 @@ namespace Monopoly.Server.GameLogic
 
                 case "GO_TO_WORLD_TOUR":
                     player.Position = 8;
-                    player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
-                    player.SkipReason = "WORLD_TOUR";
-                    actionMessages.Add("Bay đến Du Lịch Thế Giới và chờ cất cánh lượt sau.");
+                    gameState.IsWaitingForCardChoice = true;
+                    gameState.PendingCardEffectCode = "WORLD_TOUR";
+                    gameState.PendingCardPlayerUsername = player.Username;
+                    gameState.PendingCardTargetPositions = BuildCardTargetPositionsUnsafe(gameState, player, "WORLD_TOUR");
+                    actionMessages.Add("Được bay thẳng đến Du Lịch Thế Giới và chọn điểm đến!");
                     break;
 
                 case "FREE_RENT":
