@@ -27,6 +27,7 @@ public class GameEventPopupUI : MonoBehaviour
     private Button primaryButton;
 
     private bool isShowing;
+    private EventPopupData currentPopup;
 
     public static GameEventPopupUI EnsureExists()
     {
@@ -87,7 +88,7 @@ public class GameEventPopupUI : MonoBehaviour
         EnqueueOnce(key, EventPopupStyle.WoodenCard, "THẺ BẤT LỢI", title, message, details);
     }
 
-    public void ShowGameOver(GameOverData gameOver)
+    public void ShowGameOver(GameOverData gameOver, Action onClosed = null)
     {
         string matchId = string.IsNullOrWhiteSpace(gameOver?.MatchId) ? "unknown" : gameOver.MatchId;
         string key = $"game-over-packet:{matchId}";
@@ -95,13 +96,13 @@ public class GameEventPopupUI : MonoBehaviour
         GameStateData state = GameSession.CurrentState;
         bool localWon = (localRanking != null && localRanking.Rank == 1) ||
             (state != null && IsLocalUsername(state.WinnerUsername));
-        string title = localWon ? "Bạn thắng trận" : "Bạn đã thua";
-        string message = localRanking == null
-            ? "Trận đấu đã kết thúc."
-            : $"Bạn xếp hạng #{localRanking.Rank} và nhận +{localRanking.ScoreEarned} điểm.";
-        string details = BuildRankingDetails(gameOver?.Rankings);
+        string title = localWon ? "VICTORY" : "DEFEAT";
+        string message = localWon
+            ? "Ban la nguoi chien thang"
+            : "Ban da thua tran nay";
+        string details = "An man hinh de tiep tuc";
 
-        EnqueueOnce(key, localWon ? EventPopupStyle.Victory : EventPopupStyle.Defeat, "KẾT THÚC TRẬN", title, message, details);
+        EnqueueOnce(key, localWon ? EventPopupStyle.Victory : EventPopupStyle.Defeat, "KẾT THÚC TRẬN", title, message, details, onClosed);
     }
 
     public void ShowActionFailed(string message)
@@ -275,13 +276,14 @@ public class GameEventPopupUI : MonoBehaviour
         string eyebrow,
         string title,
         string message,
-        string details)
+        string details,
+        Action onClosed = null)
     {
         if (string.IsNullOrWhiteSpace(key) || shownEventKeys.Contains(key))
             return;
 
         shownEventKeys.Add(key);
-        pendingPopups.Enqueue(new EventPopupData(style, eyebrow, title, message, details));
+        pendingPopups.Enqueue(new EventPopupData(style, eyebrow, title, message, details, onClosed));
 
         if (!isShowing)
             ShowNext();
@@ -301,7 +303,9 @@ public class GameEventPopupUI : MonoBehaviour
         }
 
         EventPopupData data = pendingPopups.Dequeue();
+        currentPopup = data;
         ApplyStyle(data.Style);
+        ApplyLayout(data.Style);
 
         eyebrowText.text = data.Eyebrow;
         titleText.text = data.Title;
@@ -315,6 +319,10 @@ public class GameEventPopupUI : MonoBehaviour
 
     private void HideCurrent()
     {
+        Action onClosed = currentPopup?.OnClosed;
+        currentPopup = null;
+        onClosed?.Invoke();
+
         if (pendingPopups.Count > 0)
         {
             ShowNext();
@@ -327,6 +335,7 @@ public class GameEventPopupUI : MonoBehaviour
     private void HideImmediate()
     {
         isShowing = false;
+        currentPopup = null;
 
         if (rootRect != null)
             rootRect.gameObject.SetActive(false);
@@ -427,10 +436,14 @@ public class GameEventPopupUI : MonoBehaviour
                 headerColor = new Color(0.94f, 0.45f, 0.08f, 1f);
                 break;
             case EventPopupStyle.Victory:
-                headerColor = new Color(0.08f, 0.56f, 0.35f, 1f);
+                headerColor = new Color(1f, 0.74f, 0.18f, 1f);
+                cardColor = new Color(0f, 0f, 0f, 0f);
+                bodyColor = new Color(1f, 0.86f, 0.46f, 1f);
                 break;
             case EventPopupStyle.Defeat:
-                headerColor = new Color(0.22f, 0.27f, 0.34f, 1f);
+                headerColor = new Color(0.44f, 0.18f, 0.95f, 0.88f);
+                cardColor = new Color(0f, 0f, 0f, 0f);
+                bodyColor = new Color(0.82f, 0.75f, 1f, 1f);
                 break;
             default:
                 headerColor = new Color(0.08f, 0.45f, 0.68f, 1f);
@@ -451,6 +464,137 @@ public class GameEventPopupUI : MonoBehaviour
 
         if (primaryButton != null && primaryButton.targetGraphic != null)
             primaryButton.targetGraphic.color = headerColor;
+    }
+
+    private void ApplyLayout(EventPopupStyle style)
+    {
+        bool isEndScreen = style == EventPopupStyle.Victory || style == EventPopupStyle.Defeat;
+
+        if (isEndScreen)
+        {
+            ApplyEndScreenLayout(style);
+            return;
+        }
+
+        ApplyDefaultPopupLayout();
+    }
+
+    private void ApplyDefaultPopupLayout()
+    {
+        overlayImage.color = new Color(0.02f, 0.04f, 0.05f, 0.66f);
+        cardImage.raycastTarget = true;
+        SetRect(cardRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860f, 500f));
+        SetRect(headerImage.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(0f, 108f));
+        SetRect(eyebrowText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-36f, -24f), new Vector2(-170f, 26f));
+        SetRect(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-36f, -64f), new Vector2(-170f, 50f));
+        SetStretch(messageText.rectTransform, 76f, 148f, 76f, 238f);
+        SetStretch(detailText.rectTransform, 86f, 292f, 86f, 96f);
+        SetRect(closeButton.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-34f, -24f), new Vector2(64f, 56f));
+        SetRect(primaryButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(230f, 58f));
+
+        closeButton.gameObject.SetActive(true);
+        primaryButton.GetComponent<Image>().raycastTarget = true;
+        primaryButton.GetComponent<Image>().color = new Color(0.08f, 0.45f, 0.68f, 1f);
+
+        TextMeshProUGUI primaryText = primaryButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (primaryText != null)
+        {
+            primaryText.text = "Tiep tuc";
+            primaryText.fontSize = 22f;
+            primaryText.color = Color.white;
+        }
+
+        eyebrowText.fontSize = 18f;
+        eyebrowText.fontStyle = FontStyles.Bold;
+        eyebrowText.alignment = TextAlignmentOptions.Center;
+        eyebrowText.outlineWidth = 0f;
+        eyebrowText.characterSpacing = 0f;
+        titleText.fontSizeMax = 40f;
+        titleText.fontSizeMin = 26f;
+        titleText.fontStyle = FontStyles.Bold;
+        titleText.outlineWidth = 0f;
+        titleText.characterSpacing = 0f;
+        messageText.fontSize = 28f;
+        messageText.fontStyle = FontStyles.Normal;
+        messageText.alignment = TextAlignmentOptions.Center;
+        messageText.outlineWidth = 0f;
+        messageText.characterSpacing = 0f;
+        detailText.fontSize = 20f;
+        detailText.alignment = TextAlignmentOptions.TopLeft;
+        detailText.outlineWidth = 0f;
+    }
+
+    private void ApplyEndScreenLayout(EventPopupStyle style)
+    {
+        bool isVictory = style == EventPopupStyle.Victory;
+        Color accent = isVictory
+            ? new Color(1f, 0.73f, 0.16f, 1f)
+            : new Color(0.58f, 0.28f, 1f, 0.9f);
+        Color titleColor = isVictory
+            ? new Color(1f, 0.82f, 0.34f, 1f)
+            : new Color(0.93f, 0.9f, 1f, 1f);
+
+        overlayImage.color = isVictory
+            ? new Color(0.02f, 0.02f, 0.01f, 0.72f)
+            : new Color(0.02f, 0.01f, 0.08f, 0.78f);
+
+        SetStretch(cardRect, 0f, 0f, 0f, 0f);
+        SetRect(headerImage.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(0f, 188f));
+        SetRect(eyebrowText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 122f), new Vector2(-120f, 42f));
+        SetRect(titleText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 18f), new Vector2(-80f, 138f));
+        SetRect(messageText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -116f), new Vector2(-120f, 62f));
+        SetRect(detailText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 58f), new Vector2(-120f, 34f));
+        SetStretch(primaryButton.GetComponent<RectTransform>(), 0f, 0f, 0f, 0f);
+
+        closeButton.gameObject.SetActive(false);
+        headerImage.color = isVictory
+            ? new Color(0.34f, 0.22f, 0.03f, 0.32f)
+            : accent;
+        cardImage.color = Color.clear;
+        cardImage.raycastTarget = false;
+
+        Image primaryImage = primaryButton.GetComponent<Image>();
+        primaryImage.color = new Color(0f, 0f, 0f, 0.01f);
+        primaryImage.raycastTarget = true;
+
+        TextMeshProUGUI primaryText = primaryButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (primaryText != null)
+        {
+            primaryText.text = "";
+        }
+
+        eyebrowText.text = "";
+        titleText.color = titleColor;
+        titleText.fontStyle = FontStyles.Bold;
+        titleText.enableAutoSizing = true;
+        eyebrowText.fontSize = 36f;
+        eyebrowText.fontStyle = FontStyles.Bold;
+        eyebrowText.alignment = TextAlignmentOptions.Center;
+        eyebrowText.color = isVictory
+            ? new Color(1f, 0.78f, 0.22f, 1f)
+            : new Color(0.9f, 0.84f, 1f, 1f);
+        eyebrowText.outlineWidth = 0.16f;
+        eyebrowText.outlineColor = new Color(0.04f, 0.02f, 0.08f, 0.95f);
+
+        titleText.fontSizeMin = 78f;
+        titleText.fontSizeMax = 112f;
+        titleText.characterSpacing = 8f;
+        titleText.outlineWidth = isVictory ? 0.34f : 0.42f;
+        titleText.outlineColor = isVictory
+            ? new Color(0.95f, 0.55f, 0.04f, 0.95f)
+            : new Color(0.16f, 0.03f, 0.52f, 1f);
+
+        messageText.fontSize = 38f;
+        messageText.fontStyle = FontStyles.Bold;
+        messageText.alignment = TextAlignmentOptions.Center;
+        messageText.outlineWidth = 0.14f;
+        messageText.outlineColor = new Color(0.04f, 0.02f, 0.08f, 0.9f);
+        messageText.color = isVictory
+            ? new Color(1f, 0.9f, 0.5f, 1f)
+            : new Color(0.88f, 0.82f, 1f, 1f);
+        detailText.fontSize = 20f;
+        detailText.alignment = TextAlignmentOptions.Center;
+        detailText.color = new Color(0.82f, 0.82f, 0.82f, 0.95f);
     }
 
     private Image CreatePanelImage(string name, Transform parent, Color color)
@@ -737,14 +881,16 @@ public class GameEventPopupUI : MonoBehaviour
         public readonly string Title;
         public readonly string Message;
         public readonly string Details;
+        public readonly Action OnClosed;
 
-        public EventPopupData(EventPopupStyle style, string eyebrow, string title, string message, string details)
+        public EventPopupData(EventPopupStyle style, string eyebrow, string title, string message, string details, Action onClosed)
         {
             Style = style;
             Eyebrow = eyebrow ?? "";
             Title = title ?? "";
             Message = message ?? "";
             Details = details ?? "";
+            OnClosed = onClosed;
         }
     }
 }

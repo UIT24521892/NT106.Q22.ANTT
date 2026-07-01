@@ -1700,6 +1700,44 @@ namespace Monopoly.Server.GameLogic
             return true;
         }
 
+        public static long GetBuyoutCostUnsafe(GamePropertyState property)
+        {
+            if (property == null || property.BuyPrice <= 0)
+                return 0;
+
+            if (property.Type != "City")
+                return property.BuyPrice;
+
+            long cost = property.BuyPrice;
+            cost += Math.Max(0, property.HouseCount) * Math.Max(1, property.BuyPrice / 2);
+
+            if (property.HasHotel)
+                cost += property.BuyPrice;
+
+            return cost;
+        }
+
+        public static bool TryBuyoutPropertyUnsafe(GameState gameState, GamePlayerState buyer, GamePropertyState property, out long buyoutCost, out string errorMessage)
+        {
+            buyoutCost = GetBuyoutCostUnsafe(property);
+
+            if (property == null) { errorMessage = "Khong tim thay thong tin o dat."; return false; }
+            if (property.Type != "City" && property.Type != "Resort") { errorMessage = $"O {property.Name} khong the mua lai."; return false; }
+            if (property.OwnerPlayerIndex < 0) { errorMessage = $"O {property.Name} chua co chu."; return false; }
+            if (property.OwnerPlayerIndex == buyer.PlayerIndex) { errorMessage = $"Ban dang so huu {property.Name}."; return false; }
+            if (buyoutCost <= 0) { errorMessage = $"O {property.Name} chua co gia mua lai hop le."; return false; }
+            if (buyer.Money < buyoutCost) { errorMessage = $"Ban khong du tien mua lai {property.Name}."; return false; }
+
+            GamePlayerState owner = gameState.Players.FirstOrDefault(p => p.PlayerIndex == property.OwnerPlayerIndex);
+            if (owner == null || owner.IsBankrupt) { errorMessage = "Khong tim thay chu so huu hop le."; return false; }
+
+            buyer.Money -= buyoutCost;
+            owner.Money += buyoutCost;
+            property.OwnerPlayerIndex = buyer.PlayerIndex;
+            errorMessage = "";
+            return true;
+        }
+
         public static bool TryBuildPropertyUnsafe(GameState gameState, GamePlayerState player, GamePropertyState property, out string errorMessage)
         {
             if (property.Type != "City") { errorMessage = $"Ô {property.Name} không thể xây nhà."; return false; }
