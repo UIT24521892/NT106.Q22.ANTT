@@ -531,6 +531,11 @@ public class BoardTokenManager : MonoBehaviour
         int finalPosition,
         int slot)
     {
+        DiceVisualUI diceVisual = FindObjectOfType<DiceVisualUI>();
+
+        if (diceVisual != null)
+            yield return diceVisual.WaitForCurrentRoll();
+
         token.Rect.SetAsLastSibling();
 
         List<Vector2> dicePath = BuildMovePath(visualFromPosition, diceLandingPosition, slot);

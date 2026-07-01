@@ -77,6 +77,10 @@ namespace Monopoly.Server.Network
                         await GameHandler.HandleBuyPropertyAsync(connection);
                         break;
 
+                    case "BUYOUT_PROPERTY":
+                        await GameHandler.HandleBuyoutPropertyAsync(packet, connection);
+                        break;
+
                     case "BUILD_PROPERTY":
                         await GameHandler.HandleBuildPropertyAsync(packet, connection);
                         break;
@@ -171,6 +175,7 @@ namespace Monopoly.Server.Network
                 "ROLL_DICE",
                 "END_TURN",
                 "BUY_PROPERTY",
+                "BUYOUT_PROPERTY",
                 "BUILD_PROPERTY",
                 "SELL_PROPERTY_FOR_DEBT",
                 "USE_CARD",
