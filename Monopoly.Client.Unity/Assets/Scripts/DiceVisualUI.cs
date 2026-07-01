@@ -22,6 +22,7 @@ public class DiceVisualUI : MonoBehaviour
     private Coroutine rollRoutine;
     private float nextRefreshTime;
     private string lastDiceKey = "";
+    public bool IsRolling => rollRoutine != null;
 
     public static DiceVisualUI EnsureExists()
     {
@@ -86,10 +87,10 @@ public class DiceVisualUI : MonoBehaviour
     {
         if (dicePanel == null || dice1Text == null || dice2Text == null)
         {
-            if (force)
-                BindPanel();
+            BindPanel();
 
-            return;
+            if (dicePanel == null || dice1Text == null || dice2Text == null)
+                return;
         }
 
         GameStateData state = GameSession.CurrentState;
@@ -112,6 +113,17 @@ public class DiceVisualUI : MonoBehaviour
 
         AudioManager.EnsureExists().PlaySfx("dice");
         rollRoutine = StartCoroutine(AnimateToServerDice(state.LastDice1, state.LastDice2, state.LastDiceTotal));
+    }
+
+    public void NotifyStateUpdate(GameStateData state)
+    {
+        Refresh(force: false);
+    }
+
+    public IEnumerator WaitForCurrentRoll()
+    {
+        while (IsRolling)
+            yield return null;
     }
 
     private IEnumerator AnimateToServerDice(int dice1, int dice2, int total)

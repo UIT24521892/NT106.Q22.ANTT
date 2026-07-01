@@ -36,10 +36,13 @@ public class BoardTileInfoUI : MonoBehaviour
     private TextMeshProUGUI deedHotelCostValue;
     private TextMeshProUGUI actionHintText;
     private Button closeButton;
+    private Button declineButton;
+    private Button buyButton;
     private Button buildButton;
     private RectTransform markerClickLayer;
     private int currentPopupPosition = -1;
     private float nextPopupRefreshTime;
+    private bool buyButtonSendsBuyout;
     private bool isSelectingCardTarget;
     public bool IsSelectingCardTarget => isSelectingCardTarget;
     private string selectingCardEffectCode = "";
@@ -144,6 +147,22 @@ public class BoardTileInfoUI : MonoBehaviour
         actionHintText.color = new Color(0.26f, 0.26f, 0.26f, 1f);
         actionHintText.enableWordWrapping = true;
         SetRect(actionHintText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-160f, 28f), new Vector2(-430f, 58f));
+
+        buyButton = CreateButton("Btn_BuyPropertyInCard", popupCardRoot, "Mua đất", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-52f, 26f), new Vector2(250f, 54f));
+        buyButton.onClick.AddListener(SendBuyActionRequest);
+        SetButtonColor(buyButton, new Color(0.12f, 0.62f, 0.28f, 0.98f));
+        TextMeshProUGUI buyText = buyButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        if (buyText != null)
+            buyText.fontSize = 22f;
+
+        declineButton = CreateButton("Btn_DeclinePropertyBuyout", popupCardRoot, "Từ chối", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-320f, 26f), new Vector2(250f, 54f));
+        declineButton.onClick.AddListener(HidePopup);
+        SetButtonColor(declineButton, new Color(0.48f, 0.48f, 0.48f, 0.98f));
+        TextMeshProUGUI declineText = declineButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        if (declineText != null)
+            declineText.fontSize = 22f;
 
         buildButton = CreateButton("Btn_BuildProperty", popupCardRoot, "Nâng cấp", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-52f, 26f), new Vector2(250f, 54f));
         buildButton.onClick.AddListener(SendBuildRequest);
@@ -1067,20 +1086,73 @@ public class BoardTileInfoUI : MonoBehaviour
 
     private void RefreshBuildButton(GamePropertyStateData property, GameStateData state)
     {
-        if (buildButton == null || actionHintText == null)
+        if (buyButton == null || buildButton == null || actionHintText == null)
             return;
 
-        bool showBuildButton = property != null && property.Type == "City";
-        buildButton.gameObject.SetActive(showBuildButton);
-
-        if (!showBuildButton)
+        if (property == null || (property.Type != "City" && property.Type != "Resort"))
         {
+            SetButtonVisible(buyButton, false);
+            SetButtonVisible(buildButton, false);
+            SetButtonVisible(declineButton, false);
+            actionHintText.text = "";
+            return;
+        }
+
+        if (property.OwnerPlayerIndex < 0)
+        {
+            bool canBuy = CanBuyProperty(property, state, out string buyReason);
+            SetButtonVisible(buyButton, true);
+            SetButtonVisible(buildButton, false);
+            SetButtonVisible(declineButton, false);
+            SetButtonInteractable(buyButton, canBuy);
+            buyButtonSendsBuyout = false;
+
+            TextMeshProUGUI buyText = buyButton.GetComponentInChildren<TextMeshProUGUI>();
+
+            if (buyText != null)
+                buyText.text = "Mua đất";
+
+            actionHintText.text = buyReason;
+            return;
+        }
+
+        if (IsOwnedByAnotherPlayer(property, state))
+        {
+            bool canBuyout = CanBuyoutProperty(property, state, out string buyoutReason, out long buyoutCost);
+            SetButtonVisible(buyButton, true);
+            SetButtonVisible(buildButton, false);
+            SetButtonInteractable(buyButton, canBuyout);
+            buyButtonSendsBuyout = true;
+
+            if (declineButton != null)
+            {
+                SetButtonVisible(declineButton, true);
+                SetButtonInteractable(declineButton, true);
+            }
+
+            TextMeshProUGUI buyoutText = buyButton.GetComponentInChildren<TextMeshProUGUI>();
+
+            if (buyoutText != null)
+                buyoutText.text = "Mua lại nhà";
+
+            actionHintText.text = buyoutReason;
+            return;
+        }
+
+        if (property.Type != "City")
+        {
+            SetButtonVisible(buyButton, false);
+            SetButtonVisible(buildButton, false);
+            SetButtonVisible(declineButton, false);
             actionHintText.text = "";
             return;
         }
 
         bool canBuild = CanBuildProperty(property, state, out string reason, out long buildCost);
-        buildButton.interactable = canBuild;
+        SetButtonVisible(buyButton, false);
+        SetButtonVisible(buildButton, true);
+        SetButtonVisible(declineButton, false);
+        SetButtonInteractable(buildButton, canBuild);
 
         TextMeshProUGUI buttonText = buildButton.GetComponentInChildren<TextMeshProUGUI>();
 
@@ -1088,6 +1160,200 @@ public class BoardTileInfoUI : MonoBehaviour
             buttonText.text = "Nâng cấp";
 
         actionHintText.text = reason;
+    }
+
+    private bool CanBuyProperty(GamePropertyStateData property, GameStateData state, out string reason)
+    {
+        if (property == null)
+        {
+            reason = "";
+            return false;
+        }
+
+        if (property.Type != "City" && property.Type != "Resort")
+        {
+            reason = "";
+            return false;
+        }
+
+        if (state == null || state.IsFinished)
+        {
+            reason = "Trận đấu không còn đang diễn ra.";
+            return false;
+        }
+
+        GamePlayerStateData localPlayer = GetLocalPlayer(state);
+
+        if (localPlayer == null)
+        {
+            reason = "Không tìm thấy người chơi hiện tại.";
+            return false;
+        }
+
+        if (!localPlayer.IsConnected || localPlayer.IsBankrupt)
+        {
+            reason = "Người chơi hiện tại không thể thao tác.";
+            return false;
+        }
+
+        if (localPlayer.PlayerIndex != state.CurrentTurnPlayerIndex)
+        {
+            reason = "Chỉ mua đất trong lượt của bạn.";
+            return false;
+        }
+
+        if (!state.HasRolledThisTurn)
+        {
+            reason = "Cần tung xúc sắc trước khi mua đất.";
+            return false;
+        }
+
+        if (state.IsWaitingForCardChoice || state.IsWaitingForPropertySale)
+        {
+            reason = "Cần xử lý hành động hiện tại trước.";
+            return false;
+        }
+
+        if (localPlayer.Position != property.PositionIndex)
+        {
+            reason = "Bạn phải đứng trên ô đất này mới mua được.";
+            return false;
+        }
+
+        if (property.OwnerPlayerIndex >= 0)
+        {
+            reason = "Đất này đã có chủ.";
+            return false;
+        }
+
+        if (property.BuyPrice <= 0)
+        {
+            reason = "Đất này không có giá mua hợp lệ.";
+            return false;
+        }
+
+        if (localPlayer.Money < property.BuyPrice)
+        {
+            reason = $"Cần {FormatMoney(property.BuyPrice)}, bạn chỉ có {FormatMoney(localPlayer.Money)}.";
+            return false;
+        }
+
+        reason = $"Có thể mua với giá {FormatMoney(property.BuyPrice)}.";
+        return true;
+    }
+
+    private bool CanBuyoutProperty(GamePropertyStateData property, GameStateData state, out string reason, out long buyoutCost)
+    {
+        buyoutCost = GetBuyoutCost(property);
+
+        if (property == null)
+        {
+            reason = "";
+            return false;
+        }
+
+        if (property.Type != "City" && property.Type != "Resort")
+        {
+            reason = "";
+            return false;
+        }
+
+        if (state == null || state.IsFinished)
+        {
+            reason = "Trận đấu không còn đang diễn ra.";
+            return false;
+        }
+
+        GamePlayerStateData localPlayer = GetLocalPlayer(state);
+
+        if (localPlayer == null)
+        {
+            reason = "Không tìm thấy người chơi hiện tại.";
+            return false;
+        }
+
+        if (!localPlayer.IsConnected || localPlayer.IsBankrupt)
+        {
+            reason = "Người chơi hiện tại không thể thao tác.";
+            return false;
+        }
+
+        if (localPlayer.PlayerIndex != state.CurrentTurnPlayerIndex)
+        {
+            reason = "Chỉ mua lại nhà trong lượt của bạn.";
+            return false;
+        }
+
+        if (!state.HasRolledThisTurn)
+        {
+            reason = "Cần tung xúc sắc trước khi mua lại nhà.";
+            return false;
+        }
+
+        if (state.IsWaitingForCardChoice || state.IsWaitingForPropertySale)
+        {
+            reason = "Cần xử lý hành động hiện tại trước.";
+            return false;
+        }
+
+        if (localPlayer.Position != property.PositionIndex)
+        {
+            reason = "Bạn phải đứng trên ô này mới mua lại được.";
+            return false;
+        }
+
+        if (property.OwnerPlayerIndex < 0)
+        {
+            reason = "Đất này chưa có chủ.";
+            return false;
+        }
+
+        if (property.OwnerPlayerIndex == localPlayer.PlayerIndex)
+        {
+            reason = "Đất này đang thuộc sở hữu của bạn.";
+            return false;
+        }
+
+        if (buyoutCost <= 0)
+        {
+            reason = "Không có giá mua lại hợp lệ.";
+            return false;
+        }
+
+        if (localPlayer.Money < buyoutCost)
+        {
+            reason = $"Cần {FormatMoney(buyoutCost)}, bạn chỉ có {FormatMoney(localPlayer.Money)}.";
+            return false;
+        }
+
+        reason = $"Có thể mua lại với giá {FormatMoney(buyoutCost)}.";
+        return true;
+    }
+
+    private bool IsOwnedByAnotherPlayer(GamePropertyStateData property, GameStateData state)
+    {
+        if (property == null || property.OwnerPlayerIndex < 0)
+            return false;
+
+        GamePlayerStateData localPlayer = GetLocalPlayer(state);
+        return localPlayer != null && property.OwnerPlayerIndex != localPlayer.PlayerIndex;
+    }
+
+    private long GetBuyoutCost(GamePropertyStateData property)
+    {
+        if (property == null || property.BuyPrice <= 0)
+            return 0;
+
+        if (property.Type != "City")
+            return property.BuyPrice;
+
+        long cost = property.BuyPrice;
+        cost += Math.Max(0, property.HouseCount) * Math.Max(1, property.BuyPrice / 2);
+
+        if (property.HasHotel)
+            cost += property.BuyPrice;
+
+        return cost;
     }
 
     private bool CanBuildProperty(GamePropertyStateData property, GameStateData state, out string reason, out long buildCost)
@@ -1186,6 +1452,48 @@ public class BoardTileInfoUI : MonoBehaviour
 
         NetworkManager.Instance.SendBuildPropertyRequest(currentPopupPosition);
         actionHintText.text = "Đã gửi yêu cầu nâng cấp lên server...";
+    }
+
+    private void SendBuyActionRequest()
+    {
+        if (buyButtonSendsBuyout)
+        {
+            SendBuyoutRequest();
+            return;
+        }
+
+        SendBuyRequest();
+    }
+
+    private void SendBuyRequest()
+    {
+        if (currentPopupPosition < 0 || NetworkManager.Instance == null)
+            return;
+
+        if (buyButton != null)
+            buyButton.interactable = false;
+
+        NetworkManager.Instance.SendBuyPropertyRequest();
+
+        if (actionHintText != null)
+            actionHintText.text = "Đã gửi yêu cầu mua đất lên server...";
+    }
+
+    private void SendBuyoutRequest()
+    {
+        if (currentPopupPosition < 0 || NetworkManager.Instance == null)
+            return;
+
+        if (buyButton != null)
+            buyButton.interactable = false;
+
+        if (declineButton != null)
+            declineButton.interactable = false;
+
+        NetworkManager.Instance.SendBuyoutPropertyRequest(currentPopupPosition);
+
+        if (actionHintText != null)
+            actionHintText.text = "Đã gửi yêu cầu mua lại nhà lên server...";
     }
 
     private string GetOwnerName(int ownerPlayerIndex, GameStateData state)
@@ -1344,6 +1652,7 @@ public class BoardTileInfoUI : MonoBehaviour
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
+        button.transition = Selectable.Transition.None;
 
         TextMeshProUGUI text = CreateText("Text", rect, label, 18f, FontStyles.Bold);
         text.alignment = TextAlignmentOptions.Center;
@@ -1357,6 +1666,33 @@ public class BoardTileInfoUI : MonoBehaviour
             return;
 
         button.targetGraphic.color = color;
+    }
+
+    private void SetButtonVisible(Button button, bool visible)
+    {
+        if (button == null || button.gameObject.activeSelf == visible)
+            return;
+
+        button.gameObject.SetActive(visible);
+    }
+
+    private void SetButtonInteractable(Button button, bool interactable)
+    {
+        if (button == null || button.interactable == interactable)
+            return;
+
+        button.interactable = interactable;
+    }
+
+    private void SetButtonLabel(Button button, string label)
+    {
+        if (button == null)
+            return;
+
+        TextMeshProUGUI text = button.GetComponentInChildren<TextMeshProUGUI>();
+
+        if (text != null && text.text != label)
+            text.text = label;
     }
 
     private void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 sizeDelta)

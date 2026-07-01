@@ -474,6 +474,93 @@ namespace Monopoly.Server.Handles
                 await NetworkSender.BroadcastGameStateAsync(roomId, broadcastMessage);
             }
         }
+
+        public static async Task HandleBuyoutPropertyAsync(JObject packet, ClientConnection connection)
+        {
+            string roomId = connection.CurrentRoomId;
+            JObject payload = PacketHelper.GetPayloadObject(packet);
+            int positionIndex = payload["PositionIndex"]?.Value<int>() ?? -1;
+
+            if (string.IsNullOrWhiteSpace(roomId))
+            {
+                await NetworkSender.SendGameActionFailedAsync(connection, "Ban chua o trong tran nao.");
+                return;
+            }
+
+            string failMessage = "";
+            string broadcastMessage = "";
+            bool shouldBroadcast = false;
+
+            lock (ServerState.Lock)
+            {
+                if (!ServerState.Rooms.TryGetValue(roomId, out Room room) || !room.IsStarted || room.GameState == null)
+                {
+                    failMessage = "Tran dau khong ton tai hoac chua bat dau.";
+                }
+                else if (room.GameState.IsFinished)
+                {
+                    failMessage = $"Tran dau da ket thuc. Nguoi thang: {room.GameState.WinnerUsername}.";
+                }
+                else if (room.GameState.IsWaitingForCardChoice)
+                {
+                    failMessage = "Dang cho nguoi choi chon muc tieu the.";
+                }
+                else if (room.GameState.IsWaitingForPropertySale)
+                {
+                    failMessage = $"Dang cho {room.GameState.PendingSalePlayerUsername} ban tai san.";
+                }
+                else
+                {
+                    GamePlayerState player = room.GameState.Players.FirstOrDefault(
+                        p => p.Username == connection.Username && !p.IsBot && p.IsConnected && !p.IsBankrupt
+                    );
+
+                    if (player == null)
+                    {
+                        failMessage = "Khong tim thay nguoi choi trong tran.";
+                    }
+                    else if (player.PlayerIndex != room.GameState.CurrentTurnPlayerIndex)
+                    {
+                        failMessage = "Chua den luot cua ban.";
+                    }
+                    else if (!room.GameState.HasRolledThisTurn)
+                    {
+                        failMessage = "Ban can do xuc xac truoc khi mua lai nha.";
+                    }
+                    else if (player.Position != positionIndex)
+                    {
+                        failMessage = "Ban phai dung tren o nay moi mua lai duoc.";
+                    }
+                    else if (!room.GameState.Properties.TryGetValue(positionIndex, out GamePropertyState property))
+                    {
+                        failMessage = "Khong tim thay thong tin o dat.";
+                    }
+                    else if (!GameEngine.TryBuyoutPropertyUnsafe(room.GameState, player, property, out long buyoutCost, out failMessage))
+                    {
+                        // failMessage set by GameEngine
+                    }
+                    else
+                    {
+                        room.GameState.LastActionMessage = $"{player.Username} da mua lai {property.Name} voi gia {buyoutCost:N0}.";
+                        GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                        broadcastMessage = room.GameState.LastActionMessage;
+                        shouldBroadcast = true;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(failMessage))
+            {
+                await NetworkSender.SendGameActionFailedAsync(connection, failMessage);
+                return;
+            }
+
+            if (shouldBroadcast)
+            {
+                await NetworkSender.BroadcastGameStateAsync(roomId, broadcastMessage);
+            }
+        }
+
         public static async Task HandleResumeGameAsync(JObject packet, ClientConnection connection)
         {
             JObject payload = PacketHelper.GetPayloadObject(packet);

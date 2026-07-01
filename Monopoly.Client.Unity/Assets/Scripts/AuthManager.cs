@@ -163,7 +163,7 @@ public class AuthManager : MonoBehaviour
                     
                     // Lưu thông tin phiên chơi
                     PlayerSession.Initialize(parts[1], parts[2], sessionUsername, sessionPoint, sessionAvatar);
-                    UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
+                    UnityEngine.SceneManagement.SceneManager.LoadScene("LoadingScene");
                 }
                 else
                 {
