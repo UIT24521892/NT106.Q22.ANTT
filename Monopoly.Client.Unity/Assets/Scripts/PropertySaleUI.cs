@@ -6,14 +6,19 @@ using UnityEngine.UI;
 
 public class PropertySaleUI : MonoBehaviour
 {
+    private const string DebtAlertSpritePath = "khongdutien";
     private static PropertySaleUI instance;
 
     private RectTransform rootRect;
+    private RectTransform alertRect;
     private RectTransform cardRect;
     private RectTransform contentRect;
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI debtText;
     private TextMeshProUGUI hintText;
+    private TextMeshProUGUI loanHintText;
+    private string activeDebtKey = "";
+    private bool isSaleListVisible;
     private readonly List<GameObject> rowObjects = new List<GameObject>();
 
     public static PropertySaleUI EnsureExists()
@@ -54,6 +59,8 @@ public class PropertySaleUI : MonoBehaviour
 
         if (!shouldShow)
         {
+            activeDebtKey = "";
+            isSaleListVisible = false;
             Hide();
             return;
         }
@@ -62,7 +69,16 @@ public class PropertySaleUI : MonoBehaviour
         debtText.text = $"Còn nợ: {FormatMoney(state.PendingDebtAmount)}  |  Lý do: {state.PendingDebtReason}";
         hintText.text = "Chọn tài sản muốn bán. Tiền thu được sẽ trả khoản nợ trước, phần dư tự cộng vào tiền mặt.";
 
+        string debtKey = $"{state.RoomId}:{state.PendingSalePlayerIndex}:{state.PendingDebtAmount}:{state.PendingDebtReason}";
+
+        if (!string.Equals(activeDebtKey, debtKey, StringComparison.Ordinal))
+        {
+            activeDebtKey = debtKey;
+            isSaleListVisible = false;
+        }
+
         RebuildRows(state);
+        ApplyVisibleMode();
         rootRect.SetAsLastSibling();
         rootRect.gameObject.SetActive(true);
     }
@@ -175,6 +191,8 @@ public class PropertySaleUI : MonoBehaviour
         overlay.color = new Color(0.02f, 0.04f, 0.05f, 0.68f);
         overlay.raycastTarget = true;
 
+        BuildDebtAlertUi();
+
         GameObject cardObject = new GameObject("Card_PropertySale", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         cardRect = cardObject.GetComponent<RectTransform>();
         cardRect.SetParent(rootRect, false);
@@ -208,6 +226,57 @@ public class PropertySaleUI : MonoBehaviour
         SetRect(hintText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -164f), new Vector2(-120f, 44f));
 
         BuildScrollArea();
+        ApplyVisibleMode();
+    }
+
+    private void BuildDebtAlertUi()
+    {
+        GameObject alertObject = new GameObject("Card_NoMoneyAlert", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        alertRect = alertObject.GetComponent<RectTransform>();
+        alertRect.SetParent(rootRect, false);
+        alertRect.anchorMin = new Vector2(0.5f, 0.5f);
+        alertRect.anchorMax = new Vector2(0.5f, 0.5f);
+        alertRect.pivot = new Vector2(0.5f, 0.5f);
+        alertRect.anchoredPosition = Vector2.zero;
+        alertRect.sizeDelta = new Vector2(1500f, 900f);
+
+        Image alertImage = alertObject.GetComponent<Image>();
+        alertImage.sprite = Resources.Load<Sprite>(DebtAlertSpritePath);
+        alertImage.color = Color.white;
+        alertImage.preserveAspect = true;
+        alertImage.raycastTarget = true;
+
+        Button sellButton = CreateHotspotButton("Btn_NoMoneySellAssets", alertRect, new Vector2(0.5f, 0f), new Vector2(-330f, 80f), new Vector2(300f, 92f));
+        sellButton.onClick.AddListener(ShowSaleList);
+
+        Button loanButton = CreateHotspotButton("Btn_NoMoneyLoan", alertRect, new Vector2(0.5f, 0f), new Vector2(0f, 80f), new Vector2(300f, 92f));
+        loanButton.interactable = false;
+
+        Button continueButton = CreateHotspotButton("Btn_NoMoneyContinue", alertRect, new Vector2(0.5f, 0f), new Vector2(330f, 80f), new Vector2(300f, 92f));
+        continueButton.onClick.AddListener(ShowSaleList);
+
+        loanHintText = CreateText("Txt_NoMoneyLoanHint", alertRect, "", 18f, FontStyles.Bold);
+        loanHintText.alignment = TextAlignmentOptions.Center;
+        loanHintText.color = new Color(1f, 0.92f, 0.28f, 0.96f);
+        SetRect(loanHintText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(520f, 34f));
+    }
+
+    private void ShowSaleList()
+    {
+        isSaleListVisible = true;
+        ApplyVisibleMode();
+    }
+
+    private void ApplyVisibleMode()
+    {
+        if (alertRect != null)
+            alertRect.gameObject.SetActive(!isSaleListVisible);
+
+        if (cardRect != null)
+            cardRect.gameObject.SetActive(isSaleListVisible);
+
+        if (loanHintText != null)
+            loanHintText.text = !isSaleListVisible ? "Tinh nang vay tien chua duoc mo." : "";
     }
 
     private void BuildScrollArea()
@@ -359,6 +428,27 @@ public class PropertySaleUI : MonoBehaviour
         text.alignment = TextAlignmentOptions.Center;
         text.color = new Color(0.08f, 0.08f, 0.08f, 1f);
         SetStretch(text.rectTransform, 10f, 0f, 10f, 0f);
+        return button;
+    }
+
+    private Button CreateHotspotButton(
+        string name,
+        Transform parent,
+        Vector2 anchor,
+        Vector2 anchoredPosition,
+        Vector2 sizeDelta)
+    {
+        GameObject buttonObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        SetRect(rect, anchor, anchor, new Vector2(0.5f, 0.5f), anchoredPosition, sizeDelta);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(1f, 1f, 1f, 0.01f);
+        image.raycastTarget = true;
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
         return button;
     }
 

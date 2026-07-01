@@ -89,17 +89,17 @@ public class NetworkManager : MonoBehaviour
         UpdateGameStateOverlayText();
         UpdateGameplayButtons();
 
-        if (Input.GetKeyDown(KeyCode.R))
+        if (Input.GetKeyDown(KeyCode.R) && rollButton != null && rollButton.gameObject.activeInHierarchy && rollButton.interactable)
         {
             SendDiceRollRequest();
         }
 
-        if (Input.GetKeyDown(KeyCode.E))
+        if (Input.GetKeyDown(KeyCode.E) && endTurnButton != null && endTurnButton.interactable)
         {
             SendEndTurnRequest();
         }
 
-        if (Input.GetKeyDown(KeyCode.B))
+        if (Input.GetKeyDown(KeyCode.B) && buyButton != null && buyButton.gameObject.activeInHierarchy && buyButton.interactable)
         {
             SendBuyPropertyRequest();
         }
@@ -346,7 +346,7 @@ public class NetworkManager : MonoBehaviour
 
     private void UpdateGameplayButtons()
     {
-        if (rollButton == null || buyButton == null || endTurnButton == null)
+        if (rollButton == null || endTurnButton == null)
             return;
 
         GameStateData state = GameSession.CurrentState;
@@ -354,8 +354,13 @@ public class NetworkManager : MonoBehaviour
 
         if (state == null || localPlayer == null)
         {
+            rollButton.gameObject.SetActive(false);
             rollButton.interactable = false;
-            buyButton.interactable = false;
+            if (buyButton != null)
+            {
+                buyButton.gameObject.SetActive(false);
+                buyButton.interactable = false;
+            }
             endTurnButton.interactable = false;
             return;
         }
@@ -367,8 +372,16 @@ public class NetworkManager : MonoBehaviour
             !state.IsWaitingForPropertySale &&
             localPlayer.PlayerIndex == state.CurrentTurnPlayerIndex;
 
-        rollButton.interactable = isMyTurn && !state.HasRolledThisTurn;
-        buyButton.interactable = isMyTurn && state.HasRolledThisTurn && CanLocalPlayerBuyCurrentProperty(state, localPlayer);
+        bool canRoll = isMyTurn && !state.HasRolledThisTurn;
+        rollButton.gameObject.SetActive(canRoll);
+        rollButton.interactable = canRoll;
+
+        if (buyButton != null)
+        {
+            buyButton.gameObject.SetActive(false);
+            buyButton.interactable = false;
+        }
+
         endTurnButton.interactable = isMyTurn && state.HasRolledThisTurn;
     }
 
@@ -562,7 +575,7 @@ public class NetworkManager : MonoBehaviour
         Debug.Log("[NetworkManager] Đã gửi yêu cầu END_TURN bằng phím E.");
     }
 
-    private void SendBuyPropertyRequest()
+    public void SendBuyPropertyRequest()
     {
         var packet = new
         {
@@ -579,6 +592,26 @@ public class NetworkManager : MonoBehaviour
         lastClientActionStatus = "Sent: Buy";
         UpdateGameStateOverlayText();
         Debug.Log("[NetworkManager] Đã gửi yêu cầu BUY_PROPERTY bằng phím B.");
+    }
+
+    public void SendBuyoutPropertyRequest(int positionIndex)
+    {
+        var packet = new
+        {
+            Type = "BUYOUT_PROPERTY",
+            Payload = new
+            {
+                RoomId = GameSession.RoomId,
+                Username = PlayerSession.Instance?.Username,
+                PositionIndex = positionIndex
+            }
+        };
+
+        SendPacket(packet);
+        AudioManager.EnsureExists().PlaySfx("buy");
+        lastClientActionStatus = "Sent: Buyout";
+        UpdateGameStateOverlayText();
+        Debug.Log($"[NetworkManager] Sent BUYOUT_PROPERTY for position {positionIndex}.");
     }
 
     public void SendBuildPropertyRequest(int positionIndex)
@@ -998,6 +1031,7 @@ public class NetworkManager : MonoBehaviour
                         lastClientActionStatus = "";
                         UpdateGameStateOverlayText();
                         UpdateGameplayButtons();
+                        DiceVisualUI.EnsureExists().NotifyStateUpdate(gameState);
 
                         BoardTokenManager tokenManager = FindObjectOfType<BoardTokenManager>();
 
@@ -1060,7 +1094,7 @@ public class NetworkManager : MonoBehaviour
 
                         ChanceCardUI.EnsureExists()
                             .ShowCard(drawnByUsername, cardId, cardName, cardType, detailEffect);
-                        AudioManager.EnsureExists().PlaySfx("card");
+                        AudioManager.EnsureExists().PlaySfx(GetCardDrawSoundKey(cardType));
 
                         Debug.Log(
                             $"[NetworkManager] CARD_DRAWN By={drawnByUsername}, " +
@@ -1073,9 +1107,11 @@ public class NetworkManager : MonoBehaviour
                     {
                         GameOverData gameOver = data["Payload"]?.ToObject<GameOverData>();
                         GameOverReceived?.Invoke(gameOver);
-                        GameOverUI.EnsureExists().Show(gameOver);
-                        GameEventPopupUI.EnsureExists().ShowGameOver(gameOver);
-                        AudioManager.EnsureExists().PlaySfx("gameover");
+                        GameEventPopupUI.EnsureExists().ShowGameOver(
+                            gameOver,
+                            () => GameOverUI.EnsureExists().Show(gameOver)
+                        );
+                        AudioManager.EnsureExists().PlaySfx(IsLocalWinner(gameOver) ? "winning" : "gameover");
                         Debug.Log($"[NetworkManager] GAME_OVER MatchId={gameOver?.MatchId ?? "N/A"}");
                         break;
                     }
@@ -1147,6 +1183,43 @@ public class NetworkManager : MonoBehaviour
         {
             Debug.LogError($"[NetworkManager] Lỗi parse JSON: {ex.Message}\nNội dung: {serverMessage}");
         }
+    }
+
+    private string GetCardDrawSoundKey(string cardType)
+    {
+        string normalized = (cardType ?? "").Trim().ToLowerInvariant();
+
+        if (normalized.Contains("wood"))
+            return "woodcard";
+
+        return "goldencard";
+    }
+
+    private bool IsLocalWinner(GameOverData gameOver)
+    {
+        string localUsername = PlayerSession.Instance?.Username ?? "";
+
+        if (string.IsNullOrWhiteSpace(localUsername))
+            return false;
+
+        if (gameOver?.Rankings != null)
+        {
+            foreach (RankingEntryData entry in gameOver.Rankings)
+            {
+                if (entry == null || entry.Rank != 1)
+                    continue;
+
+                if (string.Equals(entry.DisplayName, localUsername, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(entry.UserId, localUsername, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        GameStateData state = GameSession.CurrentState;
+        return state != null &&
+            string.Equals(state.WinnerUsername, localUsername, StringComparison.OrdinalIgnoreCase);
     }
 
     // ============================================================
