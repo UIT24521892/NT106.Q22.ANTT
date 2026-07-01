@@ -410,9 +410,13 @@ namespace Monopoly.Server.GameLogic.Bots
 
                     if (targetPos >= 0)
                     {
-                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, pendingCode, targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
+                        List<string> actionMessages = new List<string>();
+                        List<CardDrawEvent> cardDrawEvents = new List<CardDrawEvent>();
+                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, pendingCode, targetPos, actionMessages, cardDrawEvents, out string err))
                         {
-                            // Success
+                            GameEngine.ClearPendingCardChoiceUnsafe(room.GameState);
+                            GameEngine.ResolveBankruptcyAndWinnerUnsafe(room.GameState, bot, actionMessages);
+                            room.GameState.LastActionMessage = string.Join(" ", actionMessages);
                             GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
                         }
                     }
