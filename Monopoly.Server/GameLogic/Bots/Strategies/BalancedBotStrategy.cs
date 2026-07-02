@@ -17,6 +17,15 @@ namespace Monopoly.Server.GameLogic.Bots.Strategies
             return bot.Money - property.BuyPrice > safeBuffer || completesColorSet || (blockOpponent && bot.Money - property.BuyPrice > 50000);
         }
 
+        public override bool ShouldBuyoutProperty(GameState gameState, GamePlayerState bot, GamePropertyState property, out bool completesColorSet)
+        {
+            completesColorSet = CheckCompletesColorSet(gameState, bot, property);
+            long buyoutCost = GameEngine.GetBuyoutCostUnsafe(property);
+            if (buyoutCost <= 0) return false;
+            
+            // Cân bằng: Mua nếu dư > 250,000. Nếu hoàn thành màu thì mua nếu dư > 100,000
+            return bot.Money - buyoutCost > 250000 || (completesColorSet && bot.Money - buyoutCost > 100000);
+        }
         public override bool ShouldBuildProperty(GameState gameState, GamePlayerState bot, GamePropertyState property)
         {
             long safeBuffer = 200000;

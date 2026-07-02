@@ -8,6 +8,7 @@ namespace Monopoly.Server.GameLogic.Bots.Strategies
     public abstract class BotStrategyBase : IBotStrategy
     {
         public abstract bool ShouldBuyProperty(GameState gameState, GamePlayerState bot, GamePropertyState property, out bool completesColorSet);
+        public abstract bool ShouldBuyoutProperty(GameState gameState, GamePlayerState bot, GamePropertyState property, out bool completesColorSet);
         public abstract bool ShouldBuildProperty(GameState gameState, GamePlayerState bot, GamePropertyState property);
 
         protected bool CheckCompletesColorSet(GameState gameState, GamePlayerState bot, GamePropertyState targetProp)
@@ -109,7 +110,7 @@ namespace Monopoly.Server.GameLogic.Bots.Strategies
 
         public virtual int SelectTargetForWorldTour(GameState gameState, GamePlayerState bot)
         {
-            var availableProps = gameState.Properties.Values.Where(p => p.OwnerPlayerIndex < 0 && (p.Type == "City" || p.Type == "Resort")).ToList();
+            var availableProps = gameState.Properties.Values.Where(p => p.OwnerPlayerIndex < 0 && (p.Type == "City")).ToList();
             if (availableProps.Count > 0 && bot.Money > 2000000)
             {
                 var target = availableProps.OrderByDescending(p => p.BuyPrice).FirstOrDefault(p => CheckCompletesColorSet(gameState, bot, p));
@@ -122,7 +123,7 @@ namespace Monopoly.Server.GameLogic.Bots.Strategies
         public virtual int SelectTargetForWorldChampionship(GameState gameState, GamePlayerState bot)
         {
             var myProps = gameState.Properties.Values
-                .Where(p => p.OwnerPlayerIndex == bot.PlayerIndex && (p.Type == "City" || p.Type == "Resort"))
+                .Where(p => p.OwnerPlayerIndex == bot.PlayerIndex && (p.Type == "City"))
                 .ToList();
             if (myProps.Count > 0)
             {
