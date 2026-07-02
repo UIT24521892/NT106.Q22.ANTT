@@ -1091,10 +1091,9 @@ namespace Monopoly.Server.GameLogic
             ApplySpecialSquareEffectUnsafe(gameState, player, targetPosition, actionMessages, cardDrawEvents);
 
             // Update movement state so visuals and logic know where they landed
-            // LastDiceTotal must be > 0 for client to animate the move
             gameState.LastDice1 = 0;
             gameState.LastDice2 = 0;
-            gameState.LastDiceTotal = 1;
+            gameState.LastDiceTotal = 0;
             gameState.LastMovedPlayerIndex = player.PlayerIndex;
             gameState.LastMoveFromPosition = oldPosition;
             gameState.LastMoveToPosition = targetPosition;
@@ -1553,7 +1552,7 @@ namespace Monopoly.Server.GameLogic
                 {
                     Username = player.Username,
                     IsBot = player.IsBot,
-                    Personality = player.IsBot ? (BotPersonality)ServerState.Random.Next(0, 3) : BotPersonality.Balanced,
+                    Personality = player.IsBot ? (player.Personality ?? (BotPersonality)ServerState.Random.Next(0, 3)) : BotPersonality.Balanced,
                     PlayerIndex = player.PlayerIndex,
                     Position = 0,
                     AvatarId = string.IsNullOrWhiteSpace(player.AvatarId) ? "avatar_1" : player.AvatarId,
