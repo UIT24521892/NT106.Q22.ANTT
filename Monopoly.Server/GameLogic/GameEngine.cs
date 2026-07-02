@@ -1403,7 +1403,7 @@ namespace Monopoly.Server.GameLogic
         }
         public static string BuildRankingSummaryUnsafe(GameState gameState)
         {
-            List<GamePlayerState> rankedPlayers = GetRankedHumanPlayersUnsafe(gameState);
+            List<GamePlayerState> rankedPlayers = GetRankedPlayersUnsafe(gameState);
 
             List<string> parts = new List<string>();
 
@@ -1416,13 +1416,17 @@ namespace Monopoly.Server.GameLogic
         }
         public static List<GameOverRankingResult> BuildGameOverRankingsUnsafe(GameState gameState)
         {
-            List<GamePlayerState> rankedPlayers = GetRankedHumanPlayersUnsafe(gameState);
+            List<GamePlayerState> rankedPlayers = GetRankedPlayersUnsafe(gameState);
 
             List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
 
             for (int i = 0; i < rankedPlayers.Count; i++)
             {
                 GamePlayerState player = rankedPlayers[i];
+                
+                // BO QUA BOT - Khong gui len Database
+                if (player.IsBot) continue;
+                
                 ClientConnection playerConnection = ServerState.Clients.Values
                     .FirstOrDefault(c => c.Username == player.Username);
 
@@ -1432,7 +1436,7 @@ namespace Monopoly.Server.GameLogic
                         ? player.Username
                         : playerConnection.Uid,
                     DisplayName = player.Username,
-                    Rank = i + 1,
+                    Rank = i + 1, // Xep hang goc cua nguoi choi trong tran dau (duoi bot se bi Rank 2,3...)
                     ScoreEarned = GetScoreForRank(i + 1),
                     IdToken = playerConnection?.IdToken ?? ""
                 });
@@ -1441,9 +1445,9 @@ namespace Monopoly.Server.GameLogic
             return rankings;
         }
 
-        private static List<GamePlayerState> GetRankedHumanPlayersUnsafe(GameState gameState)
+        private static List<GamePlayerState> GetRankedPlayersUnsafe(GameState gameState)
         {
-            IEnumerable<GamePlayerState> players = gameState.Players.Where(p => !p.IsBot);
+            IEnumerable<GamePlayerState> players = gameState.Players;
 
             if (gameState.EndReason == "TIMEOUT")
             {
@@ -1624,7 +1628,6 @@ namespace Monopoly.Server.GameLogic
                 return;
 
             List<GamePlayerState> ranked = gameState.Players
-                .Where(p => !p.IsBot)
                 .OrderByDescending(p => GetPlayerNetWorthUnsafe(gameState, p))
                 .ThenByDescending(p => p.Money)
                 .ThenBy(p => p.IsBankrupt ? 1 : 0)
