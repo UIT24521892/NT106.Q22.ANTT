@@ -9,6 +9,11 @@ using System.Linq;
 public class PlayerInfoLayerUI : MonoBehaviour
 {
     private const float RefreshInterval = 0.25f;
+    private static readonly Color PlayerNameColor = new Color(1f, 1f, 1f, 1f);
+    private static readonly Color PlayerDetailColor = new Color(0.88f, 0.96f, 1f, 1f);
+    private static readonly Color TurnTimerTrackColor = new Color(0f, 0f, 0f, 0.32f);
+    private static readonly Color TurnTimerFillColor = new Color(0.1f, 0.72f, 1f, 0.95f);
+    private static readonly Color TurnTimerDangerColor = new Color(0.95f, 0.18f, 0.12f, 0.95f);
 
     private readonly Dictionary<int, PlayerCard> cardsByPlayerIndex = new Dictionary<int, PlayerCard>();
 
@@ -213,6 +218,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
         SetStretch(badgeText.rectTransform, 100f, 68f, 6f, 4f);
 
         Image avatarImage = FindOrCreateAvatarImage(panelObject.transform);
+        CreateOrBindTurnTimerBar(panelObject.transform, true, out Image timerTrack, out Image timerFill);
 
         return new PlayerCard(
             panelObject,
@@ -222,6 +228,8 @@ public class PlayerInfoLayerUI : MonoBehaviour
             detailText,
             badgeText,
             avatarImage,
+            timerTrack,
+            timerFill,
             keepSceneLayout: true
         );
     }
@@ -372,6 +380,7 @@ public class PlayerInfoLayerUI : MonoBehaviour
         );
 
         Image avatarImage = FindOrCreateAvatarImage(cardObject.transform);
+        CreateOrBindTurnTimerBar(cardObject.transform, false, out Image timerTrack, out Image timerFill);
 
         PlayerCard card = new PlayerCard(
             cardObject,
@@ -381,6 +390,8 @@ public class PlayerInfoLayerUI : MonoBehaviour
             detailText,
             badgeText,
             avatarImage,
+            timerTrack,
+            timerFill,
             keepSceneLayout: false
         );
 
@@ -419,6 +430,56 @@ public class PlayerInfoLayerUI : MonoBehaviour
         text.overflowMode = TextOverflowModes.Ellipsis;
         text.raycastTarget = false;
         return text;
+    }
+
+    private void CreateOrBindTurnTimerBar(Transform parent, bool scenePanelLayout, out Image track, out Image fill)
+    {
+        Transform existingTrack = parent.Find("Img_TurnTimerTrack");
+
+        if (existingTrack == null)
+        {
+            GameObject trackObject = new GameObject("Img_TurnTimerTrack", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            trackObject.transform.SetParent(parent, false);
+            existingTrack = trackObject.transform;
+        }
+
+        track = existingTrack.GetComponent<Image>();
+        if (track == null)
+            track = existingTrack.gameObject.AddComponent<Image>();
+
+        track.color = TurnTimerTrackColor;
+        track.raycastTarget = false;
+
+        RectTransform trackRect = track.rectTransform;
+        if (scenePanelLayout)
+            SetStretch(trackRect, 100f, 72f, 8f, 2f);
+        else
+            SetStretch(trackRect, 14f, 70f, 10f, 2f);
+
+        Transform existingFill = existingTrack.Find("Img_TurnTimerFill");
+
+        if (existingFill == null)
+        {
+            GameObject fillObject = new GameObject("Img_TurnTimerFill", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            fillObject.transform.SetParent(existingTrack, false);
+            existingFill = fillObject.transform;
+        }
+
+        fill = existingFill.GetComponent<Image>();
+        if (fill == null)
+            fill = existingFill.gameObject.AddComponent<Image>();
+
+        fill.color = TurnTimerFillColor;
+        fill.raycastTarget = false;
+
+        RectTransform fillRect = fill.rectTransform;
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+        fillRect.pivot = new Vector2(0f, 0.5f);
+
+        track.gameObject.SetActive(false);
     }
 
     private void SetStretch(RectTransform rect, float left, float top, float right, float bottom)
@@ -510,6 +571,32 @@ public class PlayerInfoLayerUI : MonoBehaviour
         return $"${amount:N0}";
     }
 
+    private static int GetRemainingTurnSeconds(GameStateData state)
+    {
+        long remainingTicks = GetRemainingTurnTicks(state);
+        return Mathf.Max(0, Mathf.CeilToInt(remainingTicks / (float)TimeSpan.TicksPerSecond));
+    }
+
+    private static float GetTurnProgress(GameStateData state)
+    {
+        if (state == null || state.TurnDurationSeconds <= 0)
+            return 0f;
+
+        return Mathf.Clamp01(GetRemainingTurnTicks(state) / (float)(state.TurnDurationSeconds * TimeSpan.TicksPerSecond));
+    }
+
+    private static long GetRemainingTurnTicks(GameStateData state)
+    {
+        if (state == null || state.IsFinished || state.TurnEndsAtUtcTicks <= 0)
+            return 0;
+
+        long referenceTicks = state.IsPaused && state.PauseStartedAtUtcTicks > 0
+            ? state.PauseStartedAtUtcTicks
+            : NetworkManager.Instance != null ? NetworkManager.Instance.EstimatedServerNowTicks : DateTime.UtcNow.Ticks;
+
+        return Math.Max(0, state.TurnEndsAtUtcTicks - referenceTicks);
+    }
+
     private readonly struct CornerLayout
     {
         public readonly Vector2 AnchorMin;
@@ -536,6 +623,8 @@ public class PlayerInfoLayerUI : MonoBehaviour
         private readonly TextMeshProUGUI badgeText;
         private readonly bool keepSceneLayout;
         private readonly Image avatarImage;
+        private readonly Image timerTrack;
+        private readonly Image timerFill;
 
         public PlayerCard(
             GameObject root,
@@ -545,6 +634,8 @@ public class PlayerInfoLayerUI : MonoBehaviour
             TextMeshProUGUI detailText,
             TextMeshProUGUI badgeText,
             Image avatarImage,
+            Image timerTrack,
+            Image timerFill,
             bool keepSceneLayout)
         {
             Root = root;
@@ -555,6 +646,8 @@ public class PlayerInfoLayerUI : MonoBehaviour
             this.badgeText = badgeText;
             this.keepSceneLayout = keepSceneLayout;
             this.avatarImage = avatarImage;
+            this.timerTrack = timerTrack;
+            this.timerFill = timerFill;
         }
 
         public void SetCorner(CornerLayout layout)
@@ -582,13 +675,14 @@ public class PlayerInfoLayerUI : MonoBehaviour
 
             bool isCurrentTurn = player.PlayerIndex == state.CurrentTurnPlayerIndex && !state.IsFinished;
             string status = player.IsBankrupt ? "BANKRUPT" : player.IsConnected ? "ACTIVE" : "OFFLINE";
-            string badge = isCurrentTurn ? "TURN" : status;
+            int remainingTurnSeconds = PlayerInfoLayerUI.GetRemainingTurnSeconds(state);
+            string badge = isCurrentTurn ? $"{remainingTurnSeconds}s" : status;
 
             nameText.text = $"{(isLocal ? "You - " : "")}P{player.PlayerIndex + 1} {ShortName(player.Username)}";
             detailText.text = $"{FormatMoney(player.Money)} | Pos {player.Position} | Land {ownedCount}";
             badgeText.text = badge;
-            nameText.color = new Color(1f, 0.15f, 0.18f, 1f);
-            detailText.color = new Color(1f, 0.15f, 0.18f, 1f);
+            nameText.color = PlayerNameColor;
+            detailText.color = PlayerDetailColor;
 
             if (player.IsBankrupt)
             {
@@ -614,6 +708,28 @@ public class PlayerInfoLayerUI : MonoBehaviour
                     background.color = new Color(0f, 0f, 0f, 0.46f);
                 badgeText.color = new Color(0.62f, 0.9f, 1f, 1f);
             }
+
+            UpdateTurnTimerBar(isCurrentTurn, state);
+        }
+
+        private void UpdateTurnTimerBar(bool isCurrentTurn, GameStateData state)
+        {
+            if (timerTrack == null || timerFill == null)
+                return;
+
+            bool visible = isCurrentTurn && state != null && !state.IsPaused && state.TurnEndsAtUtcTicks > 0 && state.TurnDurationSeconds > 0;
+            timerTrack.gameObject.SetActive(visible);
+
+            if (!visible)
+                return;
+
+            float progress = PlayerInfoLayerUI.GetTurnProgress(state);
+            RectTransform fillRect = timerFill.rectTransform;
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = new Vector2(progress, 1f);
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            timerFill.color = progress <= 0.25f ? TurnTimerDangerColor : TurnTimerFillColor;
         }
     }
 }

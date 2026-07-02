@@ -91,15 +91,15 @@ namespace Monopoly.Shared.Models.Configs.StaticData
                 PositionIndex = 20, Name = "Cơ Hội", Type = "Chance", LineIndex = "3"
             }},
             { 21, new BoardSquareConfig {
-                PositionIndex = 21, Name = "Rome", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                PositionIndex = 21, Name = "Rome", Type = "City", ColorSet = "DarkBlue", LineIndex = "3",
                 BuyPrice = 260000, RentPrices = new List<long> { 22000, 110000, 330000, 800000, 1150000 }
             }},
             { 22, new BoardSquareConfig {
-                PositionIndex = 22, Name = "Milan", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                PositionIndex = 22, Name = "Milan", Type = "City", ColorSet = "DarkBlue", LineIndex = "3",
                 BuyPrice = 260000, RentPrices = new List<long> { 22000, 110000, 330000, 800000, 1150000 }
             }},
             { 23, new BoardSquareConfig {
-                PositionIndex = 23, Name = "Venice", Type = "City", ColorSet = "Purple", LineIndex = "3",
+                PositionIndex = 23, Name = "Venice", Type = "City", ColorSet = "DarkBlue", LineIndex = "3",
                 BuyPrice = 280000, RentPrices = new List<long> { 24000, 120000, 360000, 850000, 1200000 }
             }},
 
@@ -123,14 +123,14 @@ namespace Monopoly.Shared.Models.Configs.StaticData
                 BuyPrice = 200000, RentPrices = new List<long> { 50000 }
             }},
             { 29, new BoardSquareConfig {
-                PositionIndex = 29, Name = "Hà Nội", Type = "City", ColorSet = "Cyan", LineIndex = "4",
+                PositionIndex = 29, Name = "Hà Nội", Type = "City", ColorSet = "Red", LineIndex = "4",
                 BuyPrice = 350000, RentPrices = new List<long> { 35000, 175000, 500000, 1100000, 1500000 }
             }},
             { 30, new BoardSquareConfig {
                 PositionIndex = 30, Name = "Cơ quan Thuế", Type = "Tax", LineIndex = "4"
             }},
             { 31, new BoardSquareConfig {
-                PositionIndex = 31, Name = "Sài Gòn", Type = "City", ColorSet = "Cyan", LineIndex = "4",
+                PositionIndex = 31, Name = "Sài Gòn", Type = "City", ColorSet = "Red", LineIndex = "4",
                 BuyPrice = 400000, RentPrices = new List<long> { 50000, 200000, 600000, 1400000, 2000000 }
             }}
         };
