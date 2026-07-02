@@ -1828,6 +1828,10 @@ public class BoardTileInfoUI : MonoBehaviour
             case "blue":
                 color = new Color(0.26f, 0.58f, 1f, 1f);
                 return true;
+            case "darkblue":
+            case "dark blue":
+                color = new Color(0.02f, 0.2f, 0.58f, 1f);
+                return true;
             case "green":
                 color = new Color(0.26f, 0.88f, 0.45f, 1f);
                 return true;
@@ -1839,6 +1843,9 @@ public class BoardTileInfoUI : MonoBehaviour
                 return true;
             case "orange":
                 color = new Color(1f, 0.53f, 0.18f, 1f);
+                return true;
+            case "red":
+                color = new Color(0.92f, 0.08f, 0.08f, 1f);
                 return true;
             case "cyan":
                 color = new Color(0.16f, 0.86f, 0.95f, 1f);

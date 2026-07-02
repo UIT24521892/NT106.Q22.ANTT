@@ -22,7 +22,7 @@ namespace Monopoly.Server.Models.State
         public int LastFinalPosition { get; set; } = -1;
         public string LastActionMessage { get; set; } = "";
         public bool HasRolledThisTurn { get; set; }
-        public int TurnDurationSeconds { get; set; } = 45;
+        public int TurnDurationSeconds { get; set; } = Monopoly.Server.Program.TurnDurationSeconds;
         public long TurnEndsAtUtcTicks { get; set; }
         public long ServerUtcTicks { get; set; }
         public bool IsFinished { get; set; }

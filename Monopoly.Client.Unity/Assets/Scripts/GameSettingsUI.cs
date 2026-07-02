@@ -250,7 +250,7 @@ public class GameSettingsUI : MonoBehaviour
         SetRect(audioTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -122f), new Vector2(-76f, 32f));
 
         Image audioPanel = CreateImage(panel.transform, "Panel_Audio", Color.white);
-        SetRect(audioPanel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -157f), new Vector2(-76f, 220f));
+        SetRect(audioPanel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -157f), new Vector2(-76f, 260f));
 
         AudioManager audio = AudioManager.EnsureExists();
         CreateVolumeRow(audioPanel.transform, "Am luong tong", "Slider_Master", 44f, audio.MasterVolume, audio.SetMasterVolume);
@@ -258,17 +258,17 @@ public class GameSettingsUI : MonoBehaviour
         CreateVolumeRow(audioPanel.transform, "Hieu ung", "Slider_Sfx", 164f, audio.SfxVolume, audio.SetSfxVolume);
 
         Toggle mute = CreateToggle(audioPanel.transform, "Toggle_Mute", "Tat tat ca am thanh");
-        SetRect(mute.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(20f, 18f), new Vector2(250f, 38f));
+        SetRect(mute.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20f, -214f), new Vector2(300f, 38f));
         mute.isOn = audio.IsMuted;
         mute.onValueChanged.AddListener(audio.SetMuted);
 
         TextMeshProUGUI gameTitle = CreateText(panel.transform, "Txt_GameSection", "DIEU KHIEN TRAN DAU", 18f, FontStyles.Bold, Blue);
         gameTitle.alignment = TextAlignmentOptions.Left;
-        SetRect(gameTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -405f), new Vector2(-76f, 32f));
+        SetRect(gameTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -445f), new Vector2(-76f, 32f));
 
         pauseStatusText = CreateText(panel.transform, "Txt_PauseStatus", "Tran dau dang dien ra", 17f, FontStyles.Normal, MutedText);
         pauseStatusText.alignment = TextAlignmentOptions.Left;
-        SetRect(pauseStatusText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -444f), new Vector2(-76f, 34f));
+        SetRect(pauseStatusText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -484f), new Vector2(-76f, 34f));
 
         pauseButton = CreateButton(panel.transform, "Btn_Pause", "YEU CAU TAM DUNG", Blue, Color.white, 18f);
         SetRect(pauseButton.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(38f, 38f), new Vector2(330f, 54f));

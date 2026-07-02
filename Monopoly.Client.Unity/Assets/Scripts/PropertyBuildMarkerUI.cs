@@ -6,22 +6,28 @@ public class PropertyBuildMarkerUI : MonoBehaviour
 {
     private const float RefreshInterval = 0.25f;
     private const int BoardSquareCount = 32;
-    private const float MarkerDistanceFromTile = 46f;
-    private const float HouseWidth = 24f;
-    private const float HouseHeight = 30f;
-    private const float HouseStep = 25f;   // khoảng cách tâm giữa các căn khi xếp hàng ngang
+    private const float MarkerWidth = 150f;
+    private const float MarkerHeight = 86f;
+    private const float HouseWidth = 46f;
+    private const float HouseHeight = 52f;
+    private const float HouseStep = 42f;
     private const int MaxHouses = 3;
-    private const float HotelWidth = 78f;  // khách sạn: 1 toà dài, to ra
-    private const float HotelHeight = 46f;
+    private static readonly string[] BuildingColorKeysByOwner = { "red", "blue", "purple", "yellow" };
+    private const float HotelWidth = 122f;
+    private const float HotelHeight = 74f;
+    private const float ResortWidth = 118f;
+    private const float ResortHeight = 74f;
 
     private readonly Dictionary<int, MarkerGroup> markersByPosition = new Dictionary<int, MarkerGroup>();
     private RectTransform layerRoot;
     private RectTransform canvasRect;
     private float nextRefreshTime;
 
-    // Sprite nhà/khách sạn (tùy chọn). Nếu thiếu file -> fallback về thanh màu.
-    private Sprite houseSprite;
-    private Sprite hotelSprite;
+    private readonly Sprite[] houseSpritesByOwner = new Sprite[BuildingColorKeysByOwner.Length];
+    private readonly Sprite[] hotelSpritesByOwner = new Sprite[BuildingColorKeysByOwner.Length];
+    private Sprite fallbackHouseSprite;
+    private Sprite fallbackHotelSprite;
+    private Sprite resortSprite;
 
     public static PropertyBuildMarkerUI EnsureExists()
     {
@@ -36,16 +42,28 @@ public class PropertyBuildMarkerUI : MonoBehaviour
 
     private void Start()
     {
-        houseSprite = Resources.Load<Sprite>("UI/house");
-        if (houseSprite == null)
-            houseSprite = CreateHouseSprite();
-
-        hotelSprite = Resources.Load<Sprite>("UI/hotel");
-        if (hotelSprite == null)
-            hotelSprite = CreateHotelSprite();
+        LoadBuildingSprites();
 
         BuildLayer();
         Refresh();
+    }
+
+    private void LoadBuildingSprites()
+    {
+        fallbackHouseSprite = Resources.Load<Sprite>("UI/house") ?? CreateHouseSprite();
+        fallbackHotelSprite = Resources.Load<Sprite>("UI/hotel") ?? CreateHotelSprite();
+        resortSprite = Resources.Load<Sprite>("house/resort") ?? fallbackHotelSprite;
+
+        for (int i = 0; i < BuildingColorKeysByOwner.Length; i++)
+        {
+            string colorKey = BuildingColorKeysByOwner[i];
+            houseSpritesByOwner[i] =
+                Resources.Load<Sprite>($"house/house-{colorKey}-cutout") ??
+                Resources.Load<Sprite>($"house/house-{colorKey}");
+            hotelSpritesByOwner[i] =
+                Resources.Load<Sprite>($"house/hotel-{colorKey}-cutout") ??
+                Resources.Load<Sprite>($"house/hotel-{colorKey}");
+        }
     }
 
     private void Update()
@@ -106,7 +124,15 @@ public class PropertyBuildMarkerUI : MonoBehaviour
 
             activePositions.Add(property.PositionIndex);
             MarkerGroup marker = GetOrCreateMarker(property.PositionIndex);
-            marker.SetState(property, GetMarkerPosition(tilePosition), GetPlayerColor(property.OwnerPlayerIndex));
+            marker.SetState(
+                property,
+                tilePosition,
+                GetPlayerColor(property.OwnerPlayerIndex),
+                GetHouseSprite(property.OwnerPlayerIndex),
+                GetHotelSprite(property.OwnerPlayerIndex),
+                resortSprite,
+                ShouldTintHouse(property.OwnerPlayerIndex),
+                ShouldTintHotel(property.OwnerPlayerIndex));
         }
 
         foreach (KeyValuePair<int, MarkerGroup> pair in markersByPosition)
@@ -120,42 +146,15 @@ public class PropertyBuildMarkerUI : MonoBehaviour
         if (property == null ||
             property.PositionIndex < 0 ||
             property.PositionIndex >= BoardSquareCount ||
-            property.OwnerPlayerIndex < 0 ||
-            property.Type != "City")
+            property.OwnerPlayerIndex < 0)
         {
             return false;
         }
 
-        return property.HasHotel || property.HouseCount > 0;
-    }
+        if (property.Type == "Resort")
+            return true;
 
-    private Vector2 GetMarkerPosition(Vector2 tilePosition)
-    {
-        Vector2 boardCenter = EstimateBoardCenter();
-        Vector2 direction = tilePosition - boardCenter;
-
-        if (direction.sqrMagnitude < 0.01f)
-            direction = Vector2.up;
-
-        direction.Normalize();
-        return tilePosition + direction * MarkerDistanceFromTile;
-    }
-
-    private Vector2 EstimateBoardCenter()
-    {
-        Vector2 total = Vector2.zero;
-        int count = 0;
-
-        for (int i = 0; i < BoardSquareCount; i++)
-        {
-            if (TryGetBoardPointLocalPosition(i, out Vector2 position))
-            {
-                total += position;
-                count++;
-            }
-        }
-
-        return count == 0 ? Vector2.zero : total / count;
+        return property.Type == "City" && (property.HasHotel || property.HouseCount > 0);
     }
 
     private bool TryGetBoardPointLocalPosition(int positionIndex, out Vector2 localPosition)
@@ -220,7 +219,7 @@ public class PropertyBuildMarkerUI : MonoBehaviour
         rootRect.anchorMin = new Vector2(0.5f, 0.5f);
         rootRect.anchorMax = new Vector2(0.5f, 0.5f);
         rootRect.pivot = new Vector2(0.5f, 0.5f);
-        rootRect.sizeDelta = new Vector2(90f, 60f);
+        rootRect.sizeDelta = new Vector2(MarkerWidth, MarkerHeight);
 
         // 1..3 ngôi nhà xếp hàng ngang theo số lượng; khách sạn = 1 toà dài thay cho cụm nhà.
         List<Image> houseImages = new List<Image>();
@@ -238,7 +237,6 @@ public class PropertyBuildMarkerUI : MonoBehaviour
             Image houseImage = houseObject.GetComponent<Image>();
             houseImage.raycastTarget = false;
             houseImage.preserveAspect = true;
-            houseImage.sprite = houseSprite;
             houseImages.Add(houseImage);
         }
 
@@ -254,9 +252,21 @@ public class PropertyBuildMarkerUI : MonoBehaviour
         Image hotelImage = hotelObject.GetComponent<Image>();
         hotelImage.raycastTarget = false;
         hotelImage.preserveAspect = true;
-        hotelImage.sprite = hotelSprite;
 
-        MarkerGroup marker = new MarkerGroup(rootObject, rootRect, houseImages, hotelImage);
+        GameObject resortObject = new GameObject("Resort", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform resortRect = resortObject.GetComponent<RectTransform>();
+        resortRect.SetParent(rootRect, false);
+        resortRect.anchorMin = new Vector2(0.5f, 0.5f);
+        resortRect.anchorMax = new Vector2(0.5f, 0.5f);
+        resortRect.pivot = new Vector2(0.5f, 0.5f);
+        resortRect.anchoredPosition = Vector2.zero;
+        resortRect.sizeDelta = new Vector2(ResortWidth, ResortHeight);
+
+        Image resortImage = resortObject.GetComponent<Image>();
+        resortImage.raycastTarget = false;
+        resortImage.preserveAspect = true;
+
+        MarkerGroup marker = new MarkerGroup(rootObject, rootRect, houseImages, hotelImage, resortImage);
         markersByPosition[positionIndex] = marker;
         return marker;
     }
@@ -278,12 +288,43 @@ public class PropertyBuildMarkerUI : MonoBehaviour
             case 1:
                 return new Color(0.1f, 0.35f, 1f, 0.95f);
             case 2:
-                return new Color(0.1f, 0.75f, 0.25f, 0.95f);
+                return new Color(0.62f, 0.2f, 0.9f, 0.95f);
             case 3:
                 return new Color(1f, 0.75f, 0.08f, 0.95f);
             default:
                 return new Color(1f, 1f, 1f, 0.95f);
         }
+    }
+
+    private Sprite GetHouseSprite(int ownerPlayerIndex)
+    {
+        if (IsKnownOwnerIndex(ownerPlayerIndex) && houseSpritesByOwner[ownerPlayerIndex] != null)
+            return houseSpritesByOwner[ownerPlayerIndex];
+
+        return fallbackHouseSprite;
+    }
+
+    private Sprite GetHotelSprite(int ownerPlayerIndex)
+    {
+        if (IsKnownOwnerIndex(ownerPlayerIndex) && hotelSpritesByOwner[ownerPlayerIndex] != null)
+            return hotelSpritesByOwner[ownerPlayerIndex];
+
+        return fallbackHotelSprite;
+    }
+
+    private bool ShouldTintHouse(int ownerPlayerIndex)
+    {
+        return !IsKnownOwnerIndex(ownerPlayerIndex) || houseSpritesByOwner[ownerPlayerIndex] == null;
+    }
+
+    private bool ShouldTintHotel(int ownerPlayerIndex)
+    {
+        return !IsKnownOwnerIndex(ownerPlayerIndex) || hotelSpritesByOwner[ownerPlayerIndex] == null;
+    }
+
+    private bool IsKnownOwnerIndex(int ownerPlayerIndex)
+    {
+        return ownerPlayerIndex >= 0 && ownerPlayerIndex < BuildingColorKeysByOwner.Length;
     }
 
     // Vẽ một ngôi nhà (thân vuông + mái tam giác) bằng code; trắng/xám để Image.color tô theo chủ.
@@ -405,24 +446,50 @@ public class PropertyBuildMarkerUI : MonoBehaviour
         private readonly RectTransform rootRect;
         private readonly List<Image> houseImages;
         private readonly Image hotelImage;
+        private readonly Image resortImage;
 
-        public MarkerGroup(GameObject root, RectTransform rootRect, List<Image> houseImages, Image hotelImage)
+        public MarkerGroup(GameObject root, RectTransform rootRect, List<Image> houseImages, Image hotelImage, Image resortImage)
         {
             Root = root;
             this.rootRect = rootRect;
             this.houseImages = houseImages;
             this.hotelImage = hotelImage;
+            this.resortImage = resortImage;
         }
 
-        public void SetState(GamePropertyStateData property, Vector2 position, Color color)
+        public void SetState(
+            GamePropertyStateData property,
+            Vector2 position,
+            Color color,
+            Sprite houseSprite,
+            Sprite hotelSprite,
+            Sprite resortSprite,
+            bool tintHouse,
+            bool tintHotel)
         {
             Root.SetActive(true);
             rootRect.anchoredPosition = position;
 
+            if (property.Type == "Resort")
+            {
+                resortImage.sprite = resortSprite;
+                resortImage.color = Color.white;
+                resortImage.gameObject.SetActive(true);
+                hotelImage.gameObject.SetActive(false);
+
+                foreach (Image house in houseImages)
+                    house.gameObject.SetActive(false);
+
+                return;
+            }
+
+            resortImage.gameObject.SetActive(false);
+
             if (property.HasHotel)
             {
+                hotelImage.sprite = hotelSprite;
                 hotelImage.gameObject.SetActive(true);
-                hotelImage.color = new Color(0.85f, 0.12f, 0.12f, 1f); // khách sạn: đỏ
+                hotelImage.color = tintHotel ? color : Color.white;
 
                 foreach (Image house in houseImages)
                     house.gameObject.SetActive(false);
@@ -443,8 +510,8 @@ public class PropertyBuildMarkerUI : MonoBehaviour
                 if (!show)
                     continue;
 
-                house.color = color;
-                // Căn giữa cụm: 1 căn ở giữa, 2/3 căn xếp đối xứng quanh tâm.
+                house.sprite = houseSprite;
+                house.color = tintHouse ? color : Color.white;
                 house.rectTransform.anchoredPosition = new Vector2((i - (houseCount - 1) * 0.5f) * HouseStep, 0f);
             }
         }

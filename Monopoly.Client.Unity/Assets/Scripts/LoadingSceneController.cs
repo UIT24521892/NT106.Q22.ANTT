@@ -97,12 +97,16 @@ public class LoadingSceneController : MonoBehaviour
         background.preserveAspect = false;
         SetStretch(background.rectTransform, 0f, 0f, 0f, 0f);
 
-        TextMeshProUGUI title = CreateText(canvas.transform, "Txt_LoadingTitle", "MONOPOLY", 96f, FontStyles.Bold, new Color(1f, 0.78f, 0.18f, 1f));
-        title.alignment = TextAlignmentOptions.Center;
-        title.characterSpacing = 8f;
-        title.outlineWidth = 0.24f;
-        title.outlineColor = new Color(0.06f, 0.09f, 0.12f, 0.9f);
-        SetRect(title.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -178f), new Vector2(-120f, 118f));
+        TextMeshProUGUI titleShadow = CreateText(canvas.transform, "Txt_LoadingTitleShadow", "MONOPOLY", 112f, FontStyles.Bold, new Color(0.04f, 0.16f, 0.28f, 0.72f));
+        ConfigureTitleText(titleShadow);
+        titleShadow.outlineWidth = 0f;
+        SetRect(titleShadow.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(7f, -185f), new Vector2(-70f, 140f));
+
+        TextMeshProUGUI title = CreateText(canvas.transform, "Txt_LoadingTitle", "MONOPOLY", 112f, FontStyles.Bold, new Color(1f, 0.66f, 0.02f, 1f));
+        ConfigureTitleText(title);
+        title.outlineWidth = 0.16f;
+        title.outlineColor = new Color(0.05f, 0.18f, 0.3f, 1f);
+        SetRect(title.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -188f), new Vector2(-70f, 140f));
 
         statusText = CreateText(canvas.transform, "Txt_LoadingStatus", "LOADING . . . . . . .", 31f, FontStyles.Bold, Color.white);
         statusText.alignment = TextAlignmentOptions.Left;
@@ -165,6 +169,18 @@ public class LoadingSceneController : MonoBehaviour
         text.color = color;
         text.raycastTarget = false;
         return text;
+    }
+
+    private void ConfigureTitleText(TextMeshProUGUI text)
+    {
+        text.font = RuntimeFontManager.Font;
+        text.alignment = TextAlignmentOptions.Center;
+        text.characterSpacing = 7f;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 82f;
+        text.fontSizeMax = 112f;
+        text.enableWordWrapping = false;
+        text.overflowMode = TextOverflowModes.Ellipsis;
     }
 
     private Sprite LoadResourceSprite(string resourceKey)

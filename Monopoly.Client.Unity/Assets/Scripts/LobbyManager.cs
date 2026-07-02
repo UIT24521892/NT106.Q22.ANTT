@@ -16,6 +16,11 @@ using System.IO;
 
 public class LobbyManager : MonoBehaviour
 {
+    private static readonly Color RoomSliderTrackColor = new Color(0.12f, 0.18f, 0.24f, 0.95f);
+    private static readonly Color RoomSliderFillColor = new Color(0.25f, 0.95f, 0.24f, 1f);
+    private static readonly Color RoomSliderHandleColor = new Color(1f, 0.72f, 0.2f, 1f);
+    private static readonly Color RoomSliderHandleOutlineColor = new Color(0.42f, 0.2f, 0.04f, 1f);
+
     // ──────────────────────────────────────────────────────────
     // SECTION 1: REFERENCES ĐẾN CÁC PANEL CHÍNH
     // ──────────────────────────────────────────────────────────
@@ -136,6 +141,7 @@ public class LobbyManager : MonoBehaviour
     {
         if (sliderMaxPlayers != null)
         {
+            StyleRoomSlider(sliderMaxPlayers);
             sliderMaxPlayers.minValue = 2;
             sliderMaxPlayers.maxValue = 4;
             sliderMaxPlayers.wholeNumbers = true;
@@ -148,6 +154,7 @@ public class LobbyManager : MonoBehaviour
 
         if (sliderBotCount != null)
         {
+            StyleRoomSlider(sliderBotCount);
             sliderBotCount.minValue = 0;
             sliderBotCount.maxValue = 3;
             sliderBotCount.wholeNumbers = true;
@@ -270,7 +277,7 @@ public class LobbyManager : MonoBehaviour
         root.transform.SetParent(parent, false);
         Slider slider = root.GetComponent<Slider>();
 
-        Image background = CreateRuntimeImage(root.transform, "Background", new Color(0.72f, 0.76f, 0.79f, 1f));
+        Image background = CreateRuntimeImage(root.transform, "Background", RoomSliderTrackColor);
         SetRuntimeRect(background.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(0f, 8f));
 
         RectTransform fillArea = new GameObject("Fill Area", typeof(RectTransform)).GetComponent<RectTransform>();
@@ -280,7 +287,7 @@ public class LobbyManager : MonoBehaviour
         fillArea.offsetMin = new Vector2(8f, 10f);
         fillArea.offsetMax = new Vector2(-8f, -10f);
 
-        Image fill = CreateRuntimeImage(fillArea, "Fill", new Color(0.08f, 0.48f, 0.76f, 1f));
+        Image fill = CreateRuntimeImage(fillArea, "Fill", RoomSliderFillColor);
         fill.rectTransform.anchorMin = Vector2.zero;
         fill.rectTransform.anchorMax = Vector2.one;
         fill.rectTransform.offsetMin = Vector2.zero;
@@ -293,13 +300,59 @@ public class LobbyManager : MonoBehaviour
         handleArea.offsetMin = new Vector2(12f, 0f);
         handleArea.offsetMax = new Vector2(-12f, 0f);
 
-        Image handle = CreateRuntimeImage(handleArea, "Handle", new Color(0.04f, 0.22f, 0.34f, 1f));
+        Image handle = CreateRuntimeImage(handleArea, "Handle", RoomSliderHandleColor);
         SetRuntimeRect(handle.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(26f, 26f));
+        AddSliderHandleOutline(handle);
 
         slider.fillRect = fill.rectTransform;
         slider.handleRect = handle.rectTransform;
         slider.targetGraphic = handle;
+        StyleRoomSlider(slider);
         return slider;
+    }
+
+    private void StyleRoomSlider(Slider slider)
+    {
+        if (slider == null)
+            return;
+
+        Image[] images = slider.GetComponentsInChildren<Image>(true);
+
+        for (int i = 0; i < images.Length; i++)
+        {
+            Image image = images[i];
+            if (image == null)
+                continue;
+
+            string imageName = image.gameObject.name.ToLowerInvariant();
+
+            if (image.rectTransform == slider.fillRect || imageName.Contains("fill"))
+            {
+                image.color = RoomSliderFillColor;
+            }
+            else if (image.rectTransform == slider.handleRect || imageName.Contains("handle"))
+            {
+                image.color = RoomSliderHandleColor;
+                AddSliderHandleOutline(image);
+            }
+            else if (imageName.Contains("background"))
+            {
+                image.color = RoomSliderTrackColor;
+            }
+        }
+    }
+
+    private void AddSliderHandleOutline(Image handle)
+    {
+        if (handle == null)
+            return;
+
+        Outline outline = handle.GetComponent<Outline>();
+        if (outline == null)
+            outline = handle.gameObject.AddComponent<Outline>();
+
+        outline.effectColor = RoomSliderHandleOutlineColor;
+        outline.effectDistance = new Vector2(2f, -2f);
     }
 
     private Image CreateRuntimeImage(Transform parent, string name, Color color)

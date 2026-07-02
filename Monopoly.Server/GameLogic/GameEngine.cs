@@ -20,9 +20,10 @@ namespace Monopoly.Server.GameLogic
         {
             if (gameState.IsPaused)
                 return;
-            gameState.TurnDurationSeconds = 45;
-            gameState.TurnEndsAtUtcTicks = DateTime.UtcNow.AddSeconds(45).Ticks;
-            gameState.ServerUtcTicks = DateTime.UtcNow.Ticks;
+            DateTime now = DateTime.UtcNow;
+            gameState.TurnDurationSeconds = Monopoly.Server.Program.TurnDurationSeconds;
+            gameState.TurnEndsAtUtcTicks = now.AddSeconds(gameState.TurnDurationSeconds).Ticks;
+            gameState.ServerUtcTicks = now.Ticks;
         }
         public static void ApplySpecialSquareEffectUnsafe(
                 GameState gameState,
@@ -1524,7 +1525,7 @@ namespace Monopoly.Server.GameLogic
                 LastMoveFromPosition = -1,
                 LastMoveToPosition = -1,
                 LastFinalPosition = -1,
-                TurnDurationSeconds = 45,
+                TurnDurationSeconds = Monopoly.Server.Program.TurnDurationSeconds,
                 IsFinished = false,
                 WinnerUsername = "",
                 MatchId = Guid.NewGuid().ToString("N"),

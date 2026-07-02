@@ -11,7 +11,7 @@ namespace Monopoly.Server
 {
     class Program
     {
-        public const int TurnDurationSeconds = 45;
+        public const int TurnDurationSeconds = 25;
 
         static async Task Main(string[] args)
         {
