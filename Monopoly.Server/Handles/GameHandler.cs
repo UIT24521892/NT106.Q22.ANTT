@@ -59,7 +59,10 @@ namespace Monopoly.Server.Handles
                 {
                     List<string> actionMessages = new List<string>();
                     bool grantExtraRoll = false;
-                    GamePlayerState player = room.GameState.Players.FirstOrDefault(
+                    room.GameState.LastDice1 = 0;
+                        room.GameState.LastDice2 = 0;
+                        room.GameState.LastDiceTotal = 0;
+                        GamePlayerState player = room.GameState.Players.FirstOrDefault(
                         p => p.Username == connection.Username && !p.IsBot && p.IsConnected
                     );
 
@@ -179,7 +182,7 @@ namespace Monopoly.Server.Handles
 
                     if (string.IsNullOrWhiteSpace(failMessage))
                     {
-                        room.GameState.HasRolledThisTurn = !grantExtraRoll;
+                        room.GameState.HasRolledThisTurn = true;
                         GameEngine.ResolveBankruptcyAndWinnerUnsafe(room.GameState, player, actionMessages);
                         room.GameState.LastActionMessage = string.Join(" ", actionMessages);
                         GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
@@ -240,7 +243,10 @@ namespace Monopoly.Server.Handles
                 }
                 else
                 {
-                    GamePlayerState player = room.GameState.Players.FirstOrDefault(
+                    room.GameState.LastDice1 = 0;
+                        room.GameState.LastDice2 = 0;
+                        room.GameState.LastDiceTotal = 0;
+                        GamePlayerState player = room.GameState.Players.FirstOrDefault(
                         p => p.Username == connection.Username && !p.IsBot && p.IsConnected
                     );
 
@@ -258,21 +264,38 @@ namespace Monopoly.Server.Handles
                     }
                     else
                     {
-                        GameEngine.StartNextTurnUnsafe(room.GameState, out GamePlayerState? nextPlayer);
+                        if (player.ConsecutiveDoubles > 0 && !player.IsOnIsland && player.JailTurnsLeft <= 0)
+                        {
+                            room.GameState.HasRolledThisTurn = false;
+                            room.GameState.LastDice1 = 0;
+                            room.GameState.LastDice2 = 0;
+                            room.GameState.LastDiceTotal = 0;
+                            GameEngine.ResetTurnTimerUnsafe(room.GameState);
+                            room.GameState.LastActionMessage = $"{player.Username} đổ xúc xắc đôi, được phép đổ thêm lần nữa!";
+                            GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                            broadcastMessage = room.GameState.LastActionMessage;
+                            shouldBroadcast = true;
+                        }
+                        else
+                        {
+                            room.GameState.LastDice1 = 0;
+                            room.GameState.LastDice2 = 0;
+                            room.GameState.LastDiceTotal = 0;
+                            GameEngine.StartNextTurnUnsafe(room.GameState, out GamePlayerState? nextPlayer);
 
-                        GameEngine.ResetTurnTimerUnsafe(room.GameState);
-                        string nextUsername = nextPlayer?.Username ?? "Người chơi";
-                        room.GameState.LastActionMessage =
-                            $"{player.Username} kết thúc lượt. Đến lượt {nextUsername}.";
-                        GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                            GameEngine.ResetTurnTimerUnsafe(room.GameState);
+                            string nextUsername = nextPlayer?.Username ?? "Người chơi";
+                            room.GameState.LastActionMessage = $"{player.Username} kết thúc lượt. Đến lượt {nextUsername}.";
+                            GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
 
-                        broadcastMessage = room.GameState.LastActionMessage;
-                        shouldBroadcast = true;
+                            broadcastMessage = room.GameState.LastActionMessage;
+                            shouldBroadcast = true;
 
-                        Console.WriteLine(
-                            $"[END_TURN] Room={roomId}, From={player.Username}, " +
-                            $"Next={nextUsername}, Turn={room.GameState.TurnNumber}"
-                        );
+                            Console.WriteLine(
+                                $"[END_TURN] Room={roomId}, From={player.Username}, " +
+                                $"Next={nextUsername}, Turn={room.GameState.TurnNumber}"
+                            );
+                        }
                     }
                 }
             }
@@ -321,7 +344,10 @@ namespace Monopoly.Server.Handles
                 }
                 else
                 {
-                    GamePlayerState player = room.GameState.Players.FirstOrDefault(
+                    room.GameState.LastDice1 = 0;
+                        room.GameState.LastDice2 = 0;
+                        room.GameState.LastDiceTotal = 0;
+                        GamePlayerState player = room.GameState.Players.FirstOrDefault(
                         p => p.Username == connection.Username && !p.IsBot && p.IsConnected && !p.IsBankrupt
                     );
 
@@ -402,7 +428,10 @@ namespace Monopoly.Server.Handles
                 }
                 else
                 {
-                    GamePlayerState player = room.GameState.Players.FirstOrDefault(
+                    room.GameState.LastDice1 = 0;
+                        room.GameState.LastDice2 = 0;
+                        room.GameState.LastDiceTotal = 0;
+                        GamePlayerState player = room.GameState.Players.FirstOrDefault(
                         p => p.Username == connection.Username && !p.IsBot && p.IsConnected && !p.IsBankrupt
                     );
 

@@ -104,6 +104,20 @@ namespace Monopoly.Server.GameLogic.Bots
                 }
 
 
+                if (bot.HasMoveChampionshipCard)
+                {
+                    int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "MOVE_CHAMPIONSHIP");
+                    if (targetPos >= 0)
+                    {
+                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "MOVE_CHAMPIONSHIP", targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
+                        {
+                            string msg = $"{bot.Username} đã dùng thẻ Đăng Cai để chuyển Giải Vô Địch về ô {targetPos}.";
+                            GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                            room.GameState.LastActionMessage = msg;
+                        }
+                    }
+                }
+
                 if (bot.HasFlightCard)
                 {
                     int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "FLIGHT");
@@ -256,6 +270,20 @@ namespace Monopoly.Server.GameLogic.Bots
                                 {
                                     // Use free upgrade card if we have it
                     
+                if (bot.HasMoveChampionshipCard)
+                {
+                    int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "MOVE_CHAMPIONSHIP");
+                    if (targetPos >= 0)
+                    {
+                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "MOVE_CHAMPIONSHIP", targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
+                        {
+                            string msg = $"{bot.Username} đã dùng thẻ Đăng Cai để chuyển Giải Vô Địch về ô {targetPos}.";
+                            GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                            room.GameState.LastActionMessage = msg;
+                        }
+                    }
+                }
+
                 if (bot.HasFlightCard)
                 {
                     int targetPos = strategy.SelectTargetForPositiveCard(room.GameState, bot, "FLIGHT");
@@ -292,19 +320,27 @@ namespace Monopoly.Server.GameLogic.Bots
                             {
                                 // We are on someone else's property. We might owe rent.
                                 // The MovePlayerByDiceUnsafe already deducted rent! 
-                                // Wait, the rent was already deducted during move. If we had FreeRentCard, we should have used it.
-                                // Actually, rent is deducted during HandleBankruptcy or inside MovePlayerByDiceUnsafe if they have enough money.
-                                // We can't retroactively apply free rent easily here if rent was already deducted.
-                                // To fix this properly without refactoring GameEngine entirely, we can just assume if we are here and we HAVE FreeRentCard, we use it to get a refund or similar.
-                                // Or we just use it if we are on an opponent's property.
                                 if (bot.HasFreeRentCard)
                                 {
-                                    // TryApplyHeldCardEffectUnsafe will process the card.
                                     if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, "FREE_RENT", null, new List<string>(), new List<CardDrawEvent>(), out string err))
                                     {
                                         string msg = $"{bot.Username} đã dùng thẻ Miễn Tiền Thuê.";
                                         GameEngine.AddGameLogUnsafe(room.GameState, msg);
                                         room.GameState.LastActionMessage = msg;
+                                    }
+                                }
+
+                                // BUYOUT LOGIC
+                                if (property.Type == "City" || property.Type == "Resort")
+                                {
+                                    if (strategy.ShouldBuyoutProperty(room.GameState, bot, property, out bool completesColorSet))
+                                    {
+                                        if (GameEngine.TryBuyoutPropertyUnsafe(room.GameState, bot, property, out long buyoutCost, out string err))
+                                        {
+                                            string msg = $"{bot.Username} đã chi {buyoutCost:N0} để mua lại {property.Name}!";
+                                            GameEngine.AddGameLogUnsafe(room.GameState, msg);
+                                            room.GameState.LastActionMessage = msg;
+                                        }
                                     }
                                 }
                             }
@@ -382,10 +418,18 @@ namespace Monopoly.Server.GameLogic.Bots
 
                     if (targetPos >= 0)
                     {
-                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, pendingCode, targetPos, new List<string>(), new List<CardDrawEvent>(), out string err))
+                        List<string> actionMessages = new List<string>();
+                        List<CardDrawEvent> cardDrawEvents = new List<CardDrawEvent>();
+                        if (GameEngine.TryApplyHeldCardEffectUnsafe(room.GameState, bot, pendingCode, targetPos, actionMessages, cardDrawEvents, out string err))
                         {
-                            // Success
+                            GameEngine.ClearPendingCardChoiceUnsafe(room.GameState);
+                            GameEngine.ResolveBankruptcyAndWinnerUnsafe(room.GameState, bot, actionMessages);
+                            room.GameState.LastActionMessage = string.Join(" ", actionMessages);
                             GameEngine.AddGameLogUnsafe(room.GameState, room.GameState.LastActionMessage);
+                        }
+                        else
+                        {
+                            GameEngine.ClearPendingCardChoiceUnsafe(room.GameState);
                         }
                     }
                     else 

@@ -66,7 +66,7 @@ namespace Monopoly.Server.GameLogic
                     isChampionshipPosition = false;
 
                     bool hasCity = gameState.Properties.Values.Any(p => p.Type == "City" && p.OwnerPlayerIndex == player.PlayerIndex);
-                    if (hasCity && !player.IsBot)
+                    if (hasCity)
                     {
                         gameState.IsWaitingForCardChoice = true;
                         gameState.PendingCardEffectCode = "WORLD_CHAMPIONSHIP_HOST";
@@ -77,20 +77,11 @@ namespace Monopoly.Server.GameLogic
                     break;
 
                 case "WorldTour":
-                    if (!player.IsBot)
-                    {
-                        gameState.IsWaitingForCardChoice = true;
-                        gameState.PendingCardEffectCode = "WORLD_TOUR";
-                        gameState.PendingCardPlayerUsername = player.Username;
-                        gameState.PendingCardTargetPositions = BuildCardTargetPositionsUnsafe(gameState, player, "WORLD_TOUR");
-                        actionMessages.Add($"{player.Username} đang chọn điểm đến Du Lịch Thế Giới.");
-                    }
-                    else
-                    {
-                        player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
-                        player.SkipReason = "WORLD_TOUR";
-                        actionMessages.Add($"{player.Username} đến Du Lịch Thế Giới và đợi đi tiếp.");
-                    }
+                    gameState.IsWaitingForCardChoice = true;
+                    gameState.PendingCardEffectCode = "WORLD_TOUR";
+                    gameState.PendingCardPlayerUsername = player.Username;
+                    gameState.PendingCardTargetPositions = BuildCardTargetPositionsUnsafe(gameState, player, "WORLD_TOUR");
+                    actionMessages.Add($"{player.Username} đang chọn điểm đến Du Lịch Thế Giới.");
                     break;
             }
 
@@ -542,9 +533,11 @@ namespace Monopoly.Server.GameLogic
 
                 case "GO_TO_WORLD_TOUR":
                     player.Position = 8;
-                    player.SkipTurnsLeft = Math.Max(player.SkipTurnsLeft, 1);
-                    player.SkipReason = "WORLD_TOUR";
-                    actionMessages.Add("Bay đến Du Lịch Thế Giới và chờ cất cánh lượt sau.");
+                    gameState.IsWaitingForCardChoice = true;
+                    gameState.PendingCardEffectCode = "WORLD_TOUR";
+                    gameState.PendingCardPlayerUsername = player.Username;
+                    gameState.PendingCardTargetPositions = BuildCardTargetPositionsUnsafe(gameState, player, "WORLD_TOUR");
+                    actionMessages.Add("Được bay thẳng đến Du Lịch Thế Giới và chọn điểm đến!");
                     break;
 
                 case "FREE_RENT":
@@ -1099,10 +1092,9 @@ namespace Monopoly.Server.GameLogic
             ApplySpecialSquareEffectUnsafe(gameState, player, targetPosition, actionMessages, cardDrawEvents);
 
             // Update movement state so visuals and logic know where they landed
-            // LastDiceTotal must be > 0 for client to animate the move
             gameState.LastDice1 = 0;
             gameState.LastDice2 = 0;
-            gameState.LastDiceTotal = 1;
+            gameState.LastDiceTotal = 0;
             gameState.LastMovedPlayerIndex = player.PlayerIndex;
             gameState.LastMoveFromPosition = oldPosition;
             gameState.LastMoveToPosition = targetPosition;
@@ -1411,7 +1403,7 @@ namespace Monopoly.Server.GameLogic
         }
         public static string BuildRankingSummaryUnsafe(GameState gameState)
         {
-            List<GamePlayerState> rankedPlayers = GetRankedHumanPlayersUnsafe(gameState);
+            List<GamePlayerState> rankedPlayers = GetRankedPlayersUnsafe(gameState);
 
             List<string> parts = new List<string>();
 
@@ -1424,13 +1416,17 @@ namespace Monopoly.Server.GameLogic
         }
         public static List<GameOverRankingResult> BuildGameOverRankingsUnsafe(GameState gameState)
         {
-            List<GamePlayerState> rankedPlayers = GetRankedHumanPlayersUnsafe(gameState);
+            List<GamePlayerState> rankedPlayers = GetRankedPlayersUnsafe(gameState);
 
             List<GameOverRankingResult> rankings = new List<GameOverRankingResult>();
 
             for (int i = 0; i < rankedPlayers.Count; i++)
             {
                 GamePlayerState player = rankedPlayers[i];
+                
+                // BO QUA BOT - Khong gui len Database
+                if (player.IsBot) continue;
+                
                 ClientConnection playerConnection = ServerState.Clients.Values
                     .FirstOrDefault(c => c.Username == player.Username);
 
@@ -1440,7 +1436,7 @@ namespace Monopoly.Server.GameLogic
                         ? player.Username
                         : playerConnection.Uid,
                     DisplayName = player.Username,
-                    Rank = i + 1,
+                    Rank = i + 1, // Xep hang goc cua nguoi choi trong tran dau (duoi bot se bi Rank 2,3...)
                     ScoreEarned = GetScoreForRank(i + 1),
                     IdToken = playerConnection?.IdToken ?? ""
                 });
@@ -1449,9 +1445,9 @@ namespace Monopoly.Server.GameLogic
             return rankings;
         }
 
-        private static List<GamePlayerState> GetRankedHumanPlayersUnsafe(GameState gameState)
+        private static List<GamePlayerState> GetRankedPlayersUnsafe(GameState gameState)
         {
-            IEnumerable<GamePlayerState> players = gameState.Players.Where(p => !p.IsBot);
+            IEnumerable<GamePlayerState> players = gameState.Players;
 
             if (gameState.EndReason == "TIMEOUT")
             {
@@ -1561,7 +1557,7 @@ namespace Monopoly.Server.GameLogic
                 {
                     Username = player.Username,
                     IsBot = player.IsBot,
-                    Personality = player.IsBot ? (BotPersonality)ServerState.Random.Next(0, 3) : BotPersonality.Balanced,
+                    Personality = player.IsBot ? (player.Personality ?? (BotPersonality)ServerState.Random.Next(0, 3)) : BotPersonality.Balanced,
                     PlayerIndex = player.PlayerIndex,
                     Position = 0,
                     AvatarId = string.IsNullOrWhiteSpace(player.AvatarId) ? "avatar_1" : player.AvatarId,
@@ -1632,7 +1628,6 @@ namespace Monopoly.Server.GameLogic
                 return;
 
             List<GamePlayerState> ranked = gameState.Players
-                .Where(p => !p.IsBot)
                 .OrderByDescending(p => GetPlayerNetWorthUnsafe(gameState, p))
                 .ThenByDescending(p => p.Money)
                 .ThenBy(p => p.IsBankrupt ? 1 : 0)

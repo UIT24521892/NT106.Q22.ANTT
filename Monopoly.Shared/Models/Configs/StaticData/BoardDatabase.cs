@@ -1,4 +1,4 @@
-﻿using Monopoly.Shared.Models.Configs.Models;
+using Monopoly.Shared.Models.Configs.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,8 +38,8 @@ namespace Monopoly.Shared.Models.Configs.StaticData
                 BuyPrice = 200000, RentPrices = new List<long> { 50000 }
             }},
             { 7, new BoardSquareConfig {
-                PositionIndex = 7, Name = "Nice", Type = "Resort", LineIndex = "1",
-                BuyPrice = 200000, RentPrices = new List<long> { 50000 } // Resort fixed theo logic entity.md
+                PositionIndex = 7, Name = "Nice", Type = "City", ColorSet = "Yellow", LineIndex = "1",
+                BuyPrice = 120000, RentPrices = new List<long> { 8000, 40000, 120000, 360000, 700000 }
             }},
             { 8, new BoardSquareConfig {
                 PositionIndex = 8, Name = "Du Lịch Thế Giới", Type = "WorldTour", LineIndex = "2"

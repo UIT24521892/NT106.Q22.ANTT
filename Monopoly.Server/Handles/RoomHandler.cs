@@ -93,17 +93,19 @@ namespace Monopoly.Server.Handles
                 });
 
                 for (int i = 0; i < botCount && room.Players.Count < maxPlayers; i++)
-                {
-                    room.Players.Add(new RoomPlayer
-                    {
-                        Username = $"Bot {i + 1}",
-                        IsReady = true,
-                        IsHost = false,
-                        IsBot = true,
-                        PlayerIndex = room.Players.Count,
-                        AvatarId = "avatar_4"
-                    });
-                }
+                  {
+                      var personality = (BotPersonality)ServerState.Random.Next(0, 3);
+                      room.Players.Add(new RoomPlayer
+                      {
+                          Username = $"Bot {personality}",
+                          IsReady = true,
+                          IsHost = false,
+                          IsBot = true,
+                          PlayerIndex = room.Players.Count,
+                          AvatarId = "avatar_4",
+                          Personality = personality
+                      });
+                  }
 
                 ServerState.Rooms[roomId] = room;
             }
